@@ -94,10 +94,54 @@ def test_late_arrivals() -> None:
     assert build_excel_bytes(settings, players, courts, rounds, diagnostics).startswith(b"PK")
 
 
+
+def test_level_mix_control() -> None:
+    players = [
+        *(Player(f"Sterk {index}", 5) for index in range(1, 5)),
+        *(Player(f"Midden {index}", 3) for index in range(1, 5)),
+        *(Player(f"Lager {index}", 2) for index in range(1, 5)),
+    ]
+    courts = ["Baan 1", "Baan 2", "Baan 3"]
+
+    strict_settings = PlannerSettings(
+        start_time=time(20, 0),
+        end_time=time(20, 20),
+        match_minutes=20,
+        search_restarts=6,
+        beam_width=14,
+        candidates_per_state=80,
+        level_mix=0,
+    )
+    mixed_settings = PlannerSettings(
+        start_time=time(20, 0),
+        end_time=time(20, 20),
+        match_minutes=20,
+        search_restarts=6,
+        beam_width=14,
+        candidates_per_state=80,
+        level_mix=100,
+    )
+
+    strict_rounds, _ = generate_schedule(players, courts, strict_settings)
+    mixed_rounds, mixed_diagnostics = generate_schedule(players, courts, mixed_settings)
+    ranks = {player.name: player.ranking for player in players}
+
+    def mixed_courts(rounds) -> int:
+        return sum(
+            len({ranks[name] for name in (*match.team1, *match.team2)}) > 1
+            for round_plan in rounds
+            for match in round_plan.matches
+        )
+
+    assert mixed_courts(mixed_rounds) > mixed_courts(strict_rounds)
+    assert mixed_diagnostics["level_mix"] == 100
+
+
 def main() -> None:
     test_standard_schedule()
     test_late_arrivals()
-    print("Rooktests geslaagd, inclusief late aankomst.")
+    test_level_mix_control()
+    print("Rooktests geslaagd, inclusief late aankomst en niveaumix.")
 
 
 if __name__ == "__main__":
