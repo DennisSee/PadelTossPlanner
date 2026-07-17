@@ -306,12 +306,23 @@ class SupabaseStore:
         user_id: str,
         is_admin: bool,
     ) -> list[dict[str, Any]]:
-        query = self.admin.table("schedules").select(
-            "id,title,event_date,created_by,created_by_name,is_published,created_at"
+        """Geef alle clubschema's terug aan iedere ingelogde planner.
+
+        ``user_id`` en ``is_admin`` blijven onderdeel van de signatuur zodat oudere
+        aanroepen compatibel blijven. Wijzigingen aan een schema worden afzonderlijk
+        beveiligd in ``set_schedule_published``: alleen de maker of een beheerder mag
+        de publicatiestatus aanpassen.
+        """
+        del user_id, is_admin
+        response = (
+            self.admin.table("schedules")
+            .select(
+                "id,title,event_date,created_by,created_by_name,is_published,created_at"
+            )
+            .order("event_date", desc=True)
+            .order("created_at", desc=True)
+            .execute()
         )
-        if not is_admin:
-            query = query.eq("created_by", user_id)
-        response = query.order("event_date", desc=True).order("created_at", desc=True).execute()
         return _response_data(response)
 
     def get_schedule(self, schedule_id: str) -> dict[str, Any] | None:
