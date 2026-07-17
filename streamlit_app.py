@@ -67,7 +67,7 @@ st.set_page_config(
     page_title="TOS Padelplanner",
     page_icon="🎾",
     layout="wide",
-    initial_sidebar_state="auto",
+    initial_sidebar_state="collapsed",
 )
 
 
@@ -769,8 +769,8 @@ def _current_user() -> AuthenticatedUser | None:
 def _render_login(store: SupabaseStore) -> None:
     user = _current_user()
     with st.sidebar:
-        st.header("Account")
         if user:
+            st.header("Account")
             st.write(f"Ingelogd als **{user.display_name}**")
             st.caption("Beheerder" if user.is_admin else "Planner")
             if st.button("Uitloggen", width="stretch"):
@@ -778,23 +778,38 @@ def _render_login(store: SupabaseStore) -> None:
                 st.rerun()
             return
 
-        with st.form("login_form"):
-            email = st.text_input("E-mailadres")
-            password = st.text_input("Wachtwoord", type="password")
-            submitted = st.form_submit_button("Inloggen", width="stretch")
-        if submitted:
-            try:
-                st.session_state["auth_user"] = store.sign_in(email, password)
-                st.session_state.pop("planner_result", None)
-                # Na een succesvolle login direct naar de planner navigeren. Zonder dit
-                # blijft de openbare pagina zichtbaar en lijkt het alsof de knop niets deed.
-                st.session_state["navigation_page"] = "Planner"
-                st.session_state["login_success"] = True
-                st.rerun()
-            except AuthenticationError as exc:
-                st.error(str(exc))
-            except Exception:
-                st.error("Inloggen is tijdelijk niet gelukt.")
+        # Houd het openbare scherm rustig: de zijbalk start ingeklapt en de
+        # inlogvelden staan daarbinnen nog achter een compacte uitklapper.
+        login_error = st.session_state.pop("login_error", None)
+        with st.expander(
+            "Inloggen als planner",
+            expanded=bool(login_error),
+            icon="🔐",
+        ):
+            if login_error:
+                st.error(str(login_error))
+
+            with st.form("login_form"):
+                email = st.text_input("E-mailadres")
+                password = st.text_input("Wachtwoord", type="password")
+                submitted = st.form_submit_button("Inloggen", width="stretch")
+
+            if submitted:
+                try:
+                    st.session_state["auth_user"] = store.sign_in(email, password)
+                    st.session_state.pop("planner_result", None)
+                    # Na een succesvolle login direct naar de planner navigeren.
+                    st.session_state["navigation_page"] = "Planner"
+                    st.session_state["login_success"] = True
+                    st.rerun()
+                except AuthenticationError as exc:
+                    st.session_state["login_error"] = str(exc)
+                    st.rerun()
+                except Exception:
+                    st.session_state["login_error"] = (
+                        "Inloggen is tijdelijk niet gelukt."
+                    )
+                    st.rerun()
 
 
 def _render_public_page(store: SupabaseStore) -> None:
