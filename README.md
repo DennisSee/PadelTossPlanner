@@ -252,3 +252,19 @@ De vanaf-tijden worden als onderdeel van de gedeelde invoer opgeslagen in `club_
 Daarvoor is geen nieuwe Supabase-migratie nodig, omdat de spelerslijst als JSON wordt
 opgeslagen. Vervang alleen `streamlit_app.py`, `planner.py`, `excel_export.py` en
 `test_planner.py`.
+
+## Update: instelbare variatie in niveaus
+
+Onder **Geavanceerde instellingen** staat nu de schuif **Variatie in niveaus**:
+
+- `0`: spelers worden zoveel mogelijk met vergelijkbare niveaus op dezelfde baan gezet;
+- `50`: gebalanceerde mix;
+- `100`: de planner probeert bewust meer verschillende niveaus op dezelfde baan te zetten.
+
+Ook bij een hoge waarde blijft de gemiddelde teamsterkte de belangrijkste voorwaarde. Een
+indeling zoals niveau `5 + 3` tegen `5 + 3` krijgt dus de voorkeur boven een eenzijdige
+wedstrijd. Zeer grote combinaties zoals `5 + 1` blijven extra strafpunten krijgen.
+
+De instelling wordt samen met de gedeelde invoer in `club_drafts` opgeslagen. Er is geen
+nieuwe Supabase-migratie nodig. Voor een bestaande installatie hoeven alleen
+`streamlit_app.py`, `planner.py` en `excel_export.py` te worden vervangen.
