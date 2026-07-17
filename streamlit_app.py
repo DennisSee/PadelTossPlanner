@@ -64,7 +64,7 @@ PRIVATE_LEVEL_COLUMNS = ["Niveau T1", "Niveau T2", "Teamverschil"]
 
 
 st.set_page_config(
-    page_title="TC Zuid TOS",
+    page_title="TC Zuid TOS Avond",
     page_icon="🎾",
     layout="wide",
     initial_sidebar_state="collapsed",
@@ -85,7 +85,7 @@ def _inject_responsive_styles() -> None:
 
         .block-container {
             max-width: 1180px;
-            padding-top: 1.1rem;
+            padding-top: 4.75rem !important;
             padding-bottom: 2.5rem;
         }
 
@@ -258,7 +258,7 @@ def _inject_responsive_styles() -> None:
 
         @media (max-width: 700px) {
             .block-container {
-                padding: 2.15rem 0.72rem 2.25rem;
+                padding: 5.5rem 0.72rem 2.25rem !important;
             }
 
             h1 {
