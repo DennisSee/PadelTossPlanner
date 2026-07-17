@@ -585,6 +585,7 @@ def _generate_cached(
     match_minutes: int,
     search_profile: str,
     level_mix: int,
+    team_difference_tolerance: float,
     allow_repeat_partners: bool,
 ) -> dict[str, object]:
     """Voer dezelfde berekening niet opnieuw uit bij identieke invoer."""
@@ -603,6 +604,7 @@ def _generate_cached(
         match_minutes=match_minutes,
         allow_repeat_partners=allow_repeat_partners,
         level_mix=level_mix,
+        team_difference_tolerance=team_difference_tolerance,
         **profile,
     )
     rounds, diagnostics = generate_schedule(players, list(courts), settings)
@@ -1041,6 +1043,7 @@ def _draft_payload(
     edited_players: pd.DataFrame,
     search_profile: str,
     level_mix: int,
+    team_difference_tolerance: float,
     allow_repeat_partners: bool,
 ) -> dict[str, object]:
     return {
@@ -1053,6 +1056,7 @@ def _draft_payload(
         "players": _serialize_editor_rows(edited_players),
         "search_profile": search_profile,
         "level_mix": int(level_mix),
+        "team_difference_tolerance": float(team_difference_tolerance),
         "allow_repeat_partners": bool(allow_repeat_partners),
     }
 
@@ -1073,9 +1077,9 @@ def _render_private_result(store: SupabaseStore, user: AuthenticatedUser) -> Non
     metric3.metric("Rusters per ronde", diagnostics["rest_count"])
     metric4.metric("Onbenutte tijd", f"{diagnostics['unused_minutes']} min")
     st.caption(
-        f"Niveaumix: **{int(diagnostics.get('level_mix', 50))}/100** — "
-        "hogere waarden geven meer variatie op dezelfde baan, terwijl de teams "
-        "qua gemiddelde sterkte in balans blijven."
+        f"Niveaumix: **{int(diagnostics.get('level_mix', 50))}/100** · "
+        f"toegestaan teamverschil: **{float(diagnostics.get('team_difference_tolerance', 0.5)):.1f}** — "
+        "binnen deze marge geldt een wedstrijd als voldoende in balans."
     )
     late_players = diagnostics.get("late_players")
     if isinstance(late_players, list) and late_players:
@@ -1204,6 +1208,13 @@ def _render_planner_page(store: SupabaseStore, user: AuthenticatedUser) -> None:
     except (TypeError, ValueError):
         default_level_mix = 50
     default_level_mix = max(0, min(100, default_level_mix))
+    try:
+        default_team_tolerance = float(draft.get("team_difference_tolerance", 0.5))
+    except (TypeError, ValueError):
+        default_team_tolerance = 0.5
+    default_team_tolerance = max(0.0, min(1.5, default_team_tolerance))
+    # Zorg dat oudere of handmatig opgeslagen waarden netjes op een halve stap landen.
+    default_team_tolerance = round(default_team_tolerance * 2) / 2
     default_repeat = bool(draft.get("allow_repeat_partners", False))
     draft_players = _players_dataframe(draft.get("players"))
 
@@ -1294,6 +1305,22 @@ def _render_planner_page(store: SupabaseStore, user: AuthenticatedUser) -> None:
                 "0 = niveaus bij elkaar · 50 = gebalanceerde mix · "
                 "100 = veel niveauvariatie"
             )
+            team_difference_tolerance = st.slider(
+                "Tolerantie voor teamverschil",
+                min_value=0.0,
+                max_value=1.5,
+                value=default_team_tolerance,
+                step=0.5,
+                help=(
+                    "Verschillen in gemiddelde teamsterkte tot en met deze waarde "
+                    "krijgen geen strafpunten. Bij 0,5 zijn bijvoorbeeld 4,0 tegen "
+                    "4,5 en 3,0 tegen 3,5 gewoon acceptabel. 0,0 is zeer strikt; "
+                    "1,0 of 1,5 geeft duidelijk meer vrijheid."
+                ),
+            )
+            st.caption(
+                "Aanbevolen: 0,5 · 0,0 = exact gelijk · 1,0–1,5 = losser"
+            )
             allow_repeat_partners = st.checkbox(
                 "Dubbele partners toestaan wanneer nodig",
                 value=default_repeat,
@@ -1318,6 +1345,7 @@ def _render_planner_page(store: SupabaseStore, user: AuthenticatedUser) -> None:
             edited_players,
             search_profile,
             level_mix,
+            team_difference_tolerance,
             allow_repeat_partners,
         )
         try:
@@ -1375,6 +1403,7 @@ def _render_planner_page(store: SupabaseStore, user: AuthenticatedUser) -> None:
                     match_minutes=match_minutes,
                     search_profile=search_profile,
                     level_mix=level_mix,
+                    team_difference_tolerance=team_difference_tolerance,
                     allow_repeat_partners=allow_repeat_partners,
                 )
             st.session_state["planner_result"] = {
