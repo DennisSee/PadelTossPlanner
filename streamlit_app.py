@@ -115,17 +115,36 @@ def _generate_cached(
     }
 
 
-def _parse_time(value: Any, fallback: time) -> time:
-    if isinstance(value, time):
-        return value
+def _time_from_value(value: Any) -> time:
+    """Converteer Streamlit-, pandas- en ISO-tijdwaarden naar datetime.time.
+
+    Streamlit kan een waarde uit een TimeColumn bijvoorbeeld teruggeven als
+    ``21:00:00.000``. ``time.fromisoformat`` ondersteunt zowel HH:MM,
+    HH:MM:SS als fracties van seconden.
+    """
     if isinstance(value, datetime):
-        return value.time()
-    for pattern in ("%H:%M", "%H:%M:%S"):
-        try:
-            return datetime.strptime(str(value), pattern).time()
-        except (TypeError, ValueError):
-            continue
-    return fallback
+        return value.time().replace(tzinfo=None)
+    if isinstance(value, time):
+        return value.replace(tzinfo=None)
+
+    text = str(value).strip()
+    try:
+        return time.fromisoformat(text).replace(tzinfo=None)
+    except ValueError:
+        pass
+
+    # Sommige pandas-/Excelwaarden bevatten ook een datumdeel.
+    try:
+        return datetime.fromisoformat(text).time().replace(tzinfo=None)
+    except ValueError as exc:
+        raise ValueError(f"Ongeldige tijd: {text}.") from exc
+
+
+def _parse_time(value: Any, fallback: time) -> time:
+    try:
+        return _time_from_value(value)
+    except (TypeError, ValueError):
+        return fallback
 
 
 def _parse_optional_time(value: Any) -> time | None:
@@ -136,19 +155,15 @@ def _parse_optional_time(value: Any) -> time | None:
             return None
     except (TypeError, ValueError):
         pass
-    if isinstance(value, time):
-        return value
-    if isinstance(value, datetime):
-        return value.time()
+
     text = str(value).strip()
     if not text or text.casefold() in {"none", "nat", "nan", "vanaf start"}:
         return None
-    for pattern in ("%H:%M", "%H:%M:%S"):
-        try:
-            return datetime.strptime(text, pattern).time()
-        except ValueError:
-            continue
-    raise ValueError(f"Ongeldige vanaf-tijd: {text}.")
+
+    try:
+        return _time_from_value(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"Ongeldige vanaf-tijd: {text}.") from exc
 
 
 def _parse_date(value: Any, fallback: date) -> date:
