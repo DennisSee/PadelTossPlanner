@@ -11,7 +11,8 @@ Een bezoeker ziet alleen:
 - de naam en datum van de padelavond;
 - de deelnemersnamen;
 - het wedstrijdschema;
-- de baan- en rustindeling.
+- de baan- en rustindeling;
+- welke spelers in vroege rondes nog niet aanwezig zijn.
 
 Rankings, gemiddelde teamniveaus en spelersstatistieken worden niet openbaar getoond.
 
@@ -20,8 +21,8 @@ Rankings, gemiddelde teamniveaus en spelersstatistieken worden niet openbaar get
 Een planner kan:
 
 - inloggen met e-mailadres en wachtwoord;
-- de persoonlijke spelerslijst en instellingen opslaan;
-- dezelfde invoer op desktop en telefoon terugvinden;
+- de gedeelde spelerslijst en instellingen opslaan;
+- dezelfde clubinvoer op desktop en telefoon terugvinden;
 - schema's genereren en als Excel downloaden;
 - schema's privé opslaan of openbaar publiceren;
 - eigen opgeslagen schema's bekijken.
@@ -69,7 +70,8 @@ De Supabase secret/service key staat uitsluitend in Streamlit Secrets en nooit i
 Hiermee worden aangemaakt:
 
 - `profiles` voor rollen en accountstatus;
-- `planner_drafts` voor de persoonlijke spelerslijst en instellingen;
+- `planner_drafts` voor oudere persoonlijke concepten;
+- `club_drafts` voor de gedeelde spelerslijst en instellingen;
 - `schedules` voor opgeslagen en gepubliceerde schema's.
 
 Row Level Security wordt ingeschakeld. De tabellen hebben geen directe rechten voor anonieme of normale Supabase-clients; de Streamlit-server handelt de toegang af.
@@ -218,3 +220,35 @@ De eerste versie bevat nog geen:
 - meerdere clubs of afzonderlijke clubomgevingen;
 - verwijderknop voor opgeslagen schema's;
 - permanente login-cookie na een volledig vernieuwde browsersessie.
+
+## Update: gedeelde spelerslijst en persoonlijk openbaar schema
+
+Voor een bestaande installatie voer je één keer `supabase_migration_shared_draft.sql`
+uit via **Supabase > SQL Editor**. Daarna delen alle planners dezelfde laatst opgeslagen
+invoer. De plannerpagina toont wie de lijst het laatst heeft opgeslagen en bevat een knop
+om de nieuwste versie opnieuw te laden.
+
+Op de openbare pagina kan een deelnemer zijn of haar naam kiezen. De tabel toont dan per
+ronde alleen de eigen wedstrijd of één duidelijke rustregel. Rankings en niveauwaarden
+blijven verborgen.
+
+## Update: optionele vanaf-tijd per speler
+
+De spelerseditor bevat de optionele kolom **Vanaf tijd**. Laat deze leeg wanneer een
+speler vanaf de start aanwezig is. Bij bijvoorbeeld `21:00` wordt de speler ingepland
+vanaf de eerste wedstrijdronde die om of na 21:00 begint.
+
+Belangrijk gedrag:
+
+- vóór de vanaf-tijd staat de speler als **Nog niet aanwezig** in het schema;
+- deze verplichte afwezigheid telt niet als een normale rustbeurt;
+- de regel dat iemand niet twee echte rustbeurten achter elkaar krijgt blijft gelden;
+- na aankomst verdeelt de planner de resterende wedstrijden zo eerlijk mogelijk op basis
+  van het aantal rondes waarin iedere speler beschikbaar is;
+- rankings en niveaus blijven verborgen op de openbare pagina;
+- de persoonlijke naamfilter toont ook de status **Nog niet aanwezig**.
+
+De vanaf-tijden worden als onderdeel van de gedeelde invoer opgeslagen in `club_drafts`.
+Daarvoor is geen nieuwe Supabase-migratie nodig, omdat de spelerslijst als JSON wordt
+opgeslagen. Vervang alleen `streamlit_app.py`, `planner.py`, `excel_export.py` en
+`test_planner.py`.
