@@ -220,8 +220,42 @@ class SupabaseStore:
         )
 
     # ------------------------------------------------------------------
-    # Persoonlijke plannerinvoer
+    # Gedeelde clubinvoer
     # ------------------------------------------------------------------
+    def load_club_draft(self) -> dict[str, Any] | None:
+        """Laad de gedeelde invoer die voor alle planners hetzelfde is."""
+        response = (
+            self.admin.table("club_drafts")
+            .select("*")
+            .eq("id", "club")
+            .limit(1)
+            .execute()
+        )
+        rows = _response_data(response)
+        return rows[0] if rows else None
+
+    def save_club_draft(
+        self,
+        user_id: str,
+        display_name: str,
+        payload: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        """Sla de invoer centraal op; de laatst opgeslagen versie is leidend."""
+        record = {
+            "id": "club",
+            **dict(payload),
+            "updated_by": user_id,
+            "updated_by_name": display_name,
+        }
+        response = (
+            self.admin.table("club_drafts")
+            .upsert(record, on_conflict="id")
+            .execute()
+        )
+        rows = _response_data(response)
+        return rows[0] if rows else record
+
+    # Oude persoonlijke concepten blijven beschikbaar voor compatibiliteit.
     def load_draft(self, user_id: str) -> dict[str, Any] | None:
         response = (
             self.admin.table("planner_drafts")
