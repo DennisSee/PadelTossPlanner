@@ -1,8 +1,12 @@
-__pycache__/
-*.py[cod]
-.venv/
-venv/
-.env
-.DS_Store
-.vscode/
-.idea/
+# Kopieer lokaal naar .streamlit/secrets.toml.
+# In Streamlit Community Cloud plak je dit onder App settings > Secrets.
+# Commit secrets.toml zelf NOOIT naar GitHub.
+
+[supabase]
+url = "https://JOUW-PROJECT.supabase.co"
+publishable_key = "sb_publishable_..."
+secret_key = "sb_secret_..."
+
+# Oudere Supabase-projecten kunnen deze namen gebruiken:
+# anon_key = "eyJ..."
+# service_role_key = "eyJ..."
