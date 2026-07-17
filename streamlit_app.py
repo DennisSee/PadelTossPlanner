@@ -35,16 +35,16 @@ COURTS = [
 
 DEFAULT_PLAYERS = pd.DataFrame(
     [
-        {"Naam": "Dennis", "Ranking": 4, "Meedoen": True},
-        {"Naam": "Marieke", "Ranking": 3, "Meedoen": True},
-        {"Naam": "Peter", "Ranking": 5, "Meedoen": True},
-        {"Naam": "Anita", "Ranking": 2, "Meedoen": True},
-        {"Naam": "Bjorn", "Ranking": 3, "Meedoen": True},
-        {"Naam": "Jeroen", "Ranking": 4, "Meedoen": True},
-        {"Naam": "Jim", "Ranking": 2, "Meedoen": True},
-        {"Naam": "Frans", "Ranking": 3, "Meedoen": True},
-        {"Naam": "Trever", "Ranking": 5, "Meedoen": True},
-        {"Naam": "Niels", "Ranking": 3, "Meedoen": True},
+        {"Naam": "Dennis", "Ranking": 4, "Meedoen": True, "Vanaf tijd": None},
+        {"Naam": "Marieke", "Ranking": 3, "Meedoen": True, "Vanaf tijd": None},
+        {"Naam": "Peter", "Ranking": 5, "Meedoen": True, "Vanaf tijd": None},
+        {"Naam": "Anita", "Ranking": 2, "Meedoen": True, "Vanaf tijd": None},
+        {"Naam": "Bjorn", "Ranking": 3, "Meedoen": True, "Vanaf tijd": None},
+        {"Naam": "Jeroen", "Ranking": 4, "Meedoen": True, "Vanaf tijd": None},
+        {"Naam": "Jim", "Ranking": 2, "Meedoen": True, "Vanaf tijd": None},
+        {"Naam": "Frans", "Ranking": 3, "Meedoen": True, "Vanaf tijd": None},
+        {"Naam": "Trever", "Ranking": 5, "Meedoen": True, "Vanaf tijd": None},
+        {"Naam": "Niels", "Ranking": 3, "Meedoen": True, "Vanaf tijd": None},
     ]
 )
 
@@ -58,7 +58,7 @@ SEARCH_PROFILES = {
     },
 }
 
-PUBLIC_COLUMNS = ["Ronde", "Tijd", "Baan", "Team 1", "Team 2", "Rust"]
+PUBLIC_COLUMNS = ["Ronde", "Tijd", "Baan", "Team 1", "Team 2", "Rust", "Nog niet aanwezig"]
 PRIVATE_LEVEL_COLUMNS = ["Niveau T1", "Niveau T2", "Teamverschil"]
 
 
@@ -76,7 +76,7 @@ def _get_store(config: SupabaseConfig) -> SupabaseStore:
 
 @st.cache_data(show_spinner=False)
 def _generate_cached(
-    player_records: tuple[tuple[str, float], ...],
+    player_records: tuple[tuple[str, float, str], ...],
     courts: tuple[str, ...],
     start_hour: int,
     start_minute: int,
@@ -87,7 +87,14 @@ def _generate_cached(
     allow_repeat_partners: bool,
 ) -> dict[str, object]:
     """Voer dezelfde berekening niet opnieuw uit bij identieke invoer."""
-    players = [Player(name=name, ranking=ranking) for name, ranking in player_records]
+    players = [
+        Player(
+            name=name,
+            ranking=ranking,
+            available_from=_parse_optional_time(available_from),
+        )
+        for name, ranking, available_from in player_records
+    ]
     profile = SEARCH_PROFILES[search_profile]
     settings = PlannerSettings(
         start_time=time(start_hour, start_minute),
@@ -109,11 +116,39 @@ def _generate_cached(
 
 
 def _parse_time(value: Any, fallback: time) -> time:
+    if isinstance(value, time):
+        return value
+    if isinstance(value, datetime):
+        return value.time()
+    for pattern in ("%H:%M", "%H:%M:%S"):
+        try:
+            return datetime.strptime(str(value), pattern).time()
+        except (TypeError, ValueError):
+            continue
+    return fallback
+
+
+def _parse_optional_time(value: Any) -> time | None:
+    if value is None or value is pd.NaT:
+        return None
     try:
-        parsed = datetime.strptime(str(value), "%H:%M")
-        return parsed.time()
+        if pd.isna(value):
+            return None
     except (TypeError, ValueError):
-        return fallback
+        pass
+    if isinstance(value, time):
+        return value
+    if isinstance(value, datetime):
+        return value.time()
+    text = str(value).strip()
+    if not text or text.casefold() in {"none", "nat", "nan", "vanaf start"}:
+        return None
+    for pattern in ("%H:%M", "%H:%M:%S"):
+        try:
+            return datetime.strptime(text, pattern).time()
+        except ValueError:
+            continue
+    raise ValueError(f"Ongeldige vanaf-tijd: {text}.")
 
 
 def _parse_date(value: Any, fallback: date) -> date:
@@ -127,10 +162,16 @@ def _players_dataframe(records: Any) -> pd.DataFrame:
     if not isinstance(records, list) or not records:
         return DEFAULT_PLAYERS.copy()
     frame = pd.DataFrame(records)
-    for column, default in (("Naam", ""), ("Ranking", 3), ("Meedoen", True)):
+    for column, default in (
+        ("Naam", ""),
+        ("Ranking", 3),
+        ("Meedoen", True),
+        ("Vanaf tijd", None),
+    ):
         if column not in frame.columns:
             frame[column] = default
-    return frame[["Naam", "Ranking", "Meedoen"]]
+    frame["Vanaf tijd"] = frame["Vanaf tijd"].map(_parse_optional_time)
+    return frame[["Naam", "Ranking", "Meedoen", "Vanaf tijd"]]
 
 
 def _serialize_editor_rows(data: pd.DataFrame) -> list[dict[str, object]]:
@@ -141,18 +182,22 @@ def _serialize_editor_rows(data: pd.DataFrame) -> list[dict[str, object]]:
             continue
         ranking_value = pd.to_numeric(row.get("Ranking"), errors="coerce")
         ranking = None if pd.isna(ranking_value) else int(ranking_value)
+        available_from = _parse_optional_time(row.get("Vanaf tijd"))
         rows.append(
             {
                 "Naam": name,
                 "Ranking": ranking,
                 "Meedoen": bool(row.get("Meedoen", False)),
+                "Vanaf tijd": (
+                    available_from.strftime("%H:%M") if available_from else None
+                ),
             }
         )
     return rows
 
 
 def _parse_players(data: pd.DataFrame) -> list[Player]:
-    required_columns = {"Naam", "Ranking", "Meedoen"}
+    required_columns = {"Naam", "Ranking", "Meedoen", "Vanaf tijd"}
     if not required_columns.issubset(data.columns):
         raise ValueError("De spelerstabel mist één of meer verplichte kolommen.")
 
@@ -176,14 +221,95 @@ def _parse_players(data: pd.DataFrame) -> list[Player]:
             f"Deze namen komen dubbel voor: {', '.join(sorted(set(duplicates)))}."
         )
 
-    return [
-        Player(name=row["Naam"], ranking=float(row["Ranking"]))
-        for _, row in active.iterrows()
-    ]
+    players: list[Player] = []
+    for _, row in active.iterrows():
+        players.append(
+            Player(
+                name=str(row["Naam"]),
+                ranking=float(row["Ranking"]),
+                available_from=_parse_optional_time(row.get("Vanaf tijd")),
+            )
+        )
+    return players
 
 
 def _public_schedule_rows(rows: list[dict[str, object]]) -> list[dict[str, object]]:
     return [{column: row.get(column, "") for column in PUBLIC_COLUMNS} for row in rows]
+
+
+def _cell_names(value: object, separator: str) -> set[str]:
+    text = str(value or "").strip()
+    if not text or text.casefold() == "niemand":
+        return set()
+    return {part.strip().casefold() for part in text.split(separator) if part.strip()}
+
+
+def _personal_schedule_rows(
+    rows: list[dict[str, object]],
+    player_name: str,
+) -> list[dict[str, object]]:
+    """Maak één overzichtsregel per ronde voor de gekozen speler."""
+    player_key = player_name.strip().casefold()
+    grouped: dict[tuple[object, object], list[dict[str, object]]] = {}
+    for row in rows:
+        key = (row.get("Ronde"), row.get("Tijd"))
+        grouped.setdefault(key, []).append(row)
+
+    result: list[dict[str, object]] = []
+    for (round_number, round_time), round_rows in grouped.items():
+        playing_row: dict[str, object] | None = None
+        for row in round_rows:
+            team1 = _cell_names(row.get("Team 1"), " & ")
+            team2 = _cell_names(row.get("Team 2"), " & ")
+            if player_key in team1 or player_key in team2:
+                playing_row = row
+                break
+
+        if playing_row is not None:
+            result.append(
+                {
+                    "Ronde": round_number,
+                    "Tijd": round_time,
+                    "Status": "Spelen",
+                    "Baan": playing_row.get("Baan", ""),
+                    "Team 1": playing_row.get("Team 1", ""),
+                    "Team 2": playing_row.get("Team 2", ""),
+                }
+            )
+            continue
+
+        unavailable_names = (
+            _cell_names(round_rows[0].get("Nog niet aanwezig"), ",")
+            if round_rows
+            else set()
+        )
+        if player_key in unavailable_names:
+            result.append(
+                {
+                    "Ronde": round_number,
+                    "Tijd": round_time,
+                    "Status": "Nog niet aanwezig",
+                    "Baan": "—",
+                    "Team 1": "—",
+                    "Team 2": "—",
+                }
+            )
+            continue
+
+        rest_names = _cell_names(round_rows[0].get("Rust"), ",") if round_rows else set()
+        if player_key in rest_names:
+            result.append(
+                {
+                    "Ronde": round_number,
+                    "Tijd": round_time,
+                    "Status": "Rust",
+                    "Baan": "—",
+                    "Team 1": "—",
+                    "Team 2": "—",
+                }
+            )
+
+    return result
 
 
 def _diagnostics_for_storage(diagnostics: Mapping[str, object]) -> dict[str, object]:
@@ -197,10 +323,21 @@ def _diagnostics_for_storage(diagnostics: Mapping[str, object]) -> dict[str, obj
         "score",
     ):
         result[key] = diagnostics.get(key)
-    for key in ("play_counts", "rest_counts"):
+    for key in (
+        "play_counts",
+        "rest_counts",
+        "unavailable_counts",
+        "availability_rounds",
+    ):
         counts = diagnostics.get(key)
         if isinstance(counts, dict):
             result[key] = {str(name): int(count) for name, count in counts.items()}
+    rest_by_round = diagnostics.get("rest_counts_per_round")
+    if isinstance(rest_by_round, list):
+        result["rest_counts_per_round"] = [int(value) for value in rest_by_round]
+    late_players = diagnostics.get("late_players")
+    if isinstance(late_players, list):
+        result["late_players"] = [str(name) for name in late_players]
     return result
 
 
@@ -261,15 +398,38 @@ def _render_public_page(store: SupabaseStore) -> None:
 
     st.subheader("Deelnemers")
     participants = schedule.get("participants_public") or []
-    if isinstance(participants, list):
-        st.write(" · ".join(str(name) for name in participants))
+    participant_names = (
+        sorted([str(name) for name in participants], key=str.casefold)
+        if isinstance(participants, list)
+        else []
+    )
+    if participant_names:
+        st.write(" · ".join(participant_names))
 
     st.subheader("Wedstrijdschema")
     rows = schedule.get("schedule_public") or []
     if isinstance(rows, list) and rows:
-        public_df = pd.DataFrame(rows)
-        columns = [column for column in PUBLIC_COLUMNS if column in public_df.columns]
-        st.dataframe(public_df[columns], hide_index=True, width="stretch")
+        selected_player = st.selectbox(
+            "Toon het persoonlijke schema van",
+            options=["Iedereen", *participant_names],
+            help="Kies je naam om alleen je eigen wedstrijden en rustbeurten te zien.",
+            key=f"public_player_filter_{schedule.get('id', 'latest')}",
+        )
+        if selected_player == "Iedereen":
+            public_df = pd.DataFrame(rows)
+            columns = [column for column in PUBLIC_COLUMNS if column in public_df.columns]
+            st.dataframe(public_df[columns], hide_index=True, width="stretch")
+        else:
+            personal_rows = _personal_schedule_rows(rows, selected_player)
+            st.caption(f"Persoonlijk overzicht voor **{selected_player}**")
+            if personal_rows:
+                st.dataframe(
+                    pd.DataFrame(personal_rows),
+                    hide_index=True,
+                    width="stretch",
+                )
+            else:
+                st.info("Voor deze speler zijn geen rondes gevonden.")
     else:
         st.info("Het gepubliceerde schema bevat nog geen wedstrijden.")
 
@@ -279,14 +439,23 @@ def _render_public_page(store: SupabaseStore) -> None:
         st.caption(f"Gepubliceerd door {creator or 'beheerder'} · {created_at}")
 
 
-def _load_draft(store: SupabaseStore, user: AuthenticatedUser) -> dict[str, Any]:
-    cache_key = f"draft_{user.id}"
+def _load_club_draft(store: SupabaseStore) -> dict[str, Any]:
+    cache_key = "club_draft"
     if cache_key not in st.session_state:
         try:
-            st.session_state[cache_key] = store.load_draft(user.id) or {}
-        except Exception:
+            st.session_state[cache_key] = store.load_club_draft() or {}
+        except Exception as exc:
             st.session_state[cache_key] = {}
-            st.warning("De opgeslagen invoer kon niet worden geladen; standaardwaarden worden gebruikt.")
+            if "club_drafts" in str(exc):
+                st.error(
+                    "De tabel voor gedeelde invoer ontbreekt nog. Voer eerst "
+                    "supabase_migration_shared_draft.sql uit in Supabase."
+                )
+            else:
+                st.warning(
+                    "De gedeelde invoer kon niet worden geladen; "
+                    "standaardwaarden worden gebruikt."
+                )
     draft = st.session_state[cache_key]
     return draft if isinstance(draft, dict) else {}
 
@@ -324,12 +493,18 @@ def _render_private_result(store: SupabaseStore, user: AuthenticatedUser) -> Non
     assert isinstance(diagnostics, dict)
 
     st.divider()
-    st.success("Schema gegenereerd. De invoer is ook voor je account opgeslagen.")
+    st.success("Schema gegenereerd. De gedeelde invoer is voor alle planners opgeslagen.")
     metric1, metric2, metric3, metric4 = st.columns(4)
     metric1.metric("Rondes", diagnostics["rounds"])
     metric2.metric("Banen", diagnostics["courts_used"])
     metric3.metric("Rusters per ronde", diagnostics["rest_count"])
     metric4.metric("Onbenutte tijd", f"{diagnostics['unused_minutes']} min")
+    late_players = diagnostics.get("late_players")
+    if isinstance(late_players, list) and late_players:
+        st.info(
+            "Later aanwezig: " + ", ".join(str(name) for name in late_players) + ". "
+            "Afwezigheid vóór hun vanaf-tijd telt niet als een echte rustbeurt."
+        )
 
     schema_tab, stats_tab = st.tabs(["Wedstrijdschema", "Spelerstatistiek"])
     with schema_tab:
@@ -404,11 +579,28 @@ def _render_private_result(store: SupabaseStore, user: AuthenticatedUser) -> Non
 def _render_planner_page(store: SupabaseStore, user: AuthenticatedUser) -> None:
     st.header("Nieuw schema maken")
     st.write(
-        "Je invoer wordt aan je account gekoppeld. Daardoor staat dezelfde spelerslijst "
-        "klaar wanneer je op een ander apparaat inlogt."
+        "De invoer is gedeeld met alle planners. De laatst opgeslagen spelerslijst en "
+        "instellingen worden voor iedere planner geladen."
     )
 
-    draft = _load_draft(store, user)
+    toolbar1, toolbar2 = st.columns([1, 3])
+    with toolbar1:
+        if st.button("Gedeelde invoer opnieuw laden", width="stretch"):
+            st.session_state.pop("club_draft", None)
+            st.session_state["club_draft_revision"] = (
+                int(st.session_state.get("club_draft_revision", 0)) + 1
+            )
+            st.rerun()
+
+    draft = _load_club_draft(store)
+    updated_by = str(draft.get("updated_by_name") or "")
+    updated_at = str(draft.get("updated_at") or "").replace("T", " ")[:16]
+    with toolbar2:
+        if updated_by or updated_at:
+            st.caption(
+                f"Laatst opgeslagen door {updated_by or 'een planner'}"
+                f" · {updated_at or 'tijd onbekend'}"
+            )
     default_title = str(draft.get("event_title") or "TOS Padelavond")
     default_date = _parse_date(draft.get("event_date"), date.today())
     default_start = _parse_time(draft.get("start_time"), time(20, 0))
@@ -462,7 +654,8 @@ def _render_planner_page(store: SupabaseStore, user: AuthenticatedUser) -> None:
 
         st.subheader("2. Spelers en ranking")
         st.caption(
-            "Rankings zijn alleen zichtbaar voor ingelogde planners en beheerders."
+            "Rankings zijn alleen zichtbaar voor ingelogde planners en beheerders. "
+            "Laat Vanaf tijd leeg wanneer iemand vanaf de start aanwezig is."
         )
         edited_players = st.data_editor(
             draft_players,
@@ -475,8 +668,23 @@ def _render_planner_page(store: SupabaseStore, user: AuthenticatedUser) -> None:
                     "Ranking", min_value=1, max_value=5, step=1, required=True
                 ),
                 "Meedoen": st.column_config.CheckboxColumn("Meedoen", default=True),
+                "Vanaf tijd": st.column_config.TimeColumn(
+                    "Vanaf tijd",
+                    help=(
+                        "Optioneel. De speler doet mee vanaf de eerste ronde die op of "
+                        "na deze tijd begint. Leeg betekent vanaf de starttijd."
+                    ),
+                    required=False,
+                    min_value=start_time if end_time > start_time else None,
+                    max_value=end_time if end_time > start_time else None,
+                    format="HH:mm",
+                    step=300,
+                ),
             },
-            key=f"players_editor_{user.id}",
+            key=(
+                f"players_editor_{user.id}_"
+                f"{int(st.session_state.get('club_draft_revision', 0))}"
+            ),
         )
 
         with st.expander("Geavanceerde instellingen"):
@@ -511,12 +719,18 @@ def _render_planner_page(store: SupabaseStore, user: AuthenticatedUser) -> None:
             allow_repeat_partners,
         )
         try:
-            store.save_draft(user.id, payload)
-            st.session_state[f"draft_{user.id}"] = payload
+            saved_draft = store.save_club_draft(
+                user.id,
+                user.display_name,
+                payload,
+            )
+            st.session_state["club_draft"] = saved_draft
             if save_input:
-                st.success("De spelerslijst en instellingen zijn opgeslagen.")
+                st.success(
+                    "De gedeelde spelerslijst en instellingen zijn opgeslagen voor alle planners."
+                )
         except Exception:
-            st.error("De invoer kon niet worden opgeslagen.")
+            st.error("De gedeelde invoer kon niet worden opgeslagen.")
             if save_input:
                 return
 
@@ -532,7 +746,16 @@ def _render_planner_page(store: SupabaseStore, user: AuthenticatedUser) -> None:
                     f"spelers nodig. Er doen nu {len(players)} spelers mee."
                 )
 
-            player_records = tuple((player.name, player.ranking) for player in players)
+            player_records = tuple(
+                (
+                    player.name,
+                    player.ranking,
+                    player.available_from.strftime("%H:%M")
+                    if player.available_from
+                    else "",
+                )
+                for player in players
+            )
             with st.spinner("Schema wordt berekend…"):
                 generated = _generate_cached(
                     player_records=player_records,
@@ -549,7 +772,16 @@ def _render_planner_page(store: SupabaseStore, user: AuthenticatedUser) -> None:
                 **generated,
                 "owner_id": user.id,
                 "players": [
-                    {"name": player.name, "ranking": player.ranking} for player in players
+                    {
+                        "name": player.name,
+                        "ranking": player.ranking,
+                        "available_from": (
+                            player.available_from.strftime("%H:%M")
+                            if player.available_from
+                            else None
+                        ),
+                    }
+                    for player in players
                 ],
                 "metadata": payload,
             }
