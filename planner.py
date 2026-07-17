@@ -20,6 +20,8 @@ from typing import Iterable, Sequence
 class Player:
     name: str
     ranking: float
+    # Leeg/None betekent dat de speler vanaf de starttijd aanwezig is.
+    available_from: time | None = None
 
 
 @dataclass(frozen=True)
@@ -32,7 +34,10 @@ class Match:
 @dataclass(frozen=True)
 class RoundPlan:
     matches: tuple[Match, ...]
+    # Vrijwillige rust nadat een speler aanwezig is.
     rest: tuple[str, ...]
+    # Spelers die bij de start van deze ronde nog niet aanwezig zijn.
+    unavailable: tuple[str, ...] = tuple()
 
 
 @dataclass(frozen=True)
@@ -231,19 +236,125 @@ def _candidate_matches(
     return tuple(matches), sum(match.quality_penalty for match in matches)
 
 
-def _rest_options(
+def _count_deviation_penalty(
+    counts: Counter[str],
+    targets: dict[str, float],
     names: Sequence[str],
+    weight: float,
+) -> float:
+    """Bestraf afwijkingen van de eerlijke, beschikbaarheidsafhankelijke doelen."""
+    differences = [counts[name] - targets.get(name, 0.0) for name in names]
+    if not differences:
+        return 0.0
+    squared = sum(value * value for value in differences)
+    spread = max(differences) - min(differences)
+    return weight * squared + 2.5 * spread
+
+
+def _time_offset_minutes(start_time: time, value: time) -> int:
+    """Aantal minuten vanaf starttijd, met ondersteuning voor over-middernacht."""
+    base_date = date(2000, 1, 1)
+    start_dt = datetime.combine(base_date, start_time)
+    value_dt = datetime.combine(base_date, value)
+    if value_dt < start_dt:
+        value_dt += timedelta(days=1)
+    return int((value_dt - start_dt).total_seconds() // 60)
+
+
+def _availability_context(
+    players: Sequence[Player],
+    settings: PlannerSettings,
+    round_count: int,
+) -> tuple[
+    list[tuple[str, ...]],
+    list[tuple[str, ...]],
+    dict[str, int],
+    dict[str, int],
+]:
+    """Bereken aanwezigheid per ronde.
+
+    Een speler wordt beschikbaar in de eerste ronde waarvan de starttijd gelijk aan
+    of later dan ``available_from`` is. Verplichte afwezigheid telt niet als rust.
+    """
+    names = [player.name for player in players]
+    latest_round_start = (round_count - 1) * settings.match_minutes
+    availability_offset: dict[str, int] = {}
+
+    for player in players:
+        available_time = player.available_from or settings.start_time
+        offset = _time_offset_minutes(settings.start_time, available_time)
+        if offset > latest_round_start:
+            raise ValueError(
+                f"De vanaf-tijd van {player.name} ({available_time:%H:%M}) ligt na "
+                "de start van de laatste speelronde."
+            )
+        availability_offset[player.name] = offset
+
+    available_by_round: list[tuple[str, ...]] = []
+    unavailable_by_round: list[tuple[str, ...]] = []
+    availability_rounds = {name: 0 for name in names}
+    unavailable_counts = {name: 0 for name in names}
+
+    for round_index in range(round_count):
+        round_offset = round_index * settings.match_minutes
+        available = tuple(
+            name for name in names if availability_offset[name] <= round_offset
+        )
+        available_set = set(available)
+        unavailable = tuple(name for name in names if name not in available_set)
+        available_by_round.append(available)
+        unavailable_by_round.append(unavailable)
+
+        for name in available:
+            availability_rounds[name] += 1
+        for name in unavailable:
+            unavailable_counts[name] += 1
+
+    return (
+        available_by_round,
+        unavailable_by_round,
+        availability_rounds,
+        unavailable_counts,
+    )
+
+def _build_fairness_targets(
+    available_by_round: Sequence[Sequence[str]],
+    active_slots: int,
+    names: Sequence[str],
+) -> tuple[list[dict[str, float]], list[dict[str, float]]]:
+    cumulative_play = {name: 0.0 for name in names}
+    cumulative_rest = {name: 0.0 for name in names}
+    play_targets: list[dict[str, float]] = []
+    rest_targets: list[dict[str, float]] = []
+
+    for available in available_by_round:
+        count = len(available)
+        if count:
+            play_share = active_slots / count
+            rest_share = max(0, count - active_slots) / count
+            for name in available:
+                cumulative_play[name] += play_share
+                cumulative_rest[name] += rest_share
+        play_targets.append(cumulative_play.copy())
+        rest_targets.append(cumulative_rest.copy())
+    return play_targets, rest_targets
+
+
+def _rest_options(
+    available_names: Sequence[str],
     rest_count: int,
     state: SearchState,
-    round_index: int,
-    active_slots: int,
+    all_names: Sequence[str],
+    target_play: dict[str, float],
+    target_rest: dict[str, float],
     rng: random.Random,
     limit: int,
 ) -> list[tuple[str, ...]]:
     if rest_count == 0:
         return [tuple()]
 
-    eligible = [name for name in names if name not in state.previous_rest]
+    # Alleen echte rust telt voor de regel 'niet twee rondes achter elkaar'.
+    eligible = [name for name in available_names if name not in state.previous_rest]
     if len(eligible) < rest_count:
         return []
 
@@ -257,35 +368,29 @@ def _rest_options(
             sampled.add(tuple(sorted(rng.sample(eligible, rest_count))))
         combinations = sampled
 
-    expected_plays = (round_index + 1) * active_slots / len(names)
     scored: list[tuple[float, tuple[str, ...]]] = []
     for resters in combinations:
         rest_set = set(resters)
         projected_play = state.play_counts.copy()
         projected_rest = state.rest_counts.copy()
-        for name in names:
+        for name in available_names:
             if name in rest_set:
                 projected_rest[name] += 1
             else:
                 projected_play[name] += 1
 
-        target_deviation = sum(abs(projected_play[name] - expected_plays) for name in names)
         score = (
-            _fairness_penalty(projected_play, names, 8.0)
-            + _fairness_penalty(projected_rest, names, 6.0)
-            + 1.5 * target_deviation
+            _count_deviation_penalty(projected_play, target_play, all_names, 11.0)
+            + _count_deviation_penalty(projected_rest, target_rest, all_names, 8.0)
             + rng.random() * 0.5
         )
         scored.append((score, tuple(sorted(resters))))
 
     scored.sort(key=lambda item: item[0])
     best = [resters for _, resters in scored[:limit]]
-
-    # Voeg één iets minder voor de hand liggende optie toe om de zoekboom divers te houden.
     if len(scored) > limit and limit > 1:
         pool_end = min(len(scored), max(limit + 1, limit * 4))
-        alternative = rng.choice(scored[limit:pool_end])[1]
-        best[-1] = alternative
+        best[-1] = rng.choice(scored[limit:pool_end])[1]
     return best
 
 
@@ -293,7 +398,11 @@ def _extend_state(
     state: SearchState,
     matches: tuple[Match, ...],
     resters: tuple[str, ...],
-    names: Sequence[str],
+    unavailable: tuple[str, ...],
+    available_names: Sequence[str],
+    all_names: Sequence[str],
+    target_play: dict[str, float],
+    target_rest: dict[str, float],
     arrangement_score: float,
 ) -> SearchState:
     new_state = SearchState(
@@ -305,10 +414,12 @@ def _extend_state(
         previous_rest=frozenset(resters),
         score=state.score + arrangement_score,
     )
-    new_state.rounds.append(RoundPlan(matches=matches, rest=resters))
+    new_state.rounds.append(
+        RoundPlan(matches=matches, rest=resters, unavailable=unavailable)
+    )
 
     rest_set = set(resters)
-    for name in names:
+    for name in available_names:
         if name in rest_set:
             new_state.rest_counts[name] += 1
         else:
@@ -321,8 +432,12 @@ def _extend_state(
             for player2 in match.team2:
                 new_state.opponent_counts[pair_key(player1, player2)] += 1
 
-    new_state.score += _fairness_penalty(new_state.play_counts, names, 2.5)
-    new_state.score += _fairness_penalty(new_state.rest_counts, names, 2.0)
+    new_state.score += _count_deviation_penalty(
+        new_state.play_counts, target_play, all_names, 3.5
+    )
+    new_state.score += _count_deviation_penalty(
+        new_state.rest_counts, target_rest, all_names, 2.5
+    )
     return new_state
 
 
@@ -330,21 +445,21 @@ def _state_signature(state: SearchState, names: Sequence[str]) -> tuple[object, 
     return (
         tuple(sorted(state.partner_counts.items())),
         tuple(state.play_counts[name] for name in names),
+        tuple(state.rest_counts[name] for name in names),
         tuple(sorted(state.previous_rest)),
     )
 
 
-def _final_score(state: SearchState, names: Sequence[str]) -> float:
-    play_values = [state.play_counts[name] for name in names]
-    rest_values = [state.rest_counts[name] for name in names]
-    play_spread = max(play_values) - min(play_values)
-    rest_spread = max(rest_values) - min(rest_values)
+def _final_score(
+    state: SearchState,
+    names: Sequence[str],
+    target_play: dict[str, float],
+    target_rest: dict[str, float],
+) -> float:
     return (
         state.score
-        + _fairness_penalty(state.play_counts, names, 25.0)
-        + _fairness_penalty(state.rest_counts, names, 18.0)
-        + 1500.0 * max(0, play_spread - 1)
-        + 1000.0 * max(0, rest_spread - 1)
+        + _count_deviation_penalty(state.play_counts, target_play, names, 30.0)
+        + _count_deviation_penalty(state.rest_counts, target_rest, names, 22.0)
     )
 
 
@@ -353,7 +468,7 @@ def generate_schedule(
     courts: Sequence[str],
     settings: PlannerSettings,
 ) -> tuple[list[RoundPlan], dict[str, object]]:
-    """Genereer een schema voor precies de geselecteerde banen."""
+    """Genereer een schema met optionele aankomsttijden per speler."""
     if len(players) < 4:
         raise ValueError("Minimaal vier spelers zijn nodig.")
     if not courts:
@@ -376,20 +491,39 @@ def generate_schedule(
 
     ranks = {player.name: float(player.ranking) for player in players}
     rounds, unused_minutes = calculate_rounds(settings)
-    rest_count = len(players) - active_slots
+    (
+        available_by_round,
+        unavailable_by_round,
+        availability_rounds,
+        unavailable_counts,
+    ) = _availability_context(players, settings, rounds)
 
-    if rounds > 1 and rest_count > active_slots:
-        raise ValueError(
-            "De regel 'niemand twee rondes achter elkaar rust' is met deze verhouding "
-            "tussen spelers en banen niet mogelijk. Selecteer meer banen of gebruik minder spelers."
-        )
+    for round_index, available in enumerate(available_by_round):
+        if len(available) < active_slots:
+            start, _ = round_times(settings, round_index)
+            shortage = active_slots - len(available)
+            raise ValueError(
+                f"Om {start:%H:%M} zijn slechts {len(available)} spelers aanwezig, "
+                f"maar voor {len(courts)} banen zijn er {active_slots} nodig. "
+                f"Er ontbreken {shortage} speler(s). Pas een vanaf-tijd aan of selecteer minder banen."
+            )
 
-    minimum_games = (rounds * active_slots) // len(players)
-    if not settings.allow_repeat_partners and minimum_games > len(players) - 1:
-        raise ValueError(
-            "Het aantal rondes is niet mogelijk zonder dubbele partners. "
-            "Verkort de avond of sta dubbele partners toe."
-        )
+    play_targets, rest_targets = _build_fairness_targets(
+        available_by_round, active_slots, names
+    )
+    rest_counts_per_round = [len(available) - active_slots for available in available_by_round]
+
+    # Een snelle haalbaarheidscontrole voor de regel zonder opeenvolgende echte rust.
+    for round_index in range(1, rounds):
+        previous_rest = rest_counts_per_round[round_index - 1]
+        current_rest = rest_counts_per_round[round_index]
+        available_count = len(available_by_round[round_index])
+        if previous_rest + current_rest > available_count:
+            start, _ = round_times(settings, round_index)
+            raise ValueError(
+                f"Rond {start:%H:%M} kan de regel 'niet twee echte rustbeurten achter elkaar' "
+                "niet worden gehaald. Selecteer meer banen of gebruik minder spelers."
+            )
 
     best_state: SearchState | None = None
     best_score = math.inf
@@ -400,14 +534,21 @@ def generate_schedule(
 
         for round_index in range(rounds):
             next_states: list[SearchState] = []
+            available_names = available_by_round[round_index]
+            unavailable = unavailable_by_round[round_index]
+            rest_count = rest_counts_per_round[round_index]
+            target_play = play_targets[round_index]
+            target_rest = rest_targets[round_index]
+
             for state in states:
                 rest_limit = min(10, max(1, settings.candidates_per_state // 10))
                 rest_options = _rest_options(
-                    names,
+                    available_names,
                     rest_count,
                     state,
-                    round_index,
-                    active_slots,
+                    names,
+                    target_play,
+                    target_rest,
                     rng,
                     rest_limit,
                 )
@@ -418,7 +559,7 @@ def generate_schedule(
                 seen_rounds: set[tuple[object, ...]] = set()
                 for resters in rest_options:
                     rest_set = set(resters)
-                    active = [name for name in names if name not in rest_set]
+                    active = [name for name in available_names if name not in rest_set]
                     for _ in range(samples_per_rest):
                         candidate = _candidate_matches(active, ranks, state, settings, rng)
                         if candidate is None:
@@ -441,7 +582,11 @@ def generate_schedule(
                                 state,
                                 matches,
                                 resters,
+                                unavailable,
+                                available_names,
                                 names,
+                                target_play,
+                                target_rest,
                                 arrangement_score,
                             )
                         )
@@ -464,7 +609,7 @@ def generate_schedule(
                     break
 
         for state in states:
-            score = _final_score(state, names)
+            score = _final_score(state, names, play_targets[-1], rest_targets[-1])
             if score < best_score:
                 best_score = score
                 best_state = state
@@ -472,23 +617,37 @@ def generate_schedule(
     if best_state is None:
         raise RuntimeError(
             "Geen geldig schema gevonden. Probeer 'Uitgebreid zoeken', sta dubbele partners toe, "
-            "verkort de avond of pas het aantal spelers/banen aan."
+            "verkort de avond of pas het aantal spelers, aankomsttijden of banen aan."
         )
+
+    late_players = [
+        player.name
+        for player in players
+        if player.available_from is not None
+        and _time_offset_minutes(settings.start_time, player.available_from) > 0
+    ]
+    rest_min = min(rest_counts_per_round) if rest_counts_per_round else 0
+    rest_max = max(rest_counts_per_round) if rest_counts_per_round else 0
+    rest_display: int | str = rest_min if rest_min == rest_max else f"{rest_min}–{rest_max}"
 
     diagnostics: dict[str, object] = {
         "rounds": rounds,
         "unused_minutes": unused_minutes,
         "courts_used": len(courts),
         "active_slots": active_slots,
-        "rest_count": rest_count,
+        "rest_count": rest_display,
+        "rest_counts_per_round": rest_counts_per_round,
         "score": round(best_score, 2),
         "play_counts": dict(best_state.play_counts),
         "rest_counts": dict(best_state.rest_counts),
+        "unavailable_counts": unavailable_counts,
+        "availability_rounds": availability_rounds,
+        "target_play_counts": play_targets[-1],
         "partner_counts": dict(best_state.partner_counts),
         "opponent_counts": dict(best_state.opponent_counts),
+        "late_players": late_players,
     }
     return best_state.rounds, diagnostics
-
 
 def schedule_rows(
     rounds: Sequence[RoundPlan],
@@ -503,8 +662,6 @@ def schedule_rows(
     for round_index, round_plan in enumerate(rounds):
         start, end = round_times(settings, round_index)
         matches = list(round_plan.matches)
-        # De baanvolgorde rouleert zodat een niveaucluster niet iedere ronde op
-        # dezelfde fysieke baan staat.
         shift = round_index % len(courts)
         rotated_courts = list(courts[shift:]) + list(courts[:shift])
         matches.sort(
@@ -528,6 +685,11 @@ def schedule_rows(
                     "Niveau T2": round(team2_level, 1),
                     "Teamverschil": round(abs(team1_level - team2_level), 1),
                     "Rust": ", ".join(round_plan.rest) if round_plan.rest else "Niemand",
+                    "Nog niet aanwezig": (
+                        ", ".join(round_plan.unavailable)
+                        if round_plan.unavailable
+                        else "Niemand"
+                    ),
                 }
             )
     return rows
@@ -554,20 +716,33 @@ def player_statistics(
 
     play_counts = diagnostics["play_counts"]
     rest_counts = diagnostics["rest_counts"]
+    unavailable_counts = diagnostics.get("unavailable_counts", {})
+    availability_rounds = diagnostics.get("availability_rounds", {})
     assert isinstance(play_counts, dict)
     assert isinstance(rest_counts, dict)
+    assert isinstance(unavailable_counts, dict)
+    assert isinstance(availability_rounds, dict)
 
     result: list[dict[str, object]] = []
     for player in sorted(players, key=lambda item: (-item.ranking, item.name.casefold())):
+        available_label = (
+            player.available_from.strftime("%H:%M")
+            if player.available_from is not None
+            else "Vanaf start"
+        )
         result.append(
             {
                 "Speler": player.name,
                 "Ranking": player.ranking,
+                "Beschikbaar vanaf": available_label,
                 "Wedstrijden": int(play_counts.get(player.name, 0)),
                 "Rustbeurten": int(rest_counts.get(player.name, 0)),
+                "Nog niet aanwezig": int(unavailable_counts.get(player.name, 0)),
+                "Beschikbare rondes": int(availability_rounds.get(player.name, 0)),
                 "Unieke partners": len(partners[player.name]),
                 "Unieke tegenstanders": len(opponents[player.name]),
                 "Partners": ", ".join(sorted(partners[player.name])),
             }
         )
     return result
+
