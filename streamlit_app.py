@@ -64,7 +64,7 @@ PRIVATE_LEVEL_COLUMNS = ["Niveau T1", "Niveau T2", "Teamverschil"]
 
 
 st.set_page_config(
-    page_title="TOS Padelplanner",
+    page_title="TC Zuid TOS",
     page_icon="🎾",
     layout="wide",
     initial_sidebar_state="collapsed",
@@ -258,7 +258,7 @@ def _inject_responsive_styles() -> None:
 
         @media (max-width: 700px) {
             .block-container {
-                padding: 0.55rem 0.72rem 2.25rem;
+                padding: 2.15rem 0.72rem 2.25rem;
             }
 
             h1 {
@@ -813,7 +813,7 @@ def _render_login(store: SupabaseStore) -> None:
 
 
 def _render_public_page(store: SupabaseStore) -> None:
-    st.markdown('<div class="tos-public-heading">Actueel padelschema</div>', unsafe_allow_html=True)
+    st.markdown('<div class="tos-public-heading">TC Zuid TOS</div>', unsafe_allow_html=True)
     try:
         schedule = store.latest_public_schedule()
     except Exception:
@@ -825,12 +825,6 @@ def _render_public_page(store: SupabaseStore) -> None:
         return
 
     event_date = _parse_date(schedule.get("event_date"), date.today())
-    title = str(schedule.get("title") or "Padelavond")
-    st.markdown(
-        f'<div class="tos-event-title">{escape(title)}</div>',
-        unsafe_allow_html=True,
-    )
-
     courts = schedule.get("courts") or []
     court_count: object = len(courts) if isinstance(courts, list) else "-"
     st.markdown(
@@ -1495,7 +1489,6 @@ def _render_user_management(store: SupabaseStore, user: AuthenticatedUser) -> No
 
 def main() -> None:
     _inject_responsive_styles()
-    st.title("🎾 TOS Padelplanner")
 
     try:
         config = config_from_secrets(st.secrets)
