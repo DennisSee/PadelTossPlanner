@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import secrets
 from datetime import date, datetime, time
 from pathlib import Path
 from html import escape
@@ -574,8 +575,7 @@ def _get_store(config: SupabaseConfig) -> SupabaseStore:
     return SupabaseStore(config)
 
 
-@st.cache_data(show_spinner=False)
-def _generate_cached(
+def _generate_schedule_once(
     player_records: tuple[tuple[str, float, str], ...],
     courts: tuple[str, ...],
     start_hour: int,
@@ -587,8 +587,9 @@ def _generate_cached(
     level_mix: int,
     team_difference_tolerance: float,
     allow_repeat_partners: bool,
+    generation_seed: int,
 ) -> dict[str, object]:
-    """Voer dezelfde berekening niet opnieuw uit bij identieke invoer."""
+    """Bereken één nieuw schema-alternatief voor de opgegeven random seed."""
     players = [
         Player(
             name=name,
@@ -605,6 +606,7 @@ def _generate_cached(
         allow_repeat_partners=allow_repeat_partners,
         level_mix=level_mix,
         team_difference_tolerance=team_difference_tolerance,
+        random_seed=generation_seed,
         **profile,
     )
     rounds, diagnostics = generate_schedule(players, list(courts), settings)
@@ -616,6 +618,7 @@ def _generate_cached(
         "statistics": stats,
         "diagnostics": diagnostics,
         "excel": excel,
+        "generation_seed": generation_seed,
     }
 
 
@@ -1158,6 +1161,26 @@ def _render_private_result(store: SupabaseStore, user: AuthenticatedUser) -> Non
                 st.error("Het schema kon niet worden opgeslagen.")
 
 
+
+def _schedule_fingerprint(rows: object) -> tuple[tuple[str, ...], ...]:
+    """Maak een stabiele vergelijking van een gegenereerd schema."""
+    if not isinstance(rows, list):
+        return tuple()
+    columns = (
+        "Ronde",
+        "Tijd",
+        "Baan",
+        "Team 1",
+        "Team 2",
+        "Rust",
+        "Nog niet aanwezig",
+    )
+    return tuple(
+        tuple(str(row.get(column, "")) for column in columns)
+        for row in rows
+        if isinstance(row, dict)
+    )
+
 def _render_planner_page(store: SupabaseStore, user: AuthenticatedUser) -> None:
     st.header("Nieuw schema maken")
     st.write(
@@ -1392,20 +1415,42 @@ def _render_planner_page(store: SupabaseStore, user: AuthenticatedUser) -> None:
                 )
                 for player in players
             )
-            with st.spinner("Schema wordt berekend…"):
-                generated = _generate_cached(
-                    player_records=player_records,
-                    courts=tuple(selected_courts),
-                    start_hour=start_time.hour,
-                    start_minute=start_time.minute,
-                    end_hour=end_time.hour,
-                    end_minute=end_time.minute,
-                    match_minutes=match_minutes,
-                    search_profile=search_profile,
-                    level_mix=level_mix,
-                    team_difference_tolerance=team_difference_tolerance,
-                    allow_repeat_partners=allow_repeat_partners,
-                )
+            previous_result = st.session_state.get("planner_result")
+            previous_fingerprint = (
+                _schedule_fingerprint(previous_result.get("schedule"))
+                if isinstance(previous_result, dict)
+                else tuple()
+            )
+
+            # Iedere druk op de knop gebruikt een nieuwe seed. Als de optimizer
+            # toevallig exact hetzelfde schema vindt, proberen we nog twee keer.
+            generated: dict[str, object] | None = None
+            with st.spinner("Nieuw schema wordt berekend…"):
+                for _ in range(3):
+                    generation_seed = secrets.randbelow(2_000_000_000) + 1
+                    candidate = _generate_schedule_once(
+                        player_records=player_records,
+                        courts=tuple(selected_courts),
+                        start_hour=start_time.hour,
+                        start_minute=start_time.minute,
+                        end_hour=end_time.hour,
+                        end_minute=end_time.minute,
+                        match_minutes=match_minutes,
+                        search_profile=search_profile,
+                        level_mix=level_mix,
+                        team_difference_tolerance=team_difference_tolerance,
+                        allow_repeat_partners=allow_repeat_partners,
+                        generation_seed=generation_seed,
+                    )
+                    generated = candidate
+                    if not previous_fingerprint or (
+                        _schedule_fingerprint(candidate.get("schedule"))
+                        != previous_fingerprint
+                    ):
+                        break
+
+            if generated is None:
+                raise RuntimeError("Er kon geen schema worden gegenereerd.")
             st.session_state["planner_result"] = {
                 **generated,
                 "owner_id": user.id,
