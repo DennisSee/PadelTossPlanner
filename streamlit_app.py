@@ -878,8 +878,34 @@ def _render_planner_page(store: SupabaseStore, user: AuthenticatedUser) -> None:
     _render_private_result(store, user)
 
 
+def _format_saved_at(value: Any) -> str:
+    """Maak een Supabase-tijdstempel leesbaar zonder tijdzone-aannames."""
+    raw = str(value or "").strip()
+    if not raw:
+        return "Onbekend tijdstip"
+    normalized = raw.replace("T", " ").replace("Z", "")
+    # Bewaar seconden zodat twee schema's uit dezelfde minuut onderscheidbaar zijn.
+    return normalized[:19]
+
+
+def _saved_schedule_label(item: Mapping[str, Any]) -> str:
+    status = "Openbaar" if item.get("is_published") else "Privé"
+    saved_at = _format_saved_at(item.get("created_at"))
+    schedule_id = str(item.get("id") or "")
+    short_id = schedule_id[:8] if schedule_id else "zonder-id"
+    return (
+        f"{saved_at} · {item.get('event_date', '')} · "
+        f"{item.get('title', 'Schema')} · {item.get('created_by_name', '')} · "
+        f"{status} · {short_id}"
+    )
+
+
 def _render_saved_page(store: SupabaseStore, user: AuthenticatedUser) -> None:
     st.header("Opgeslagen schema's")
+    st.caption(
+        "Alle ingelogde planners kunnen alle clubschema's bekijken. Alleen de maker "
+        "van een schema of een beheerder kan de openbare publicatie aanpassen."
+    )
     try:
         schedules = store.list_schedule_summaries(user.id, user.is_admin)
     except Exception:
@@ -890,6 +916,16 @@ def _render_saved_page(store: SupabaseStore, user: AuthenticatedUser) -> None:
         st.info("Er zijn nog geen schema's opgeslagen.")
         return
 
+    show_only_mine = st.checkbox("Toon alleen mijn schema's", value=False)
+    visible_schedules = (
+        [item for item in schedules if str(item.get("created_by")) == user.id]
+        if show_only_mine
+        else schedules
+    )
+    if not visible_schedules:
+        st.info("Je hebt zelf nog geen schema's opgeslagen.")
+        return
+
     overview = pd.DataFrame(
         [
             {
@@ -897,24 +933,21 @@ def _render_saved_page(store: SupabaseStore, user: AuthenticatedUser) -> None:
                 "Datum": item.get("event_date"),
                 "Gemaakt door": item.get("created_by_name"),
                 "Openbaar": "Ja" if item.get("is_published") else "Nee",
-                "Opgeslagen": str(item.get("created_at") or "").replace("T", " ")[:16],
+                "Opgeslagen": _format_saved_at(item.get("created_at")),
+                "Nr.": str(item.get("id") or "")[:8],
             }
-            for item in schedules
+            for item in visible_schedules
         ]
     )
     st.dataframe(overview, hide_index=True, width="stretch")
 
-    labels = {
-        str(item["id"]): (
-            f"{item.get('event_date', '')} — {item.get('title', 'Schema')}"
-            f" — {item.get('created_by_name', '')}"
-        )
-        for item in schedules
-    }
+    schedule_ids = [str(item["id"]) for item in visible_schedules]
+    labels = {str(item["id"]): _saved_schedule_label(item) for item in visible_schedules}
     selected_id = st.selectbox(
         "Schema bekijken",
-        options=list(labels),
+        options=schedule_ids,
         format_func=lambda schedule_id: labels[schedule_id],
+        key="saved_schedule_selector",
     )
 
     try:
@@ -924,6 +957,13 @@ def _render_saved_page(store: SupabaseStore, user: AuthenticatedUser) -> None:
     if not selected:
         st.error("Dit schema kon niet worden geladen.")
         return
+
+    status_text = "Openbaar" if selected.get("is_published") else "Privé"
+    meta1, meta2, meta3, meta4 = st.columns(4)
+    meta1.metric("Datum", str(selected.get("event_date") or "—"))
+    meta2.metric("Gemaakt door", str(selected.get("created_by_name") or "—"))
+    meta3.metric("Status", status_text)
+    meta4.metric("Opgeslagen", _format_saved_at(selected.get("created_at")))
 
     st.subheader(str(selected.get("title") or "Schema"))
     private_rows = selected.get("schedule_private") or []
@@ -936,20 +976,33 @@ def _render_saved_page(store: SupabaseStore, user: AuthenticatedUser) -> None:
             st.dataframe(pd.DataFrame(players), hide_index=True, width="stretch")
 
     is_published = bool(selected.get("is_published"))
-    action_label = "Openbare publicatie intrekken" if is_published else "Openbaar publiceren"
-    if st.button(action_label, type="primary" if not is_published else "secondary"):
-        try:
-            store.set_schedule_published(
-                selected_id,
-                not is_published,
-                user.id,
-                user.is_admin,
-            )
-            st.success("Publicatiestatus aangepast.")
-            st.rerun()
-        except Exception:
-            st.error("De publicatiestatus kon niet worden aangepast.")
-
+    is_owner = str(selected.get("created_by") or "") == user.id
+    can_manage_publication = user.is_admin or is_owner
+    if can_manage_publication:
+        action_label = (
+            "Openbare publicatie intrekken" if is_published else "Openbaar publiceren"
+        )
+        if st.button(
+            action_label,
+            type="primary" if not is_published else "secondary",
+            key=f"publication_action_{selected_id}",
+        ):
+            try:
+                store.set_schedule_published(
+                    selected_id,
+                    not is_published,
+                    user.id,
+                    user.is_admin,
+                )
+                st.success("Publicatiestatus aangepast.")
+                st.rerun()
+            except Exception:
+                st.error("De publicatiestatus kon niet worden aangepast.")
+    else:
+        st.info(
+            "Je kunt dit schema bekijken. Alleen de maker of een beheerder kan de "
+            "openbare publicatie aanpassen."
+        )
 
 def _render_user_management(store: SupabaseStore, user: AuthenticatedUser) -> None:
     if not user.is_admin:
