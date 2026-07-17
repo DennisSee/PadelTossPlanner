@@ -49,6 +49,9 @@ class PlannerSettings:
     beam_width: int = 12
     candidates_per_state: int = 70
     allow_repeat_partners: bool = False
+    # 0 = spelers zoveel mogelijk op vergelijkbaar niveau groeperen.
+    # 100 = bewust meer niveauvariatie op de baan, terwijl teams in balans blijven.
+    level_mix: int = 50
     random_seed: int = 2026
 
 
@@ -111,6 +114,7 @@ def _match_penalty(
     partner_counts: Counter[tuple[str, str]],
     opponent_counts: Counter[tuple[str, str]],
     allow_repeat_partners: bool,
+    level_mix: int,
 ) -> float:
     repeat_partners = sum(partner_counts[pair_key(*team)] for team in (team1, team2))
     if repeat_partners and not allow_repeat_partners:
@@ -133,14 +137,31 @@ def _match_penalty(
         for player2 in team2
     )
 
-    # Teamgelijkheid weegt het zwaarst. Daarna beperken we de spreiding op de
-    # baan. Een beetje niveauverschil binnen een team is toegestaan, maar zeer
-    # grote verschillen worden extra bestraft.
+    # De niveaumix verandert vooral hoe graag de planner verschillende niveaus
+    # op dezelfde baan zet. Teamgelijkheid blijft altijd de belangrijkste factor.
+    # Bij een hoge mix is een baan met bijvoorbeeld niveaus 5, 5, 3 en 3 gewenst,
+    # omdat daar twee evenwichtige teams van 5+3 tegen 5+3 van gemaakt kunnen worden.
+    mix = max(0.0, min(100.0, float(level_mix))) / 100.0
+    target_court_spread = 2.0 * mix
+    target_teammate_gap = 1.5 * mix
+    average_teammate_gap = statistics.mean(teammate_gaps)
+
+    court_spread_weight = 4.4 - 3.2 * mix
+    teammate_gap_weight = 1.8 - 1.25 * mix
+    extreme_gap_weight = 10.0 - 2.0 * mix
+    homogeneous_court_penalty = 12.0 * mix if court_spread < 0.5 else 0.0
+    mix_target_penalty = (
+        3.2 * abs(court_spread - target_court_spread)
+        + 1.1 * abs(average_teammate_gap - target_teammate_gap)
+        + homogeneous_court_penalty
+    )
+
     return (
-        15.0 * team_difference
-        + 3.2 * court_spread
-        + 1.2 * sum(teammate_gaps)
-        + 8.0 * extreme_gap
+        18.0 * team_difference
+        + court_spread_weight * court_spread
+        + teammate_gap_weight * sum(teammate_gaps)
+        + extreme_gap_weight * extreme_gap
+        + mix_target_penalty
         + 2.0 * repeated_opponents
         + 100.0 * repeat_partners
     )
@@ -171,6 +192,7 @@ def _best_match_for_group(
             state.partner_counts,
             state.opponent_counts,
             settings.allow_repeat_partners,
+            settings.level_mix,
         )
         if math.isinf(penalty):
             continue
@@ -187,25 +209,44 @@ def _make_groups(
     ranks: dict[str, float],
     rng: random.Random,
     strategy: int,
+    level_mix: int,
 ) -> list[list[str]]:
     names = list(active)
+    mix = max(0.0, min(100.0, float(level_mix))) / 100.0
 
-    if strategy < 65:
-        # Meestal groeperen we spelers op ongeveer gelijk niveau. De jitter zorgt
-        # voor voldoende afwisseling tussen aangrenzende niveaus.
-        jitter = 0.75 if strategy < 40 else 1.25
-        names.sort(key=lambda name: (ranks[name] + rng.uniform(-jitter, jitter), rng.random()))
-    elif strategy < 88:
-        # Sorteer eerst en wissel daarna spelers tussen aangrenzende groepen.
-        names.sort(key=lambda name: (ranks[name], rng.random()))
-        for index in range(0, len(names) - 4, 4):
-            if rng.random() < 0.8:
-                left = index + rng.randrange(4)
-                right = index + 4 + rng.randrange(min(4, len(names) - index - 4))
-                names[left], names[right] = names[right], names[left]
+    # Bij een lage mix worden de meeste kandidaten op niveau gesorteerd. Naarmate
+    # de mix hoger wordt, proberen we vaker een laag/hoog-verweving of een volledig
+    # willekeurige indeling. De matchfunctie balanceert daarna de twee teams.
+    similar_threshold = int(round(80 - 70 * mix))
+    structured_threshold = int(round(similar_threshold + 15 + 35 * mix))
+
+    if strategy < similar_threshold:
+        jitter = 0.45 + 1.1 * mix
+        names.sort(
+            key=lambda name: (
+                ranks[name] + rng.uniform(-jitter, jitter),
+                rng.random(),
+            )
+        )
+    elif strategy < structured_threshold:
+        # Wissel lage en hoge niveaus af. Hierdoor ontstaan vaker groepen zoals
+        # 3, 5, 3, 5 in plaats van vier spelers van niveau 5 bij elkaar.
+        ordered = sorted(names, key=lambda name: (ranks[name], rng.random()))
+        mixed: list[str] = []
+        take_low = rng.random() < 0.5
+        while ordered:
+            if take_low:
+                mixed.append(ordered.pop(0))
+            else:
+                mixed.append(ordered.pop())
+            take_low = not take_low
+        names = mixed
+        # Wissel complete groepjes zodat dezelfde niveaus niet steeds op dezelfde
+        # genummerde baan terechtkomen.
+        groups = [names[index : index + 4] for index in range(0, len(names), 4)]
+        rng.shuffle(groups)
+        return groups
     else:
-        # Een volledig willekeurige indeling helpt om uit lokale doodlopende
-        # situaties met partnerrestricties te ontsnappen.
         rng.shuffle(names)
 
     return [names[index : index + 4] for index in range(0, len(names), 4)]
@@ -218,7 +259,9 @@ def _candidate_matches(
     settings: PlannerSettings,
     rng: random.Random,
 ) -> tuple[tuple[Match, ...], float] | None:
-    groups = _make_groups(active, ranks, rng, rng.randrange(100))
+    groups = _make_groups(
+        active, ranks, rng, rng.randrange(100), settings.level_mix
+    )
     matches: list[Match] = []
 
     for group in groups:
@@ -481,6 +524,8 @@ def generate_schedule(
         raise ValueError("Spelernamen moeten uniek zijn.")
     if any(not 1 <= player.ranking <= 5 for player in players):
         raise ValueError("Iedere ranking moet tussen 1 en 5 liggen.")
+    if not 0 <= settings.level_mix <= 100:
+        raise ValueError("Niveaumix moet tussen 0 en 100 liggen.")
 
     active_slots = len(courts) * 4
     if len(players) < active_slots:
@@ -646,6 +691,7 @@ def generate_schedule(
         "partner_counts": dict(best_state.partner_counts),
         "opponent_counts": dict(best_state.opponent_counts),
         "late_players": late_players,
+        "level_mix": settings.level_mix,
     }
     return best_state.rounds, diagnostics
 
