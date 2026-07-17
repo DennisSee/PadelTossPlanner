@@ -157,6 +157,7 @@ def build_excel_bytes(
         ("Starttijd", settings.start_time.strftime("%H:%M")),
         ("Eindtijd", settings.end_time.strftime("%H:%M")),
         ("Wedstrijdduur", settings.match_minutes),
+        ("Variatie in niveaus", f"{settings.level_mix}/100"),
         ("Dubbele partners toegestaan", "Ja" if settings.allow_repeat_partners else "Nee"),
         ("Banen", ", ".join(courts)),
     ]
