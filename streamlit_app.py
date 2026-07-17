@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import base64
 from datetime import date, datetime, time
+from pathlib import Path
 from html import escape
-import secrets
 from typing import Any, Mapping
 
 import pandas as pd
@@ -78,10 +79,16 @@ def _inject_responsive_styles() -> None:
         """
         <style>
         :root {
-            --tos-border: rgba(49, 51, 63, 0.16);
-            --tos-muted: rgba(49, 51, 63, 0.68);
-            --tos-card: rgba(247, 248, 252, 0.92);
-            --tos-accent: #5b5bd6;
+            --tc-green: #0a6951;
+            --tc-green-dark: #07503f;
+            --tc-yellow: #fdd424;
+            --tc-lime: #dff04a;
+            --tc-soft-green: #eef8f4;
+            --tc-soft-yellow: #fff8d7;
+            --tos-border: rgba(10, 105, 81, 0.18);
+            --tos-muted: rgba(30, 46, 42, 0.66);
+            --tos-card: #f7faf8;
+            --tos-accent: var(--tc-green);
         }
 
         .block-container {
@@ -95,11 +102,30 @@ def _inject_responsive_styles() -> None:
             display: none !important;
         }
 
-        .tos-public-heading {
-            font-size: clamp(1.65rem, 4vw, 2.35rem);
-            line-height: 1.1;
-            font-weight: 750;
-            margin: 0.15rem 0 0.75rem;
+        .tos-brand-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.8rem;
+            margin: 0.05rem 0 0.9rem;
+            padding: 0.15rem 0;
+        }
+
+        .tos-brand-title {
+            color: var(--tc-green-dark);
+            font-size: clamp(1.55rem, 4vw, 2.25rem);
+            line-height: 1.08;
+            font-weight: 800;
+            letter-spacing: -0.025em;
+        }
+
+        .tos-brand-logo {
+            width: clamp(3.25rem, 9vw, 4.6rem);
+            height: clamp(3.25rem, 9vw, 4.6rem);
+            object-fit: contain;
+            flex: 0 0 auto;
+            border-radius: 0.55rem;
+            box-shadow: 0 2px 8px rgba(7, 80, 63, 0.10);
         }
 
         .tos-event-title {
@@ -118,10 +144,12 @@ def _inject_responsive_styles() -> None:
 
         .tos-meta-item {
             border: 1px solid var(--tos-border);
+            border-top: 3px solid var(--tc-green);
             border-radius: 0.8rem;
-            padding: 0.65rem 0.75rem;
-            background: var(--tos-card);
+            padding: 0.62rem 0.75rem 0.68rem;
+            background: #ffffff;
             min-width: 0;
+            box-shadow: 0 1px 3px rgba(7, 80, 63, 0.04);
         }
 
         .tos-meta-label {
@@ -156,7 +184,20 @@ def _inject_responsive_styles() -> None:
             border-radius: 0.9rem;
             background: white;
             overflow: hidden;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+            box-shadow: 0 2px 7px rgba(7, 80, 63, 0.06);
+        }
+
+        .tos-personal-card.tos-card-playing {
+            border-left: 5px solid var(--tc-green);
+            box-shadow: 0 3px 12px rgba(10, 105, 81, 0.12);
+        }
+
+        .tos-personal-card.tos-card-rest {
+            border-left: 5px solid #a9b2af;
+        }
+
+        .tos-personal-card.tos-card-away {
+            border-left: 5px solid var(--tc-yellow);
         }
 
         .tos-card-head {
@@ -165,7 +206,7 @@ def _inject_responsive_styles() -> None:
             gap: 0.5rem;
             align-items: center;
             padding: 0.65rem 0.8rem;
-            background: var(--tos-card);
+            background: linear-gradient(90deg, var(--tc-soft-green), #ffffff 72%);
             border-bottom: 1px solid var(--tos-border);
         }
 
@@ -189,12 +230,19 @@ def _inject_responsive_styles() -> None:
             border-bottom: 0;
         }
 
-        .tos-court {
-            display: inline-block;
-            color: var(--tos-accent);
-            font-weight: 700;
-            font-size: 0.78rem;
-            margin-bottom: 0.28rem;
+        .tos-court,
+        .tos-personal-court {
+            display: inline-flex;
+            align-items: center;
+            color: var(--tc-green-dark);
+            background: rgba(253, 212, 36, 0.23);
+            border: 1px solid rgba(10, 105, 81, 0.16);
+            border-radius: 999px;
+            padding: 0.18rem 0.5rem;
+            font-weight: 750;
+            font-size: 0.76rem;
+            line-height: 1.2;
+            margin-bottom: 0.34rem;
         }
 
         .tos-matchup {
@@ -229,18 +277,50 @@ def _inject_responsive_styles() -> None:
             white-space: nowrap;
         }
 
-        .tos-status-playing { background: #e7f7ed; color: #176b39; }
-        .tos-status-rest { background: #fff4dc; color: #895d00; }
-        .tos-status-away { background: #edf0f5; color: #535b68; }
+        .tos-status-playing {
+            background: var(--tc-lime);
+            color: var(--tc-green-dark);
+            border: 1px solid rgba(10, 105, 81, 0.22);
+        }
+        .tos-status-rest {
+            background: #eef1f0;
+            color: #4f5d58;
+            border: 1px solid #d5dcda;
+        }
+        .tos-status-away {
+            background: var(--tc-soft-yellow);
+            color: #765f00;
+            border: 1px solid rgba(253, 212, 36, 0.65);
+        }
+
+        .tos-round-footer {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.35rem;
+        }
+
+        .tos-footer-chip {
+            display: inline-block;
+            border-radius: 999px;
+            padding: 0.18rem 0.48rem;
+            font-size: 0.75rem;
+            line-height: 1.25;
+        }
+
+        .tos-footer-rest {
+            background: #eef1f0;
+            color: #4f5d58;
+        }
+
+        .tos-footer-away {
+            background: var(--tc-soft-yellow);
+            color: #765f00;
+        }
 
         .tos-personal-body {
             padding: 0.75rem 0.8rem;
         }
 
-        .tos-personal-court {
-            font-weight: 700;
-            margin-bottom: 0.3rem;
-        }
 
         .tos-name-chips {
             display: flex;
@@ -281,6 +361,19 @@ def _inject_responsive_styles() -> None:
 
             p, label, [data-testid="stMarkdownContainer"] {
                 line-height: 1.35;
+            }
+
+            .tos-brand-header {
+                margin-bottom: 0.7rem;
+            }
+
+            .tos-brand-title {
+                font-size: 1.62rem;
+            }
+
+            .tos-brand-logo {
+                width: 3.25rem;
+                height: 3.25rem;
             }
 
             .tos-event-meta {
@@ -338,6 +431,32 @@ def _inject_responsive_styles() -> None:
     )
 
 
+@st.cache_data(show_spinner=False)
+def _club_logo_data_uri() -> str:
+    """Lees het lokale clublogo als data-URI voor de openbare header."""
+    logo_path = Path(__file__).resolve().parent / "assets" / "tc-zuid-logo.png"
+    if not logo_path.exists():
+        return ""
+    encoded = base64.b64encode(logo_path.read_bytes()).decode("ascii")
+    return f"data:image/png;base64,{encoded}"
+
+
+def _public_brand_header_html() -> str:
+    logo_uri = _club_logo_data_uri()
+    logo_html = (
+        f'<img class="tos-brand-logo" src="{logo_uri}" '
+        'alt="Logo Tennisclub Zuid Doetinchem">'
+        if logo_uri
+        else ""
+    )
+    return (
+        '<header class="tos-brand-header">'
+        '<div class="tos-brand-title">T.C. Zuid TOS Avond</div>'
+        f'{logo_html}'
+        '</header>'
+    )
+
+
 def _public_meta_html(event_date: date, start_time: object, end_time: object, court_count: object) -> str:
     items = (
         ("Datum", event_date.strftime("%d-%m-%Y")),
@@ -389,11 +508,16 @@ def _public_schedule_cards_html(rows: list[dict[str, object]]) -> str:
         unavailable = _normalise_public_text(first.get("Nog niet aanwezig"))
         footer_bits = []
         if rest:
-            footer_bits.append(f"Rust: {escape(rest)}")
+            footer_bits.append(
+                f'<span class="tos-footer-chip tos-footer-rest">Rust: {escape(rest)}</span>'
+            )
         if unavailable:
-            footer_bits.append(f"Nog niet aanwezig: {escape(unavailable)}")
+            footer_bits.append(
+                '<span class="tos-footer-chip tos-footer-away">'
+                f'Nog niet aanwezig: {escape(unavailable)}</span>'
+            )
         footer = (
-            f'<div class="tos-round-footer">{" · ".join(footer_bits)}</div>'
+            f'<div class="tos-round-footer">{"".join(footer_bits)}</div>'
             if footer_bits
             else ""
         )
@@ -415,6 +539,7 @@ def _personal_schedule_cards_html(rows: list[dict[str, object]]) -> str:
         status = str(row.get("Status") or "")
         if status == "Spelen":
             status_class = "tos-status-playing"
+            card_class = "tos-card-playing"
             body = (
                 f'<div class="tos-personal-court">{escape(str(row.get("Baan", "")))}</div>'
                 f'<div class="tos-matchup">{escape(str(row.get("Team 1", "")))}'
@@ -422,13 +547,15 @@ def _personal_schedule_cards_html(rows: list[dict[str, object]]) -> str:
             )
         elif status == "Rust":
             status_class = "tos-status-rest"
+            card_class = "tos-card-rest"
             body = '<div class="tos-matchup">Deze ronde heb je rust.</div>'
         else:
             status_class = "tos-status-away"
+            card_class = "tos-card-away"
             body = '<div class="tos-matchup">Je bent deze ronde nog niet beschikbaar.</div>'
 
         cards.append(
-            '<article class="tos-personal-card">'
+            f'<article class="tos-personal-card {card_class}">'
             '<div class="tos-card-head">'
             f'<span class="tos-round-label">Ronde {escape(str(row.get("Ronde", "")))}</span>'
             f'<span class="tos-time-label">{escape(str(row.get("Tijd", "")))}</span>'
@@ -459,14 +586,8 @@ def _generate_cached(
     search_profile: str,
     level_mix: int,
     allow_repeat_partners: bool,
-    generation_seed: int,
 ) -> dict[str, object]:
-    """Bereken één reproduceerbaar alternatief voor een opgegeven seed.
-
-    De seed is onderdeel van de cache-key. Daardoor kan iedere druk op de knop
-    bewust een nieuw alternatief laten zoeken, terwijl een identieke interne
-    berekening niet onnodig opnieuw wordt uitgevoerd.
-    """
+    """Voer dezelfde berekening niet opnieuw uit bij identieke invoer."""
     players = [
         Player(
             name=name,
@@ -482,7 +603,6 @@ def _generate_cached(
         match_minutes=match_minutes,
         allow_repeat_partners=allow_repeat_partners,
         level_mix=level_mix,
-        random_seed=generation_seed,
         **profile,
     )
     rounds, diagnostics = generate_schedule(players, list(courts), settings)
@@ -494,7 +614,6 @@ def _generate_cached(
         "statistics": stats,
         "diagnostics": diagnostics,
         "excel": excel,
-        "generation_seed": generation_seed,
     }
 
 
@@ -822,7 +941,7 @@ def _render_login(store: SupabaseStore) -> None:
 
 
 def _render_public_page(store: SupabaseStore) -> None:
-    st.markdown('<div class="tos-public-heading">TC Zuid TOS</div>', unsafe_allow_html=True)
+    st.markdown(_public_brand_header_html(), unsafe_allow_html=True)
     try:
         schedule = store.latest_public_schedule()
     except Exception:
@@ -1035,19 +1154,6 @@ def _render_private_result(store: SupabaseStore, user: AuthenticatedUser) -> Non
                 st.error("Het schema kon niet worden opgeslagen.")
 
 
-
-def _schedule_fingerprint(rows: object) -> tuple[tuple[str, ...], ...]:
-    """Maak een stabiele vergelijking van een gegenereerd schema."""
-    if not isinstance(rows, list):
-        return tuple()
-    columns = ("Ronde", "Tijd", "Baan", "Team 1", "Team 2", "Rust", "Nog niet aanwezig")
-    return tuple(
-        tuple(str(row.get(column, "")) for column in columns)
-        for row in rows
-        if isinstance(row, dict)
-    )
-
-
 def _render_planner_page(store: SupabaseStore, user: AuthenticatedUser) -> None:
     st.header("Nieuw schema maken")
     st.write(
@@ -1258,42 +1364,19 @@ def _render_planner_page(store: SupabaseStore, user: AuthenticatedUser) -> None:
                 )
                 for player in players
             )
-            previous_result = st.session_state.get("planner_result")
-            previous_fingerprint = (
-                _schedule_fingerprint(previous_result.get("schedule"))
-                if isinstance(previous_result, dict)
-                else tuple()
-            )
-
-            # Iedere klik krijgt een nieuwe seed. Wanneer het toeval toch exact
-            # hetzelfde schema oplevert, proberen we maximaal twee alternatieven.
-            generated: dict[str, object] | None = None
-            with st.spinner("Nieuw schema wordt berekend…"):
-                for _ in range(3):
-                    generation_seed = secrets.randbelow(2_000_000_000) + 1
-                    candidate = _generate_cached(
-                        player_records=player_records,
-                        courts=tuple(selected_courts),
-                        start_hour=start_time.hour,
-                        start_minute=start_time.minute,
-                        end_hour=end_time.hour,
-                        end_minute=end_time.minute,
-                        match_minutes=match_minutes,
-                        search_profile=search_profile,
-                        level_mix=level_mix,
-                        allow_repeat_partners=allow_repeat_partners,
-                        generation_seed=generation_seed,
-                    )
-                    generated = candidate
-                    if not previous_fingerprint or (
-                        _schedule_fingerprint(candidate.get("schedule"))
-                        != previous_fingerprint
-                    ):
-                        break
-
-            if generated is None:
-                raise RuntimeError("Er kon geen schema worden gegenereerd.")
-
+            with st.spinner("Schema wordt berekend…"):
+                generated = _generate_cached(
+                    player_records=player_records,
+                    courts=tuple(selected_courts),
+                    start_hour=start_time.hour,
+                    start_minute=start_time.minute,
+                    end_hour=end_time.hour,
+                    end_minute=end_time.minute,
+                    match_minutes=match_minutes,
+                    search_profile=search_profile,
+                    level_mix=level_mix,
+                    allow_repeat_partners=allow_repeat_partners,
+                )
             st.session_state["planner_result"] = {
                 **generated,
                 "owner_id": user.id,
