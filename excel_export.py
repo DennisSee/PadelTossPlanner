@@ -93,20 +93,25 @@ def build_excel_bytes(
                 vertical="top", wrap_text=True
             )
 
-    schema_sheet.auto_filter.ref = f"A5:I{5 + len(rows)}"
-    widths = {
-        "A": 9,
-        "B": 17,
-        "C": 23,
-        "D": 28,
-        "E": 12,
-        "F": 28,
-        "G": 12,
-        "H": 14,
-        "I": 30,
+    schema_sheet.auto_filter.ref = (
+        f"A5:{get_column_letter(len(headers))}{5 + len(rows)}"
+    )
+    header_widths = {
+        "Ronde": 9,
+        "Tijd": 17,
+        "Baan": 23,
+        "Team 1": 28,
+        "Niveau T1": 12,
+        "Team 2": 28,
+        "Niveau T2": 12,
+        "Teamverschil": 14,
+        "Rust": 30,
+        "Nog niet aanwezig": 30,
     }
-    for letter, width in widths.items():
-        schema_sheet.column_dimensions[letter].width = width
+    for column, header in enumerate(headers, start=1):
+        schema_sheet.column_dimensions[get_column_letter(column)].width = (
+            header_widths.get(header, 18)
+        )
 
     stats_sheet = workbook.create_sheet("Spelerstatistiek")
     stats_sheet.sheet_view.showGridLines = False
@@ -133,9 +138,13 @@ def build_excel_bytes(
                 vertical="top", wrap_text=True
             )
 
-    stats_sheet.auto_filter.ref = f"A2:G{2 + len(stats)}"
+    stats_sheet.auto_filter.ref = (
+        f"A2:{get_column_letter(len(stat_headers))}{2 + len(stats)}"
+    )
     _auto_fit(stats_sheet)
-    stats_sheet.column_dimensions["G"].width = 46
+    if "Partners" in stat_headers:
+        partner_column = get_column_letter(stat_headers.index("Partners") + 1)
+        stats_sheet.column_dimensions[partner_column].width = 46
 
     input_sheet = workbook.create_sheet("Invoer")
     input_sheet.sheet_view.showGridLines = False
@@ -160,10 +169,16 @@ def build_excel_bytes(
     player_start = 11
     input_sheet.cell(player_start, 1, "Speler")
     input_sheet.cell(player_start, 2, "Ranking")
-    _style_header(input_sheet, player_start, 1, 2)
+    input_sheet.cell(player_start, 3, "Vanaf tijd")
+    _style_header(input_sheet, player_start, 1, 3)
     for row_index, player in enumerate(players, start=player_start + 1):
         input_sheet.cell(row_index, 1, player.name)
         input_sheet.cell(row_index, 2, player.ranking)
+        input_sheet.cell(row_index, 3, (
+            player.available_from.strftime("%H:%M")
+            if player.available_from is not None
+            else "Vanaf start"
+        ))
     _auto_fit(input_sheet)
     input_sheet.column_dimensions["A"].width = 30
     input_sheet.column_dimensions["B"].width = 55
