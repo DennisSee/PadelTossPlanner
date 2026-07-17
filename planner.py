@@ -52,6 +52,9 @@ class PlannerSettings:
     # 0 = spelers zoveel mogelijk op vergelijkbaar niveau groeperen.
     # 100 = bewust meer niveauvariatie op de baan, terwijl teams in balans blijven.
     level_mix: int = 50
+    # Verschillen in gemiddelde teamsterkte tot en met deze waarde zijn acceptabel.
+    # Bij 0.5 zijn bijvoorbeeld 4.0 tegen 4.5 en 3.0 tegen 3.5 gelijkwaardig genoeg.
+    team_difference_tolerance: float = 0.5
     random_seed: int = 2026
 
 
@@ -115,6 +118,7 @@ def _match_penalty(
     opponent_counts: Counter[tuple[str, str]],
     allow_repeat_partners: bool,
     level_mix: int,
+    team_difference_tolerance: float,
 ) -> float:
     repeat_partners = sum(partner_counts[pair_key(*team)] for team in (team1, team2))
     if repeat_partners and not allow_repeat_partners:
@@ -125,6 +129,10 @@ def _match_penalty(
     all_ranks = team1_ranks + team2_ranks
 
     team_difference = abs(statistics.mean(team1_ranks) - statistics.mean(team2_ranks))
+    tolerance = max(0.0, min(1.5, float(team_difference_tolerance)))
+    # Binnen de ingestelde marge behandelen we de wedstrijd als voldoende in balans.
+    # Daardoor wint 0.0 niet meer automatisch van 0.5 en ontstaat meer afwisseling.
+    excess_team_difference = max(0.0, team_difference - tolerance)
     court_spread = max(all_ranks) - min(all_ranks)
     teammate_gaps = [
         abs(team1_ranks[0] - team1_ranks[1]),
@@ -157,7 +165,7 @@ def _match_penalty(
     )
 
     return (
-        18.0 * team_difference
+        18.0 * excess_team_difference
         + court_spread_weight * court_spread
         + teammate_gap_weight * sum(teammate_gaps)
         + extreme_gap_weight * extreme_gap
@@ -193,6 +201,7 @@ def _best_match_for_group(
             state.opponent_counts,
             settings.allow_repeat_partners,
             settings.level_mix,
+            settings.team_difference_tolerance,
         )
         if math.isinf(penalty):
             continue
@@ -526,6 +535,8 @@ def generate_schedule(
         raise ValueError("Iedere ranking moet tussen 1 en 5 liggen.")
     if not 0 <= settings.level_mix <= 100:
         raise ValueError("Niveaumix moet tussen 0 en 100 liggen.")
+    if not 0 <= settings.team_difference_tolerance <= 1.5:
+        raise ValueError("Tolerantie voor teamverschil moet tussen 0 en 1,5 liggen.")
 
     active_slots = len(courts) * 4
     if len(players) < active_slots:
@@ -692,6 +703,7 @@ def generate_schedule(
         "opponent_counts": dict(best_state.opponent_counts),
         "late_players": late_players,
         "level_mix": settings.level_mix,
+        "team_difference_tolerance": settings.team_difference_tolerance,
     }
     return best_state.rounds, diagnostics
 
