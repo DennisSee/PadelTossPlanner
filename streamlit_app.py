@@ -84,6 +84,7 @@ def _generate_cached(
     end_minute: int,
     match_minutes: int,
     search_profile: str,
+    level_mix: int,
     allow_repeat_partners: bool,
 ) -> dict[str, object]:
     """Voer dezelfde berekening niet opnieuw uit bij identieke invoer."""
@@ -101,6 +102,7 @@ def _generate_cached(
         end_time=time(end_hour, end_minute),
         match_minutes=match_minutes,
         allow_repeat_partners=allow_repeat_partners,
+        level_mix=level_mix,
         **profile,
     )
     rounds, diagnostics = generate_schedule(players, list(courts), settings)
@@ -174,8 +176,21 @@ def _parse_date(value: Any, fallback: date) -> date:
 
 
 def _players_dataframe(records: Any) -> pd.DataFrame:
-    if not isinstance(records, list) or not records:
+    """Maak de editorinhoud uit de exact opgeslagen spelerslijst.
+
+    Alleen wanneer er nog helemaal geen gedeeld concept bestaat (``records is None``)
+    tonen we de voorbeeldspelers. Een bewust leeg opgeslagen JSON-array mag nooit de
+    standaardlijst opnieuw activeren.
+    """
+    columns = ["Naam", "Ranking", "Meedoen", "Vanaf tijd"]
+
+    if records is None:
         return DEFAULT_PLAYERS.copy()
+    if not isinstance(records, list):
+        return DEFAULT_PLAYERS.copy()
+    if len(records) == 0:
+        return pd.DataFrame(columns=columns)
+
     frame = pd.DataFrame(records)
     for column, default in (
         ("Naam", ""),
@@ -186,7 +201,24 @@ def _players_dataframe(records: Any) -> pd.DataFrame:
         if column not in frame.columns:
             frame[column] = default
     frame["Vanaf tijd"] = frame["Vanaf tijd"].map(_parse_optional_time)
-    return frame[["Naam", "Ranking", "Meedoen", "Vanaf tijd"]]
+    return frame[columns]
+
+
+def _player_editor_key(user_id: str, draft: Mapping[str, Any]) -> str:
+    """Geef iedere opgeslagen revisie een nieuwe Streamlit-widgetstatus.
+
+    Zonder revisie in de sleutel kan ``st.data_editor`` lokale, verwijderde of oude
+    rijen blijven combineren met een nieuw DataFrame uit Supabase.
+    """
+    database_revision = str(draft.get("updated_at") or "nieuw")
+    local_revision = int(st.session_state.get("club_draft_revision", 0))
+    safe_revision = (
+        database_revision.replace(":", "-")
+        .replace("+", "-")
+        .replace(".", "-")
+        .replace(" ", "-")
+    )
+    return f"players_editor_{user_id}_{safe_revision}_{local_revision}"
 
 
 def _serialize_editor_rows(data: pd.DataFrame) -> list[dict[str, object]]:
@@ -336,6 +368,7 @@ def _diagnostics_for_storage(diagnostics: Mapping[str, object]) -> dict[str, obj
         "active_slots",
         "rest_count",
         "score",
+        "level_mix",
     ):
         result[key] = diagnostics.get(key)
     for key in (
@@ -484,6 +517,7 @@ def _draft_payload(
     selected_courts: list[str],
     edited_players: pd.DataFrame,
     search_profile: str,
+    level_mix: int,
     allow_repeat_partners: bool,
 ) -> dict[str, object]:
     return {
@@ -495,6 +529,7 @@ def _draft_payload(
         "selected_courts": list(selected_courts),
         "players": _serialize_editor_rows(edited_players),
         "search_profile": search_profile,
+        "level_mix": int(level_mix),
         "allow_repeat_partners": bool(allow_repeat_partners),
     }
 
@@ -514,6 +549,11 @@ def _render_private_result(store: SupabaseStore, user: AuthenticatedUser) -> Non
     metric2.metric("Banen", diagnostics["courts_used"])
     metric3.metric("Rusters per ronde", diagnostics["rest_count"])
     metric4.metric("Onbenutte tijd", f"{diagnostics['unused_minutes']} min")
+    st.caption(
+        f"Niveaumix: **{int(diagnostics.get('level_mix', 50))}/100** — "
+        "hogere waarden geven meer variatie op dezelfde baan, terwijl de teams "
+        "qua gemiddelde sterkte in balans blijven."
+    )
     late_players = diagnostics.get("late_players")
     if isinstance(late_players, list) and late_players:
         st.info(
@@ -598,6 +638,10 @@ def _render_planner_page(store: SupabaseStore, user: AuthenticatedUser) -> None:
         "instellingen worden voor iedere planner geladen."
     )
 
+    flash_message = st.session_state.pop("planner_flash_message", None)
+    if flash_message:
+        st.success(str(flash_message))
+
     toolbar1, toolbar2 = st.columns([1, 3])
     with toolbar1:
         if st.button("Gedeelde invoer opnieuw laden", width="stretch"):
@@ -632,6 +676,11 @@ def _render_planner_page(store: SupabaseStore, user: AuthenticatedUser) -> None:
     default_profile = str(draft.get("search_profile") or "Normaal")
     if default_profile not in SEARCH_PROFILES:
         default_profile = "Normaal"
+    try:
+        default_level_mix = int(draft.get("level_mix", 50))
+    except (TypeError, ValueError):
+        default_level_mix = 50
+    default_level_mix = max(0, min(100, default_level_mix))
     default_repeat = bool(draft.get("allow_repeat_partners", False))
     draft_players = _players_dataframe(draft.get("players"))
 
@@ -696,10 +745,7 @@ def _render_planner_page(store: SupabaseStore, user: AuthenticatedUser) -> None:
                     step=300,
                 ),
             },
-            key=(
-                f"players_editor_{user.id}_"
-                f"{int(st.session_state.get('club_draft_revision', 0))}"
-            ),
+            key=_player_editor_key(user.id, draft),
         )
 
         with st.expander("Geavanceerde instellingen"):
@@ -707,6 +753,23 @@ def _render_planner_page(store: SupabaseStore, user: AuthenticatedUser) -> None:
                 "Zoekkwaliteit",
                 options=list(SEARCH_PROFILES),
                 index=list(SEARCH_PROFILES).index(default_profile),
+            )
+            level_mix = st.slider(
+                "Variatie in niveaus",
+                min_value=0,
+                max_value=100,
+                value=default_level_mix,
+                step=10,
+                help=(
+                    "0 groepeert spelers zoveel mogelijk met vergelijkbare niveaus. "
+                    "100 maakt bewust meer gemengde banen, bijvoorbeeld 5+3 tegen "
+                    "5+3 of 5+3 tegen 4+4. De planner blijft de gemiddelde "
+                    "teamsterkte zo gelijk mogelijk houden."
+                ),
+            )
+            st.caption(
+                "0 = niveaus bij elkaar · 50 = gebalanceerde mix · "
+                "100 = veel niveauvariatie"
             )
             allow_repeat_partners = st.checkbox(
                 "Dubbele partners toestaan wanneer nodig",
@@ -731,6 +794,7 @@ def _render_planner_page(store: SupabaseStore, user: AuthenticatedUser) -> None:
             selected_courts,
             edited_players,
             search_profile,
+            level_mix,
             allow_repeat_partners,
         )
         try:
@@ -739,11 +803,17 @@ def _render_planner_page(store: SupabaseStore, user: AuthenticatedUser) -> None:
                 user.display_name,
                 payload,
             )
+            # Maak van het opgeslagen record onmiddellijk de enige bron van waarheid.
+            # Een hogere revisie forceert daarnaast een schone data-editor bij de volgende run.
             st.session_state["club_draft"] = saved_draft
+            st.session_state["club_draft_revision"] = (
+                int(st.session_state.get("club_draft_revision", 0)) + 1
+            )
             if save_input:
-                st.success(
+                st.session_state["planner_flash_message"] = (
                     "De gedeelde spelerslijst en instellingen zijn opgeslagen voor alle planners."
                 )
+                st.rerun()
         except Exception:
             st.error("De gedeelde invoer kon niet worden opgeslagen.")
             if save_input:
@@ -781,6 +851,7 @@ def _render_planner_page(store: SupabaseStore, user: AuthenticatedUser) -> None:
                     end_minute=end_time.minute,
                     match_minutes=match_minutes,
                     search_profile=search_profile,
+                    level_mix=level_mix,
                     allow_repeat_partners=allow_repeat_partners,
                 )
             st.session_state["planner_result"] = {
