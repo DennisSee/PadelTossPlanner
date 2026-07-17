@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime, time
+from html import escape
 from typing import Any, Mapping
 
 import pandas as pd
@@ -66,7 +67,378 @@ st.set_page_config(
     page_title="TOS Padelplanner",
     page_icon="🎾",
     layout="wide",
+    initial_sidebar_state="collapsed",
 )
+
+
+def _inject_responsive_styles() -> None:
+    """Compacte, mobielvriendelijke vormgeving voor de publieke pagina."""
+    st.markdown(
+        """
+        <style>
+        :root {
+            --tos-border: rgba(49, 51, 63, 0.16);
+            --tos-muted: rgba(49, 51, 63, 0.68);
+            --tos-card: rgba(247, 248, 252, 0.92);
+            --tos-accent: #5b5bd6;
+        }
+
+        .block-container {
+            max-width: 1180px;
+            padding-top: 1.1rem;
+            padding-bottom: 2.5rem;
+        }
+
+        [data-testid="stToolbarActions"],
+        [data-testid="stStatusWidget"] {
+            display: none !important;
+        }
+
+        .tos-public-heading {
+            font-size: clamp(1.65rem, 4vw, 2.35rem);
+            line-height: 1.1;
+            font-weight: 750;
+            margin: 0.15rem 0 0.75rem;
+        }
+
+        .tos-event-title {
+            font-size: clamp(1.3rem, 3.3vw, 1.85rem);
+            line-height: 1.15;
+            font-weight: 700;
+            margin: 0.1rem 0 0.7rem;
+        }
+
+        .tos-event-meta {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0.6rem;
+            margin-bottom: 1rem;
+        }
+
+        .tos-meta-item {
+            border: 1px solid var(--tos-border);
+            border-radius: 0.8rem;
+            padding: 0.65rem 0.75rem;
+            background: var(--tos-card);
+            min-width: 0;
+        }
+
+        .tos-meta-label {
+            color: var(--tos-muted);
+            font-size: 0.78rem;
+            margin-bottom: 0.1rem;
+        }
+
+        .tos-meta-value {
+            font-weight: 700;
+            font-size: 1.03rem;
+            line-height: 1.25;
+            overflow-wrap: anywhere;
+        }
+
+        .tos-section-title {
+            font-size: clamp(1.2rem, 3vw, 1.55rem);
+            font-weight: 750;
+            margin: 1rem 0 0.55rem;
+        }
+
+        .tos-schedule-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(285px, 1fr));
+            gap: 0.75rem;
+            margin-top: 0.65rem;
+        }
+
+        .tos-round-card,
+        .tos-personal-card {
+            border: 1px solid var(--tos-border);
+            border-radius: 0.9rem;
+            background: white;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        }
+
+        .tos-card-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 0.5rem;
+            align-items: center;
+            padding: 0.65rem 0.8rem;
+            background: var(--tos-card);
+            border-bottom: 1px solid var(--tos-border);
+        }
+
+        .tos-round-label {
+            font-weight: 750;
+            font-size: 0.96rem;
+        }
+
+        .tos-time-label {
+            color: var(--tos-muted);
+            font-size: 0.86rem;
+            white-space: nowrap;
+        }
+
+        .tos-match-row {
+            padding: 0.72rem 0.8rem;
+            border-bottom: 1px solid rgba(49, 51, 63, 0.09);
+        }
+
+        .tos-match-row:last-child {
+            border-bottom: 0;
+        }
+
+        .tos-court {
+            display: inline-block;
+            color: var(--tos-accent);
+            font-weight: 700;
+            font-size: 0.78rem;
+            margin-bottom: 0.28rem;
+        }
+
+        .tos-matchup {
+            font-size: 0.96rem;
+            line-height: 1.35;
+            overflow-wrap: anywhere;
+        }
+
+        .tos-vs {
+            color: var(--tos-muted);
+            font-size: 0.77rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin: 0 0.25rem;
+        }
+
+        .tos-round-footer {
+            padding: 0.55rem 0.8rem;
+            background: rgba(247, 248, 252, 0.72);
+            color: var(--tos-muted);
+            font-size: 0.78rem;
+            line-height: 1.35;
+            border-top: 1px solid rgba(49, 51, 63, 0.08);
+        }
+
+        .tos-status {
+            display: inline-block;
+            border-radius: 999px;
+            padding: 0.18rem 0.52rem;
+            font-size: 0.76rem;
+            font-weight: 750;
+            white-space: nowrap;
+        }
+
+        .tos-status-playing { background: #e7f7ed; color: #176b39; }
+        .tos-status-rest { background: #fff4dc; color: #895d00; }
+        .tos-status-away { background: #edf0f5; color: #535b68; }
+
+        .tos-personal-body {
+            padding: 0.75rem 0.8rem;
+        }
+
+        .tos-personal-court {
+            font-weight: 700;
+            margin-bottom: 0.3rem;
+        }
+
+        .tos-name-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.35rem;
+            padding: 0.15rem 0 0.35rem;
+        }
+
+        .tos-name-chip {
+            border: 1px solid var(--tos-border);
+            border-radius: 999px;
+            padding: 0.22rem 0.52rem;
+            background: var(--tos-card);
+            font-size: 0.82rem;
+        }
+
+        @media (max-width: 700px) {
+            .block-container {
+                padding: 0.55rem 0.72rem 2.25rem;
+            }
+
+            h1 {
+                font-size: 1.85rem !important;
+                line-height: 1.08 !important;
+                margin-bottom: 0.45rem !important;
+            }
+
+            h2 {
+                font-size: 1.35rem !important;
+                line-height: 1.15 !important;
+                margin-top: 0.8rem !important;
+                margin-bottom: 0.45rem !important;
+            }
+
+            h3 {
+                font-size: 1.12rem !important;
+            }
+
+            p, label, [data-testid="stMarkdownContainer"] {
+                line-height: 1.35;
+            }
+
+            .tos-event-meta {
+                gap: 0.38rem;
+            }
+
+            .tos-meta-item {
+                padding: 0.52rem 0.48rem;
+                border-radius: 0.65rem;
+            }
+
+            .tos-meta-label {
+                font-size: 0.68rem;
+            }
+
+            .tos-meta-value {
+                font-size: 0.88rem;
+            }
+
+            .tos-schedule-grid {
+                grid-template-columns: 1fr;
+                gap: 0.58rem;
+            }
+
+            .tos-card-head {
+                padding: 0.55rem 0.65rem;
+            }
+
+            .tos-match-row,
+            .tos-personal-body {
+                padding: 0.62rem 0.65rem;
+            }
+
+            .tos-round-footer {
+                padding: 0.48rem 0.65rem;
+            }
+
+            [data-testid="stSelectbox"] {
+                margin-bottom: 0.15rem;
+            }
+
+            [data-testid="stSelectbox"] label p {
+                font-size: 0.88rem !important;
+                font-weight: 650;
+            }
+
+            [data-testid="stExpander"] details summary {
+                padding-top: 0.55rem;
+                padding-bottom: 0.55rem;
+            }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def _public_meta_html(event_date: date, start_time: object, end_time: object, court_count: object) -> str:
+    items = (
+        ("Datum", event_date.strftime("%d-%m-%Y")),
+        ("Tijd", f"{start_time or ''}–{end_time or ''}"),
+        ("Banen", str(court_count)),
+    )
+    cards = "".join(
+        f'<div class="tos-meta-item"><div class="tos-meta-label">{escape(label)}</div>'
+        f'<div class="tos-meta-value">{escape(value)}</div></div>'
+        for label, value in items
+    )
+    return f'<div class="tos-event-meta">{cards}</div>'
+
+
+def _participant_chips_html(names: list[str]) -> str:
+    chips = "".join(
+        f'<span class="tos-name-chip">{escape(name)}</span>' for name in names
+    )
+    return f'<div class="tos-name-chips">{chips}</div>'
+
+
+def _normalise_public_text(value: object) -> str:
+    text = str(value or "").strip()
+    return "" if text.casefold() in {"niemand", "none", "nan"} else text
+
+
+def _public_schedule_cards_html(rows: list[dict[str, object]]) -> str:
+    grouped: dict[tuple[str, str], list[dict[str, object]]] = {}
+    for row in rows:
+        key = (str(row.get("Ronde", "")), str(row.get("Tijd", "")))
+        grouped.setdefault(key, []).append(row)
+
+    cards: list[str] = []
+    for (round_number, round_time), round_rows in grouped.items():
+        match_rows = []
+        for row in round_rows:
+            court = escape(str(row.get("Baan", "")))
+            team1 = escape(str(row.get("Team 1", "")))
+            team2 = escape(str(row.get("Team 2", "")))
+            match_rows.append(
+                '<div class="tos-match-row">'
+                f'<div class="tos-court">{court}</div>'
+                f'<div class="tos-matchup">{team1}<span class="tos-vs">vs</span>{team2}</div>'
+                '</div>'
+            )
+
+        first = round_rows[0] if round_rows else {}
+        rest = _normalise_public_text(first.get("Rust"))
+        unavailable = _normalise_public_text(first.get("Nog niet aanwezig"))
+        footer_bits = []
+        if rest:
+            footer_bits.append(f"Rust: {escape(rest)}")
+        if unavailable:
+            footer_bits.append(f"Nog niet aanwezig: {escape(unavailable)}")
+        footer = (
+            f'<div class="tos-round-footer">{" · ".join(footer_bits)}</div>'
+            if footer_bits
+            else ""
+        )
+        cards.append(
+            '<article class="tos-round-card">'
+            '<div class="tos-card-head">'
+            f'<span class="tos-round-label">Ronde {escape(round_number)}</span>'
+            f'<span class="tos-time-label">{escape(round_time)}</span>'
+            '</div>'
+            f'{"".join(match_rows)}{footer}'
+            '</article>'
+        )
+    return f'<div class="tos-schedule-grid">{"".join(cards)}</div>'
+
+
+def _personal_schedule_cards_html(rows: list[dict[str, object]]) -> str:
+    cards: list[str] = []
+    for row in rows:
+        status = str(row.get("Status") or "")
+        if status == "Spelen":
+            status_class = "tos-status-playing"
+            body = (
+                f'<div class="tos-personal-court">{escape(str(row.get("Baan", "")))}</div>'
+                f'<div class="tos-matchup">{escape(str(row.get("Team 1", "")))}'
+                f'<span class="tos-vs">vs</span>{escape(str(row.get("Team 2", "")))}</div>'
+            )
+        elif status == "Rust":
+            status_class = "tos-status-rest"
+            body = '<div class="tos-matchup">Deze ronde heb je rust.</div>'
+        else:
+            status_class = "tos-status-away"
+            body = '<div class="tos-matchup">Je bent deze ronde nog niet beschikbaar.</div>'
+
+        cards.append(
+            '<article class="tos-personal-card">'
+            '<div class="tos-card-head">'
+            f'<span class="tos-round-label">Ronde {escape(str(row.get("Ronde", "")))}</span>'
+            f'<span class="tos-time-label">{escape(str(row.get("Tijd", "")))}</span>'
+            '</div>'
+            '<div class="tos-personal-body">'
+            f'<span class="tos-status {status_class}">{escape(status)}</span>'
+            f'<div style="height:0.45rem"></div>{body}'
+            '</div>'
+            '</article>'
+        )
+    return f'<div class="tos-schedule-grid">{"".join(cards)}</div>'
 
 
 @st.cache_resource(show_spinner=False)
@@ -422,7 +794,7 @@ def _render_login(store: SupabaseStore) -> None:
 
 
 def _render_public_page(store: SupabaseStore) -> None:
-    st.header("Actueel padelschema")
+    st.markdown('<div class="tos-public-heading">Actueel padelschema</div>', unsafe_allow_html=True)
     try:
         schedule = store.latest_public_schedule()
     except Exception:
@@ -434,52 +806,62 @@ def _render_public_page(store: SupabaseStore) -> None:
         return
 
     event_date = _parse_date(schedule.get("event_date"), date.today())
-    st.subheader(str(schedule.get("title") or "Padelavond"))
-    info1, info2, info3 = st.columns(3)
-    info1.metric("Datum", event_date.strftime("%d-%m-%Y"))
-    info2.metric(
-        "Tijd",
-        f"{schedule.get('start_time', '')} - {schedule.get('end_time', '')}",
+    title = str(schedule.get("title") or "Padelavond")
+    st.markdown(
+        f'<div class="tos-event-title">{escape(title)}</div>',
+        unsafe_allow_html=True,
     )
-    courts = schedule.get("courts") or []
-    info3.metric("Banen", len(courts) if isinstance(courts, list) else "-")
 
-    st.subheader("Deelnemers")
+    courts = schedule.get("courts") or []
+    court_count: object = len(courts) if isinstance(courts, list) else "-"
+    st.markdown(
+        _public_meta_html(
+            event_date,
+            schedule.get("start_time", ""),
+            schedule.get("end_time", ""),
+            court_count,
+        ),
+        unsafe_allow_html=True,
+    )
+
     participants = schedule.get("participants_public") or []
     participant_names = (
         sorted([str(name) for name in participants], key=str.casefold)
         if isinstance(participants, list)
         else []
     )
-    if participant_names:
-        st.write(" · ".join(participant_names))
-
-    st.subheader("Wedstrijdschema")
     rows = schedule.get("schedule_public") or []
+
+    st.markdown('<div class="tos-section-title">Jouw wedstrijden</div>', unsafe_allow_html=True)
+    selected_player = st.selectbox(
+        "Kies je naam",
+        options=["Iedereen", *participant_names],
+        help="Kies je naam om direct alleen jouw wedstrijden, rust en afwezigheid te zien.",
+        key=f"public_player_filter_{schedule.get('id', 'latest')}",
+    )
+
     if isinstance(rows, list) and rows:
-        selected_player = st.selectbox(
-            "Toon het persoonlijke schema van",
-            options=["Iedereen", *participant_names],
-            help="Kies je naam om alleen je eigen wedstrijden en rustbeurten te zien.",
-            key=f"public_player_filter_{schedule.get('id', 'latest')}",
-        )
         if selected_player == "Iedereen":
-            public_df = pd.DataFrame(rows)
-            columns = [column for column in PUBLIC_COLUMNS if column in public_df.columns]
-            st.dataframe(public_df[columns], hide_index=True, width="stretch")
+            st.caption("Alle wedstrijden per ronde")
+            st.markdown(_public_schedule_cards_html(rows), unsafe_allow_html=True)
         else:
             personal_rows = _personal_schedule_rows(rows, selected_player)
-            st.caption(f"Persoonlijk overzicht voor **{selected_player}**")
             if personal_rows:
-                st.dataframe(
-                    pd.DataFrame(personal_rows),
-                    hide_index=True,
-                    width="stretch",
+                st.markdown(
+                    _personal_schedule_cards_html(personal_rows),
+                    unsafe_allow_html=True,
                 )
             else:
                 st.info("Voor deze speler zijn geen rondes gevonden.")
     else:
         st.info("Het gepubliceerde schema bevat nog geen wedstrijden.")
+
+    if participant_names:
+        with st.expander(f"Deelnemers ({len(participant_names)})", expanded=False):
+            st.markdown(
+                _participant_chips_html(participant_names),
+                unsafe_allow_html=True,
+            )
 
     creator = schedule.get("created_by_name")
     created_at = str(schedule.get("created_at") or "").replace("T", " ")[:16]
@@ -1093,6 +1475,7 @@ def _render_user_management(store: SupabaseStore, user: AuthenticatedUser) -> No
 
 
 def main() -> None:
+    _inject_responsive_styles()
     st.title("🎾 TOS Padelplanner")
 
     try:
