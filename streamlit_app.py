@@ -67,7 +67,7 @@ st.set_page_config(
     page_title="TOS Padelplanner",
     page_icon="🎾",
     layout="wide",
-    initial_sidebar_state="collapsed",
+    initial_sidebar_state="auto",
 )
 
 
@@ -786,6 +786,10 @@ def _render_login(store: SupabaseStore) -> None:
             try:
                 st.session_state["auth_user"] = store.sign_in(email, password)
                 st.session_state.pop("planner_result", None)
+                # Na een succesvolle login direct naar de planner navigeren. Zonder dit
+                # blijft de openbare pagina zichtbaar en lijkt het alsof de knop niets deed.
+                st.session_state["navigation_page"] = "Planner"
+                st.session_state["login_success"] = True
                 st.rerun()
             except AuthenticationError as exc:
                 st.error(str(exc))
@@ -1492,12 +1496,18 @@ def main() -> None:
     _render_login(store)
     user = _current_user()
 
+    if user and st.session_state.pop("login_success", False):
+        st.toast(f"Ingelogd als {user.display_name}", icon="✅")
+
     with st.sidebar:
         if user:
             options = ["Openbaar schema", "Planner", "Opgeslagen schema's"]
             if user.is_admin:
                 options.append("Gebruikersbeheer")
-            page = st.radio("Navigatie", options)
+            current_page = st.session_state.get("navigation_page")
+            if current_page not in options:
+                st.session_state["navigation_page"] = "Openbaar schema"
+            page = st.radio("Navigatie", options, key="navigation_page")
         else:
             page = "Openbaar schema"
             st.info("Bezoekers zien alleen deelnemers en het gepubliceerde schema.")
