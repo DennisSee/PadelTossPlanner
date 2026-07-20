@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import base64
 import logging
+import re
 import secrets
-from datetime import date, datetime, time, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 from html import escape
 from typing import Any, Mapping
@@ -70,6 +71,15 @@ SEARCH_PROFILES = {
 PUBLIC_COLUMNS = ["Ronde", "Tijd", "Baan", "Team 1", "Team 2", "Rust", "Nog niet aanwezig"]
 PRIVATE_LEVEL_COLUMNS = ["Niveau T1", "Niveau T2", "Teamverschil"]
 LOCAL_TIMEZONE = ZoneInfo("Europe/Amsterdam")
+LIVE_SWITCH_LEAD_MINUTES = 2
+LIVE_REFRESH_SECONDS = 30
+
+COURT_STYLE_CLASSES = {
+    "Kremer Baan": "tos-court-kremer",
+    "ZGA/F&F Baan": "tos-court-zga",
+    "PlaySeat Baan": "tos-court-playseat",
+    "Seppworks/Bax Baan": "tos-court-seppworks",
+}
 
 
 st.set_page_config(
@@ -96,6 +106,10 @@ def _inject_responsive_styles() -> None:
             --tos-muted: rgba(30, 46, 42, 0.66);
             --tos-card: #f7faf8;
             --tos-accent: var(--tc-green);
+            --court-kremer: #0a6951;
+            --court-zga: #d39b00;
+            --court-playseat: #2563a7;
+            --court-seppworks: #8551a8;
         }
 
         .block-container {
@@ -371,6 +385,201 @@ def _inject_responsive_styles() -> None:
             font-size: 0.82rem;
         }
 
+        /* Vaste baankleuren voor snelle herkenning. */
+        .tos-court::before,
+        .tos-personal-court::before {
+            content: "";
+            width: 0.48rem;
+            height: 0.48rem;
+            border-radius: 50%;
+            margin-right: 0.34rem;
+            background: currentColor;
+            flex: 0 0 auto;
+        }
+
+        .tos-court-kremer {
+            color: var(--court-kremer) !important;
+            background: rgba(10, 105, 81, 0.10) !important;
+            border-color: rgba(10, 105, 81, 0.28) !important;
+        }
+
+        .tos-court-zga {
+            color: #806000 !important;
+            background: rgba(253, 212, 36, 0.24) !important;
+            border-color: rgba(211, 155, 0, 0.38) !important;
+        }
+
+        .tos-court-playseat {
+            color: var(--court-playseat) !important;
+            background: rgba(37, 99, 167, 0.10) !important;
+            border-color: rgba(37, 99, 167, 0.30) !important;
+        }
+
+        .tos-court-seppworks {
+            color: var(--court-seppworks) !important;
+            background: rgba(133, 81, 168, 0.10) !important;
+            border-color: rgba(133, 81, 168, 0.30) !important;
+        }
+
+        .tos-live-banner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            border: 1px solid var(--tos-border);
+            border-left: 5px solid var(--tc-green);
+            border-radius: 0.85rem;
+            padding: 0.72rem 0.82rem;
+            margin: 0.45rem 0 0.8rem;
+            background: linear-gradient(90deg, var(--tc-soft-green), #ffffff 74%);
+        }
+
+        .tos-live-banner-title {
+            font-weight: 800;
+            color: var(--tc-green-dark);
+            line-height: 1.2;
+        }
+
+        .tos-live-banner-note {
+            color: var(--tos-muted);
+            font-size: 0.82rem;
+            margin-top: 0.12rem;
+        }
+
+        .tos-live-countdown {
+            flex: 0 0 auto;
+            border-radius: 999px;
+            padding: 0.28rem 0.62rem;
+            background: white;
+            border: 1px solid var(--tos-border);
+            color: var(--tc-green-dark);
+            font-size: 0.8rem;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+
+        .tos-live-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.12fr);
+            gap: 0.8rem;
+            align-items: start;
+            margin: 0.55rem 0 0.9rem;
+        }
+
+        .tos-live-section-label {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.45rem;
+            margin: 0 0 0.38rem;
+            font-size: 0.8rem;
+            font-weight: 850;
+            letter-spacing: 0.055em;
+            text-transform: uppercase;
+            color: var(--tos-muted);
+        }
+
+        .tos-live-panel-next .tos-live-section-label {
+            color: #7b6200;
+        }
+
+        .tos-live-panel-next.tos-live-urgent .tos-live-section-label {
+            color: #8b4d00;
+        }
+
+        .tos-live-round-card {
+            border-width: 2px;
+        }
+
+        .tos-live-current-card {
+            border-color: rgba(10, 105, 81, 0.62);
+            box-shadow: 0 5px 16px rgba(10, 105, 81, 0.14);
+        }
+
+        .tos-live-next-card {
+            border-color: rgba(211, 155, 0, 0.58);
+            box-shadow: 0 7px 20px rgba(128, 96, 0, 0.14);
+        }
+
+        .tos-live-next-card .tos-card-head {
+            padding-top: 0.78rem;
+            padding-bottom: 0.78rem;
+            background: linear-gradient(90deg, var(--tc-soft-yellow), #ffffff 76%);
+        }
+
+        .tos-live-next-card .tos-round-label {
+            font-size: 1.08rem;
+        }
+
+        .tos-live-next-card .tos-matchup {
+            font-size: 1.02rem;
+            font-weight: 650;
+        }
+
+        .tos-live-urgent .tos-live-next-card {
+            border-color: var(--tc-yellow);
+            box-shadow: 0 8px 24px rgba(211, 155, 0, 0.22);
+        }
+
+        .tos-round-card.tos-round-current,
+        .tos-personal-card.tos-round-current {
+            border: 2px solid rgba(10, 105, 81, 0.62);
+            box-shadow: 0 4px 14px rgba(10, 105, 81, 0.13);
+        }
+
+        .tos-round-card.tos-round-next,
+        .tos-personal-card.tos-round-next {
+            border: 2px solid rgba(211, 155, 0, 0.50);
+        }
+
+        .tos-round-state {
+            display: inline-flex;
+            align-items: center;
+            border-radius: 999px;
+            padding: 0.16rem 0.45rem;
+            font-size: 0.68rem;
+            font-weight: 850;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        .tos-round-state-current {
+            color: white;
+            background: var(--tc-green);
+        }
+
+        .tos-round-state-next {
+            color: #705700;
+            background: var(--tc-yellow);
+        }
+
+        .tos-card-head-right {
+            display: flex;
+            align-items: center;
+            gap: 0.38rem;
+        }
+
+        /* Rust en afwezigheid nemen minder ruimte in dan een wedstrijdkaart. */
+        .tos-personal-card.tos-card-rest .tos-personal-body,
+        .tos-personal-card.tos-card-away .tos-personal-body {
+            padding-top: 0.5rem;
+            padding-bottom: 0.52rem;
+        }
+
+        .tos-personal-card.tos-card-rest .tos-matchup,
+        .tos-personal-card.tos-card-away .tos-matchup {
+            display: inline;
+            margin-left: 0.35rem;
+            color: var(--tos-muted);
+            font-size: 0.84rem;
+        }
+
+        .tos-personal-card.tos-card-rest .tos-personal-body > div[style],
+        .tos-personal-card.tos-card-away .tos-personal-body > div[style] {
+            display: none;
+        }
+
         /* Gelijkmatige naamknoppen op desktop. */
         [data-testid="stPills"] [role="radiogroup"] {
             gap: 0.42rem !important;
@@ -474,6 +683,37 @@ def _inject_responsive_styles() -> None:
 
             .tos-round-footer {
                 padding: 0.48rem 0.65rem;
+            }
+
+            .tos-live-grid {
+                grid-template-columns: 1fr;
+                gap: 0.62rem;
+            }
+
+            .tos-live-banner {
+                padding: 0.62rem 0.67rem;
+                margin-bottom: 0.62rem;
+            }
+
+            .tos-live-banner-title {
+                font-size: 0.93rem;
+            }
+
+            .tos-live-banner-note {
+                font-size: 0.75rem;
+            }
+
+            .tos-live-countdown {
+                font-size: 0.72rem;
+                padding: 0.24rem 0.48rem;
+            }
+
+            .tos-live-next-card .tos-round-label {
+                font-size: 1.02rem;
+            }
+
+            .tos-live-next-card .tos-matchup {
+                font-size: 0.96rem;
             }
 
             /*
@@ -596,90 +836,467 @@ def _normalise_public_text(value: object) -> str:
     return "" if text.casefold() in {"niemand", "none", "nan"} else text
 
 
-def _public_schedule_cards_html(rows: list[dict[str, object]]) -> str:
+def _court_style_class(court_name: object) -> str:
+    return COURT_STYLE_CLASSES.get(str(court_name or '').strip(), 'tos-court-default')
+
+
+def _round_number_sort_key(value: object) -> tuple[int, str]:
+    text = str(value or '').strip()
+    try:
+        return int(float(text)), text
+    except ValueError:
+        return 10_000, text.casefold()
+
+
+def _group_schedule_rows(rows: list[dict[str, object]]) -> list[dict[str, object]]:
     grouped: dict[tuple[str, str], list[dict[str, object]]] = {}
     for row in rows:
-        key = (str(row.get("Ronde", "")), str(row.get("Tijd", "")))
+        key = (str(row.get('Ronde', '')), str(row.get('Tijd', '')))
         grouped.setdefault(key, []).append(row)
 
-    cards: list[str] = []
-    for (round_number, round_time), round_rows in grouped.items():
-        match_rows = []
-        for row in round_rows:
-            court = escape(str(row.get("Baan", "")))
-            team1 = escape(str(row.get("Team 1", "")))
-            team2 = escape(str(row.get("Team 2", "")))
-            match_rows.append(
-                '<div class="tos-match-row">'
-                f'<div class="tos-court">{court}</div>'
-                f'<div class="tos-matchup">{team1}<span class="tos-vs">vs</span>{team2}</div>'
-                '</div>'
-            )
-
-        first = round_rows[0] if round_rows else {}
-        rest = _normalise_public_text(first.get("Rust"))
-        unavailable = _normalise_public_text(first.get("Nog niet aanwezig"))
-        footer_bits = []
-        if rest:
-            footer_bits.append(
-                f'<span class="tos-footer-chip tos-footer-rest">Rust: {escape(rest)}</span>'
-            )
-        if unavailable:
-            footer_bits.append(
-                '<span class="tos-footer-chip tos-footer-away">'
-                f'Nog niet aanwezig: {escape(unavailable)}</span>'
-            )
-        footer = (
-            f'<div class="tos-round-footer">{"".join(footer_bits)}</div>'
-            if footer_bits
-            else ""
+    result: list[dict[str, object]] = []
+    for (round_number, round_time), round_rows in sorted(
+        grouped.items(), key=lambda item: _round_number_sort_key(item[0][0])
+    ):
+        result.append(
+            {
+                'round_number': round_number,
+                'round_time': round_time,
+                'rows': round_rows,
+            }
         )
-        cards.append(
-            '<article class="tos-round-card">'
-            '<div class="tos-card-head">'
-            f'<span class="tos-round-label">Ronde {escape(round_number)}</span>'
-            f'<span class="tos-time-label">{escape(round_time)}</span>'
+    return result
+
+
+def _round_window(
+    event_date: date,
+    round_time: object,
+    previous_start: datetime | None = None,
+) -> tuple[datetime, datetime] | None:
+    matches = re.findall(r'(\d{1,2}):(\d{2})', str(round_time or ''))
+    if len(matches) < 2:
+        return None
+
+    start_value = time(int(matches[0][0]), int(matches[0][1]))
+    end_value = time(int(matches[1][0]), int(matches[1][1]))
+    start_dt = datetime.combine(event_date, start_value, LOCAL_TIMEZONE)
+    end_dt = datetime.combine(event_date, end_value, LOCAL_TIMEZONE)
+
+    if previous_start is not None and start_dt <= previous_start:
+        start_dt += timedelta(days=1)
+        end_dt += timedelta(days=1)
+    if end_dt <= start_dt:
+        end_dt += timedelta(days=1)
+    return start_dt, end_dt
+
+
+def _timed_rounds(
+    rows: list[dict[str, object]],
+    event_date: date,
+) -> list[dict[str, object]]:
+    result: list[dict[str, object]] = []
+    previous_start: datetime | None = None
+    for group in _group_schedule_rows(rows):
+        window = _round_window(event_date, group['round_time'], previous_start)
+        if window is None:
+            continue
+        start_dt, end_dt = window
+        previous_start = start_dt
+        result.append({**group, 'start': start_dt, 'end': end_dt})
+    return result
+
+
+def _minutes_label(delta: timedelta, *, past_text: str = 'nu') -> str:
+    seconds = max(0, int(delta.total_seconds()))
+    if seconds <= 0:
+        return past_text
+    minutes = max(1, (seconds + 59) // 60)
+    return f'{minutes} min'
+
+
+def _round_state_badge(state: str | None) -> str:
+    if state == 'current':
+        return '<span class="tos-round-state tos-round-state-current">Nu</span>'
+    if state == 'next':
+        return '<span class="tos-round-state tos-round-state-next">Hierna</span>'
+    return ''
+
+
+def _public_round_card_html(
+    round_number: object,
+    round_time: object,
+    round_rows: list[dict[str, object]],
+    *,
+    state: str | None = None,
+    live_kind: str | None = None,
+) -> str:
+    match_rows: list[str] = []
+    for row in round_rows:
+        court_text = str(row.get('Baan', ''))
+        court = escape(court_text)
+        court_class = _court_style_class(court_text)
+        team1 = escape(str(row.get('Team 1', '')))
+        team2 = escape(str(row.get('Team 2', '')))
+        match_rows.append(
+            '<div class="tos-match-row">'
+            f'<div class="tos-court {court_class}">{court}</div>'
+            f'<div class="tos-matchup">{team1}<span class="tos-vs">vs</span>{team2}</div>'
             '</div>'
-            f'{"".join(match_rows)}{footer}'
-            '</article>'
+        )
+
+    first = round_rows[0] if round_rows else {}
+    rest = _normalise_public_text(first.get('Rust'))
+    unavailable = _normalise_public_text(first.get('Nog niet aanwezig'))
+    footer_bits: list[str] = []
+    if rest:
+        footer_bits.append(
+            f'<span class="tos-footer-chip tos-footer-rest">Rust: {escape(rest)}</span>'
+        )
+    if unavailable:
+        footer_bits.append(
+            '<span class="tos-footer-chip tos-footer-away">'
+            f'Nog niet aanwezig: {escape(unavailable)}</span>'
+        )
+    footer = (
+        f'<div class="tos-round-footer">{"".join(footer_bits)}</div>'
+        if footer_bits
+        else ''
+    )
+
+    classes = ['tos-round-card']
+    if state == 'current':
+        classes.append('tos-round-current')
+    elif state == 'next':
+        classes.append('tos-round-next')
+    if live_kind:
+        classes.extend(['tos-live-round-card', f'tos-live-{live_kind}-card'])
+
+    return (
+        f'<article class="{" ".join(classes)}">'
+        '<div class="tos-card-head">'
+        f'<span class="tos-round-label">Ronde {escape(str(round_number))}</span>'
+        '<span class="tos-card-head-right">'
+        f'{_round_state_badge(state)}'
+        f'<span class="tos-time-label">{escape(str(round_time))}</span>'
+        '</span>'
+        '</div>'
+        f'{"".join(match_rows)}{footer}'
+        '</article>'
+    )
+
+
+def _public_schedule_cards_html(
+    rows: list[dict[str, object]],
+    *,
+    current_round: object | None = None,
+    next_round: object | None = None,
+) -> str:
+    cards: list[str] = []
+    for group in _group_schedule_rows(rows):
+        number = str(group['round_number'])
+        state = None
+        if current_round is not None and number == str(current_round):
+            state = 'current'
+        elif next_round is not None and number == str(next_round):
+            state = 'next'
+        cards.append(
+            _public_round_card_html(
+                group['round_number'],
+                group['round_time'],
+                group['rows'],
+                state=state,
+            )
         )
     return f'<div class="tos-schedule-grid">{"".join(cards)}</div>'
 
 
-def _personal_schedule_cards_html(rows: list[dict[str, object]]) -> str:
+def _personal_round_card_html(
+    row: dict[str, object],
+    *,
+    state: str | None = None,
+    live_kind: str | None = None,
+) -> str:
+    status = str(row.get('Status') or '')
+    if status == 'Spelen':
+        status_class = 'tos-status-playing'
+        card_class = 'tos-card-playing'
+        court_text = str(row.get('Baan', ''))
+        court_class = _court_style_class(court_text)
+        body = (
+            f'<div class="tos-personal-court {court_class}">{escape(court_text)}</div>'
+            f'<div class="tos-matchup">{escape(str(row.get("Team 1", "")))}'
+            f'<span class="tos-vs">vs</span>{escape(str(row.get("Team 2", "")))}</div>'
+        )
+    elif status == 'Rust':
+        status_class = 'tos-status-rest'
+        card_class = 'tos-card-rest'
+        body = '<div class="tos-matchup">Deze ronde heb je rust.</div>'
+    else:
+        status_class = 'tos-status-away'
+        card_class = 'tos-card-away'
+        body = '<div class="tos-matchup">Je bent deze ronde nog niet beschikbaar.</div>'
+
+    classes = ['tos-personal-card', card_class]
+    if state == 'current':
+        classes.append('tos-round-current')
+    elif state == 'next':
+        classes.append('tos-round-next')
+    if live_kind:
+        classes.extend(['tos-live-round-card', f'tos-live-{live_kind}-card'])
+
+    return (
+        f'<article class="{" ".join(classes)}">'
+        '<div class="tos-card-head">'
+        f'<span class="tos-round-label">Ronde {escape(str(row.get("Ronde", "")))}</span>'
+        '<span class="tos-card-head-right">'
+        f'{_round_state_badge(state)}'
+        f'<span class="tos-time-label">{escape(str(row.get("Tijd", "")))}</span>'
+        '</span>'
+        '</div>'
+        '<div class="tos-personal-body">'
+        f'<span class="tos-status {status_class}">{escape(status)}</span>'
+        f'<div style="height:0.45rem"></div>{body}'
+        '</div>'
+        '</article>'
+    )
+
+
+def _personal_schedule_cards_html(
+    rows: list[dict[str, object]],
+    *,
+    current_round: object | None = None,
+    next_round: object | None = None,
+) -> str:
     cards: list[str] = []
     for row in rows:
-        status = str(row.get("Status") or "")
-        if status == "Spelen":
-            status_class = "tos-status-playing"
-            card_class = "tos-card-playing"
-            body = (
-                f'<div class="tos-personal-court">{escape(str(row.get("Baan", "")))}</div>'
-                f'<div class="tos-matchup">{escape(str(row.get("Team 1", "")))}'
-                f'<span class="tos-vs">vs</span>{escape(str(row.get("Team 2", "")))}</div>'
-            )
-        elif status == "Rust":
-            status_class = "tos-status-rest"
-            card_class = "tos-card-rest"
-            body = '<div class="tos-matchup">Deze ronde heb je rust.</div>'
-        else:
-            status_class = "tos-status-away"
-            card_class = "tos-card-away"
-            body = '<div class="tos-matchup">Je bent deze ronde nog niet beschikbaar.</div>'
-
-        cards.append(
-            f'<article class="tos-personal-card {card_class}">'
-            '<div class="tos-card-head">'
-            f'<span class="tos-round-label">Ronde {escape(str(row.get("Ronde", "")))}</span>'
-            f'<span class="tos-time-label">{escape(str(row.get("Tijd", "")))}</span>'
-            '</div>'
-            '<div class="tos-personal-body">'
-            f'<span class="tos-status {status_class}">{escape(status)}</span>'
-            f'<div style="height:0.45rem"></div>{body}'
-            '</div>'
-            '</article>'
-        )
+        number = str(row.get('Ronde', ''))
+        state = None
+        if current_round is not None and number == str(current_round):
+            state = 'current'
+        elif next_round is not None and number == str(next_round):
+            state = 'next'
+        cards.append(_personal_round_card_html(row, state=state))
     return f'<div class="tos-schedule-grid">{"".join(cards)}</div>'
+
+
+def _live_banner_html(title: str, note: str, countdown: str) -> str:
+    return (
+        '<div class="tos-live-banner">'
+        '<div>'
+        f'<div class="tos-live-banner-title">{escape(title)}</div>'
+        f'<div class="tos-live-banner-note">{escape(note)}</div>'
+        '</div>'
+        f'<div class="tos-live-countdown">{escape(countdown)}</div>'
+        '</div>'
+    )
+
+
+def _live_focus_html(
+    current_group: dict[str, object] | None,
+    next_group: dict[str, object] | None,
+    *,
+    personal_rows: list[dict[str, object]] | None,
+    now: datetime,
+) -> str:
+    personal_by_round = {
+        str(row.get('Ronde', '')): row for row in (personal_rows or [])
+    }
+    panels: list[str] = []
+
+    if current_group is not None:
+        remaining = _minutes_label(current_group['end'] - now)
+        if personal_rows is None:
+            card = _public_round_card_html(
+                current_group['round_number'],
+                current_group['round_time'],
+                current_group['rows'],
+                state='current',
+                live_kind='current',
+            )
+        else:
+            row = personal_by_round.get(str(current_group['round_number']))
+            card = (
+                _personal_round_card_html(row, state='current', live_kind='current')
+                if row is not None
+                else ''
+            )
+        panels.append(
+            '<section class="tos-live-panel tos-live-panel-current">'
+            '<div class="tos-live-section-label">'
+            '<span>Nu bezig</span>'
+            f'<span>Nog {escape(remaining)}</span>'
+            '</div>'
+            f'{card}'
+            '</section>'
+        )
+
+    if next_group is not None:
+        until_next = next_group['start'] - now
+        urgent = until_next <= timedelta(minutes=LIVE_SWITCH_LEAD_MINUTES)
+        if personal_rows is None:
+            card = _public_round_card_html(
+                next_group['round_number'],
+                next_group['round_time'],
+                next_group['rows'],
+                state='next',
+                live_kind='next',
+            )
+        else:
+            row = personal_by_round.get(str(next_group['round_number']))
+            card = (
+                _personal_round_card_html(row, state='next', live_kind='next')
+                if row is not None
+                else ''
+            )
+        panel_class = 'tos-live-panel tos-live-panel-next'
+        if urgent:
+            panel_class += ' tos-live-urgent'
+        next_label = 'Klaarmaken' if urgent else 'Volgende ronde'
+        starts = _minutes_label(until_next, past_text='nu')
+        panels.append(
+            f'<section class="{panel_class}">'
+            '<div class="tos-live-section-label">'
+            f'<span>{escape(next_label)}</span>'
+            f'<span>Start over {escape(starts)}</span>'
+            '</div>'
+            f'{card}'
+            '</section>'
+        )
+
+    return f'<div class="tos-live-grid">{"".join(panels)}</div>'
+
+
+def _find_live_rounds(
+    timed_rounds: list[dict[str, object]],
+    now: datetime,
+) -> tuple[dict[str, object] | None, dict[str, object] | None]:
+    current_group = next(
+        (
+            group
+            for group in timed_rounds
+            if group['start'] <= now < group['end']
+        ),
+        None,
+    )
+    next_group = next(
+        (group for group in timed_rounds if group['start'] > now),
+        None,
+    )
+    return current_group, next_group
+
+
+@st.fragment(run_every=LIVE_REFRESH_SECONDS)
+def _render_public_schedule_fragment(
+    rows: list[dict[str, object]],
+    event_date: date,
+    selected_player: str,
+) -> None:
+    """Werk alleen het tijdgevoelige openbare schema iedere 30 seconden bij."""
+    now = datetime.now(LOCAL_TIMEZONE)
+    timed_rounds = _timed_rounds(rows, event_date)
+    if not timed_rounds:
+        st.info('Het gepubliceerde schema bevat geen herkenbare rondetijden.')
+        return
+
+    first_start = timed_rounds[0]['start']
+    final_end = timed_rounds[-1]['end']
+    personal_rows = (
+        None
+        if selected_player == 'Iedereen'
+        else _personal_schedule_rows(rows, selected_player)
+    )
+
+    # Voor de avond blijft het volledige schema direct zichtbaar.
+    if now < first_start:
+        starts_in = _minutes_label(first_start - now)
+        st.markdown(
+            _live_banner_html(
+                'Het schema staat klaar',
+                'Voor de start blijven alle rondes zichtbaar.',
+                f'Start over {starts_in}',
+            ),
+            unsafe_allow_html=True,
+        )
+        if personal_rows is None:
+            st.markdown(_public_schedule_cards_html(rows), unsafe_allow_html=True)
+        elif personal_rows:
+            st.markdown(
+                _personal_schedule_cards_html(personal_rows),
+                unsafe_allow_html=True,
+            )
+        else:
+            st.info('Voor deze speler zijn geen rondes gevonden.')
+        return
+
+    # Na afloop blijft het volledige overzicht beschikbaar.
+    if now >= final_end:
+        st.markdown(
+            _live_banner_html(
+                'De TOS-avond is afgelopen',
+                'Alle rondes blijven hieronder zichtbaar.',
+                'Afgelopen',
+            ),
+            unsafe_allow_html=True,
+        )
+        if personal_rows is None:
+            st.markdown(_public_schedule_cards_html(rows), unsafe_allow_html=True)
+        elif personal_rows:
+            st.markdown(
+                _personal_schedule_cards_html(personal_rows),
+                unsafe_allow_html=True,
+            )
+        return
+
+    current_group, next_group = _find_live_rounds(timed_rounds, now)
+
+    # Een korte eventuele pauze tussen twee rondes: toon de volgende ronde prominent.
+    if current_group is None and next_group is not None:
+        starts_in = _minutes_label(next_group['start'] - now)
+        st.markdown(
+            _live_banner_html(
+                'Volgende ronde komt eraan',
+                'Controleer alvast je baan en medespelers.',
+                f'Start over {starts_in}',
+            ),
+            unsafe_allow_html=True,
+        )
+
+    st.markdown(
+        _live_focus_html(
+            current_group,
+            next_group,
+            personal_rows=personal_rows,
+            now=now,
+        ),
+        unsafe_allow_html=True,
+    )
+
+    current_number = current_group['round_number'] if current_group else None
+    next_number = next_group['round_number'] if next_group else None
+    expander_title = (
+        'Mijn volledige schema'
+        if personal_rows is not None
+        else 'Alle rondes bekijken'
+    )
+    with st.expander(expander_title, expanded=False):
+        if personal_rows is None:
+            st.markdown(
+                _public_schedule_cards_html(
+                    rows,
+                    current_round=current_number,
+                    next_round=next_number,
+                ),
+                unsafe_allow_html=True,
+            )
+        elif personal_rows:
+            st.markdown(
+                _personal_schedule_cards_html(
+                    personal_rows,
+                    current_round=current_number,
+                    next_round=next_number,
+                ),
+                unsafe_allow_html=True,
+            )
 
 
 @st.cache_resource(show_spinner=False)
@@ -1131,17 +1748,7 @@ def _render_public_page(store: SupabaseStore) -> None:
     selected_player = selected_player or "Iedereen"
 
     if isinstance(rows, list) and rows:
-        if selected_player == "Iedereen":
-            st.markdown(_public_schedule_cards_html(rows), unsafe_allow_html=True)
-        else:
-            personal_rows = _personal_schedule_rows(rows, selected_player)
-            if personal_rows:
-                st.markdown(
-                    _personal_schedule_cards_html(personal_rows),
-                    unsafe_allow_html=True,
-                )
-            else:
-                st.info("Voor deze speler zijn geen rondes gevonden.")
+        _render_public_schedule_fragment(rows, event_date, selected_player)
     else:
         st.info("Het gepubliceerde schema bevat nog geen wedstrijden.")
 
