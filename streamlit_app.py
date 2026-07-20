@@ -359,6 +359,27 @@ def _inject_responsive_styles() -> None:
             padding: 0.75rem 0.8rem;
         }
 
+        /*
+         * Bij een wedstrijd staan baan en teams op één compacte, flexibele regel.
+         * De status 'Spelen' is overbodig en wordt daarom niet meer getoond.
+         */
+        .tos-playing-line {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.38rem 0.55rem;
+        }
+
+        .tos-playing-line .tos-personal-court {
+            flex: 0 0 auto;
+            margin-bottom: 0;
+        }
+
+        .tos-playing-matchup {
+            flex: 1 1 13rem;
+            min-width: 0;
+        }
+
 
         .tos-name-chips {
             display: flex;
@@ -666,6 +687,19 @@ def _inject_responsive_styles() -> None:
             .tos-match-row,
             .tos-personal-body {
                 padding: 0.62rem 0.65rem;
+            }
+
+            .tos-playing-line {
+                gap: 0.3rem 0.45rem;
+            }
+
+            .tos-playing-line .tos-personal-court {
+                font-size: 0.72rem;
+                padding: 0.16rem 0.43rem;
+            }
+
+            .tos-playing-matchup {
+                flex-basis: 11.5rem;
             }
 
             .tos-round-footer {
@@ -1107,23 +1141,30 @@ def _personal_round_card_html(
 ) -> str:
     status = str(row.get('Status') or '')
     if status == 'Spelen':
-        status_class = 'tos-status-playing'
         card_class = 'tos-card-playing'
         court_text = str(row.get('Baan', ''))
         court_class = _court_style_class(court_text)
         body = (
+            '<div class="tos-playing-line">'
             f'<div class="tos-personal-court {court_class}">{escape(court_text)}</div>'
-            f'<div class="tos-matchup">{escape(str(row.get("Team 1", "")))}'
-            f'<span class="tos-vs">vs</span>{escape(str(row.get("Team 2", "")))}</div>'
+            f'<div class="tos-matchup tos-playing-matchup">'
+            f'{escape(str(row.get("Team 1", "")))}'
+            f'<span class="tos-vs">vs</span>{escape(str(row.get("Team 2", "")))}'
+            '</div>'
+            '</div>'
         )
     elif status == 'Rust':
-        status_class = 'tos-status-rest'
         card_class = 'tos-card-rest'
-        body = '<div class="tos-matchup">Deze ronde heb je rust.</div>'
+        body = (
+            '<span class="tos-status tos-status-rest">Rust</span>'
+            '<div class="tos-matchup">Deze ronde heb je rust.</div>'
+        )
     else:
-        status_class = 'tos-status-away'
         card_class = 'tos-card-away'
-        body = '<div class="tos-matchup">Je bent deze ronde nog niet beschikbaar.</div>'
+        body = (
+            '<span class="tos-status tos-status-away">Nog niet aanwezig</span>'
+            '<div class="tos-matchup">Je bent deze ronde nog niet beschikbaar.</div>'
+        )
 
     classes = ['tos-personal-card', card_class]
     if state == 'current':
@@ -1142,10 +1183,7 @@ def _personal_round_card_html(
         f'<span class="tos-time-label">{escape(str(row.get("Tijd", "")))}</span>'
         '</span>'
         '</div>'
-        '<div class="tos-personal-body">'
-        f'<span class="tos-status {status_class}">{escape(status)}</span>'
-        f'<div style="height:0.45rem"></div>{body}'
-        '</div>'
+        f'<div class="tos-personal-body">{body}</div>'
         '</article>'
     )
 
