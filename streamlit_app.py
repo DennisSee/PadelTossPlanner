@@ -344,6 +344,21 @@ def _inject_responsive_styles() -> None:
             font-size: 0.82rem;
         }
 
+        /* Gelijkmatige naamknoppen op desktop. */
+        [data-testid="stPills"] [role="radiogroup"] {
+            gap: 0.42rem !important;
+        }
+
+        [data-testid="stPills"] button {
+            justify-content: center !important;
+            min-width: 6.7rem;
+        }
+
+        [data-testid="stPills"] button p {
+            text-align: center !important;
+            white-space: nowrap !important;
+        }
+
         @media (max-width: 700px) {
             .block-container {
                 padding: 5.5rem 0.72rem 2.25rem !important;
@@ -416,6 +431,54 @@ def _inject_responsive_styles() -> None:
 
             .tos-round-footer {
                 padding: 0.48rem 0.65rem;
+            }
+
+            /*
+             * Eén compacte, horizontaal veegbare rij met namen.
+             * Dit voorkomt zowel het mobiele toetsenbord als vier regels knoppen.
+             */
+            [data-testid="stPills"] {
+                width: 100%;
+                overflow: hidden;
+                margin-bottom: 0.2rem;
+            }
+
+            [data-testid="stPills"] [role="radiogroup"] {
+                display: flex !important;
+                flex-wrap: nowrap !important;
+                width: 100% !important;
+                overflow-x: auto !important;
+                overflow-y: hidden !important;
+                gap: 0.38rem !important;
+                padding: 0.08rem 0 0.38rem !important;
+                scroll-snap-type: x proximity;
+                scrollbar-width: none;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            [data-testid="stPills"] [role="radiogroup"]::-webkit-scrollbar {
+                display: none;
+            }
+
+            [data-testid="stPills"] button {
+                flex: 0 0 7rem !important;
+                width: 7rem !important;
+                min-width: 7rem !important;
+                max-width: 7rem !important;
+                min-height: 2.55rem !important;
+                padding-left: 0.45rem !important;
+                padding-right: 0.45rem !important;
+                justify-content: center !important;
+                scroll-snap-align: start;
+            }
+
+            [data-testid="stPills"] button p {
+                width: 100%;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                text-align: center !important;
+                font-size: 0.88rem !important;
+                white-space: nowrap !important;
             }
 
             [data-testid="stSelectbox"] {
@@ -1026,7 +1089,6 @@ def _render_public_page(store: SupabaseStore) -> None:
 
     if isinstance(rows, list) and rows:
         if selected_player == "Iedereen":
-            st.caption("Alle wedstrijden per ronde")
             st.markdown(_public_schedule_cards_html(rows), unsafe_allow_html=True)
         else:
             personal_rows = _personal_schedule_rows(rows, selected_player)
