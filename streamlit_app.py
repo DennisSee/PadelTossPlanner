@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import base64
+import logging
 import secrets
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timezone
 from pathlib import Path
 from html import escape
 from typing import Any, Mapping
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 import streamlit as st
@@ -28,6 +30,9 @@ from planner import (
     player_statistics,
     schedule_rows,
 )
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 COURTS = [
@@ -64,6 +69,7 @@ SEARCH_PROFILES = {
 
 PUBLIC_COLUMNS = ["Ronde", "Tijd", "Baan", "Team 1", "Team 2", "Rust", "Nog niet aanwezig"]
 PRIVATE_LEVEL_COLUMNS = ["Niveau T1", "Niveau T2", "Teamverschil"]
+LOCAL_TIMEZONE = ZoneInfo("Europe/Amsterdam")
 
 
 st.set_page_config(
@@ -945,6 +951,33 @@ def _render_login(store: SupabaseStore) -> None:
                     st.rerun()
 
 
+def _format_local_datetime(
+    value: Any,
+    *,
+    include_seconds: bool = False,
+    fallback: str = "",
+) -> str:
+    """Formatteer een Supabase UTC-tijdstempel in Europe/Amsterdam."""
+    raw = str(value or "").strip()
+    if not raw:
+        return fallback
+
+    try:
+        parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        # Houd de app bruikbaar bij onverwachte legacywaarden.
+        normalized = raw.replace("T", " ").replace("Z", "")
+        return normalized[:19 if include_seconds else 16]
+
+    # Supabase gebruikt UTC. Een tijdstempel zonder offset behandelen we daarom als UTC.
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+
+    local_value = parsed.astimezone(LOCAL_TIMEZONE)
+    pattern = "%d-%m-%Y %H:%M:%S" if include_seconds else "%d-%m-%Y %H:%M"
+    return local_value.strftime(pattern)
+
+
 def _render_public_page(store: SupabaseStore) -> None:
     st.markdown(_public_brand_header_html(), unsafe_allow_html=True)
     try:
@@ -979,12 +1012,17 @@ def _render_public_page(store: SupabaseStore) -> None:
     rows = schedule.get("schedule_public") or []
 
     st.markdown('<div class="tos-section-title">Jouw wedstrijden</div>', unsafe_allow_html=True)
-    selected_player = st.selectbox(
+    selected_player = st.pills(
         "Kies je naam",
         options=["Iedereen", *participant_names],
+        default="Iedereen",
+        selection_mode="single",
+        required=True,
         help="Kies je naam om direct alleen jouw wedstrijden, rust en afwezigheid te zien.",
-        key=f"public_player_filter_{schedule.get('id', 'latest')}",
+        key=f"public_player_pills_{schedule.get('id', 'latest')}",
+        width="stretch",
     )
+    selected_player = selected_player or "Iedereen"
 
     if isinstance(rows, list) and rows:
         if selected_player == "Iedereen":
@@ -1010,7 +1048,7 @@ def _render_public_page(store: SupabaseStore) -> None:
             )
 
     creator = schedule.get("created_by_name")
-    created_at = str(schedule.get("created_at") or "").replace("T", " ")[:16]
+    created_at = _format_local_datetime(schedule.get("created_at"))
     if creator or created_at:
         st.caption(f"Gepubliceerd door {creator or 'beheerder'} · {created_at}")
 
@@ -1203,7 +1241,7 @@ def _render_planner_page(store: SupabaseStore, user: AuthenticatedUser) -> None:
 
     draft = _load_club_draft(store)
     updated_by = str(draft.get("updated_by_name") or "")
-    updated_at = str(draft.get("updated_at") or "").replace("T", " ")[:16]
+    updated_at = _format_local_datetime(draft.get("updated_at"))
     with toolbar2:
         if updated_by or updated_at:
             st.caption(
@@ -1388,8 +1426,12 @@ def _render_planner_page(store: SupabaseStore, user: AuthenticatedUser) -> None:
                     "De gedeelde spelerslijst en instellingen zijn opgeslagen voor alle planners."
                 )
                 st.rerun()
-        except Exception:
+        except Exception as exc:
+            LOGGER.exception("Opslaan van de gedeelde plannerinvoer is mislukt")
             st.error("De gedeelde invoer kon niet worden opgeslagen.")
+            if user.is_admin:
+                with st.expander("Technische details voor beheerder", expanded=True):
+                    st.code(f"{type(exc).__name__}: {exc}")
             if save_input:
                 return
 
@@ -1476,13 +1518,12 @@ def _render_planner_page(store: SupabaseStore, user: AuthenticatedUser) -> None:
 
 
 def _format_saved_at(value: Any) -> str:
-    """Maak een Supabase-tijdstempel leesbaar zonder tijdzone-aannames."""
-    raw = str(value or "").strip()
-    if not raw:
-        return "Onbekend tijdstip"
-    normalized = raw.replace("T", " ").replace("Z", "")
-    # Bewaar seconden zodat twee schema's uit dezelfde minuut onderscheidbaar zijn.
-    return normalized[:19]
+    """Toon een Supabase-tijdstempel in Nederlandse lokale tijd, inclusief seconden."""
+    return _format_local_datetime(
+        value,
+        include_seconds=True,
+        fallback="Onbekend tijdstip",
+    )
 
 
 def _saved_schedule_label(item: Mapping[str, Any]) -> str:
