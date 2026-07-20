@@ -14,11 +14,13 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 import streamlit as st
+from streamlit_cookies_manager import EncryptedCookieManager
 
 from database import (
     AuthenticatedUser,
     AuthenticationError,
     ConfigurationError,
+    PersistentAuthSession,
     SupabaseConfig,
     SupabaseStore,
     config_from_secrets,
@@ -73,6 +75,8 @@ PRIVATE_LEVEL_COLUMNS = ["Niveau T1", "Niveau T2", "Teamverschil"]
 LOCAL_TIMEZONE = ZoneInfo("Europe/Amsterdam")
 LIVE_SWITCH_LEAD_MINUTES = 2
 LIVE_REFRESH_SECONDS = 30
+AUTH_COOKIE_NAME = "supabase_refresh_token"
+AUTH_COOKIE_PREFIX = "tc-zuid-tos/"
 
 COURT_STYLE_CLASSES = {
     "Kremer Baan": "tos-court-kremer",
@@ -1750,12 +1754,96 @@ def _diagnostics_for_storage(diagnostics: Mapping[str, object]) -> dict[str, obj
     return result
 
 
+def _cookie_password(config: SupabaseConfig) -> str:
+    """Gebruik een aparte cookie-secret indien ingesteld, anders de server-secret."""
+    try:
+        auth_section = st.secrets.get("auth", {})
+        configured = str(auth_section.get("cookie_password", "")).strip()
+    except Exception:
+        configured = ""
+    return configured or config.secret_key
+
+
+def _get_cookie_manager(config: SupabaseConfig) -> EncryptedCookieManager:
+    """Initialiseer de versleutelde browsercookie voor dit specifieke apparaat."""
+    return EncryptedCookieManager(
+        prefix=AUTH_COOKIE_PREFIX,
+        password=_cookie_password(config),
+    )
+
+
+def _remove_persistent_cookie(cookies: EncryptedCookieManager) -> None:
+    try:
+        if AUTH_COOKIE_NAME in cookies:
+            del cookies[AUTH_COOKIE_NAME]
+            cookies.save()
+    except Exception:
+        LOGGER.exception("De persistente login-cookie kon niet worden verwijderd.")
+
+
+def _save_persistent_cookie(
+    cookies: EncryptedCookieManager,
+    session: PersistentAuthSession,
+) -> None:
+    cookies[AUTH_COOKIE_NAME] = session.refresh_token
+    cookies.save()
+
+
+def _restore_persistent_auth(
+    store: SupabaseStore,
+    cookies: EncryptedCookieManager,
+) -> None:
+    """Herstel bij een nieuwe Streamlit/WebSocket-sessie de ingelogde gebruiker."""
+    if _current_user() is not None:
+        return
+    if st.session_state.get("persistent_auth_checked"):
+        return
+
+    st.session_state["persistent_auth_checked"] = True
+    try:
+        refresh_token = str(cookies.get(AUTH_COOKIE_NAME) or "").strip()
+    except Exception:
+        LOGGER.exception("De persistente login-cookie kon niet worden gelezen.")
+        return
+
+    if not refresh_token:
+        return
+
+    try:
+        session = store.restore_session(refresh_token)
+        st.session_state["auth_user"] = session.user
+        st.session_state["navigation_page"] = "Planner"
+        st.session_state["auth_restored"] = True
+
+        # Supabase roteert refresh-tokens. Bewaar daarom direct de nieuwste token.
+        if session.refresh_token != refresh_token:
+            _save_persistent_cookie(cookies, session)
+    except AuthenticationError:
+        _remove_persistent_cookie(cookies)
+    except Exception:
+        LOGGER.exception("Automatisch sessieherstel is mislukt.")
+
+
+def _clear_auth_session_state() -> None:
+    """Verwijder alleen login-gerelateerde state en behoud CookieManager-internals."""
+    for key in (
+        "auth_user",
+        "auth_restored",
+        "login_success",
+        "login_error",
+        "planner_result",
+        "last_saved_schedule_id",
+    ):
+        st.session_state.pop(key, None)
+    st.session_state["navigation_page"] = "Openbaar schema"
+
+
 def _current_user() -> AuthenticatedUser | None:
     user = st.session_state.get("auth_user")
     return user if isinstance(user, AuthenticatedUser) else None
 
 
-def _render_login(store: SupabaseStore) -> None:
+def _render_login(store: SupabaseStore, cookies: EncryptedCookieManager) -> None:
     user = _current_user()
     with st.sidebar:
         if user:
@@ -1763,7 +1851,19 @@ def _render_login(store: SupabaseStore) -> None:
             st.write(f"Ingelogd als **{user.display_name}**")
             st.caption("Beheerder" if user.is_admin else "Planner")
             if st.button("Uitloggen", width="stretch"):
-                st.session_state.clear()
+                try:
+                    refresh_token = str(
+                        cookies.get(AUTH_COOKIE_NAME) or ""
+                    ).strip()
+                    if refresh_token:
+                        store.sign_out_session(refresh_token)
+                except Exception:
+                    # Lokaal uitloggen moet altijd lukken, ook bij een verlopen
+                    # of tijdelijk onbereikbare Supabase-sessie.
+                    LOGGER.exception("De Supabase-sessie kon niet worden ingetrokken.")
+
+                _remove_persistent_cookie(cookies)
+                _clear_auth_session_state()
                 st.rerun()
             return
 
@@ -1781,12 +1881,23 @@ def _render_login(store: SupabaseStore) -> None:
             with st.form("login_form"):
                 email = st.text_input("E-mailadres")
                 password = st.text_input("Wachtwoord", type="password")
+                remember_login = st.checkbox(
+                    "Ingelogd blijven op dit apparaat",
+                    value=True,
+                )
                 submitted = st.form_submit_button("Inloggen", width="stretch")
 
             if submitted:
                 try:
-                    st.session_state["auth_user"] = store.sign_in(email, password)
+                    auth_session = store.sign_in_with_session(email, password)
+                    st.session_state["auth_user"] = auth_session.user
                     st.session_state.pop("planner_result", None)
+
+                    if remember_login:
+                        _save_persistent_cookie(cookies, auth_session)
+                    else:
+                        _remove_persistent_cookie(cookies)
+
                     # Na een succesvolle login direct naar de planner navigeren.
                     st.session_state["navigation_page"] = "Planner"
                     st.session_state["login_success"] = True
@@ -2582,11 +2693,19 @@ def main() -> None:
         )
         st.stop()
 
-    _render_login(store)
+    cookies = _get_cookie_manager(config)
+    if not cookies.ready():
+        # De cookiecomponent levert zijn waarde in een korte vervolgrun.
+        st.stop()
+
+    _restore_persistent_auth(store, cookies)
+    _render_login(store, cookies)
     user = _current_user()
 
     if user and st.session_state.pop("login_success", False):
         st.toast(f"Ingelogd als {user.display_name}", icon="✅")
+    elif user and st.session_state.pop("auth_restored", False):
+        st.toast(f"Sessie hersteld voor {user.display_name}", icon="🔐")
 
     with st.sidebar:
         if user:
