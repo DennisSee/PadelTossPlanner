@@ -1877,9 +1877,6 @@ def main() -> None:
     elif page == "Gebruikersbeheer" and user:
         _render_user_management(store, user)
 
-    st.caption(
-        "Rankings, niveaus en spelersstatistieken zijn uitsluitend zichtbaar na inloggen."
-    )
 
 
 if __name__ == "__main__":
