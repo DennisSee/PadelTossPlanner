@@ -76,6 +76,7 @@ LOCAL_TIMEZONE = ZoneInfo("Europe/Amsterdam")
 LIVE_SWITCH_LEAD_MINUTES = 2
 LIVE_REFRESH_SECONDS = 30
 AUTH_COOKIE_NAME = "supabase_refresh_token"
+PREFERRED_PLAYER_COOKIE_NAME = "preferred_player_name"
 AUTH_COOKIE_PREFIX = "tc-zuid-tos/"
 
 COURT_STYLE_CLASSES = {
@@ -1789,6 +1790,56 @@ def _save_persistent_cookie(
     cookies.save()
 
 
+def _preferred_player_from_cookie(
+    cookies: EncryptedCookieManager,
+    participant_names: list[str],
+) -> str:
+    """
+    Geef de lokaal onthouden speler terug wanneer die in het actuele schema staat.
+
+    De cookie zelf blijft bewaard wanneer een speler deze week niet deelneemt,
+    zodat dezelfde voorkeur bij een volgend schema weer gebruikt kan worden.
+    """
+    try:
+        preferred_name = str(
+            cookies.get(PREFERRED_PLAYER_COOKIE_NAME) or ""
+        ).strip()
+    except Exception:
+        LOGGER.exception("De lokale spelersvoorkeur kon niet worden gelezen.")
+        return "Iedereen"
+
+    return preferred_name if preferred_name in participant_names else "Iedereen"
+
+
+def _save_preferred_player(
+    cookies: EncryptedCookieManager,
+    selected_player: str,
+) -> None:
+    """
+    Bewaar de gekozen naam uitsluitend in deze browser.
+
+    Bij 'Iedereen' wordt de voorkeur gewist, zodat het volgende bezoek weer
+    met het volledige schema opent.
+    """
+    try:
+        current_value = str(
+            cookies.get(PREFERRED_PLAYER_COOKIE_NAME) or ""
+        ).strip()
+
+        if selected_player == "Iedereen":
+            if PREFERRED_PLAYER_COOKIE_NAME in cookies:
+                del cookies[PREFERRED_PLAYER_COOKIE_NAME]
+                cookies.save()
+            return
+
+        if selected_player != current_value:
+            cookies[PREFERRED_PLAYER_COOKIE_NAME] = selected_player
+            cookies.save()
+    except Exception:
+        # Een cookieprobleem mag de openbare planner nooit onbruikbaar maken.
+        LOGGER.exception("De lokale spelersvoorkeur kon niet worden opgeslagen.")
+
+
 def _restore_persistent_auth(
     store: SupabaseStore,
     cookies: EncryptedCookieManager,
@@ -1939,7 +1990,10 @@ def _format_local_datetime(
     return local_value.strftime(pattern)
 
 
-def _render_public_page(store: SupabaseStore) -> None:
+def _render_public_page(
+    store: SupabaseStore,
+    cookies: EncryptedCookieManager,
+) -> None:
     st.markdown(_public_brand_header_html(), unsafe_allow_html=True)
     try:
         schedule = store.latest_public_schedule()
@@ -1972,17 +2026,26 @@ def _render_public_page(store: SupabaseStore) -> None:
     )
 
     st.markdown('<div class="tos-section-title">Jouw wedstrijden</div>', unsafe_allow_html=True)
+
+    preferred_player = _preferred_player_from_cookie(
+        cookies,
+        participant_names,
+    )
     selected_player = st.pills(
         "Kies je naam",
         options=["Iedereen", *participant_names],
-        default="Iedereen",
+        default=preferred_player,
         selection_mode="single",
         required=True,
-        help="Kies je naam om direct alleen jouw wedstrijden, rust en afwezigheid te zien.",
+        help=(
+            "Kies je naam om direct alleen jouw wedstrijden, rust en "
+            "afwezigheid te zien. De keuze wordt alleen in deze browser onthouden."
+        ),
         key=f"public_player_pills_{schedule.get('id', 'latest')}",
         width="stretch",
     )
     selected_player = selected_player or "Iedereen"
+    _save_preferred_player(cookies, selected_player)
 
     if isinstance(rows, list) and rows:
         _render_public_schedule_fragment(rows, event_date, selected_player)
@@ -2721,7 +2784,7 @@ def main() -> None:
             st.info("Bezoekers zien alleen deelnemers en het gepubliceerde schema.")
 
     if page == "Openbaar schema":
-        _render_public_page(store)
+        _render_public_page(store, cookies)
     elif page == "Planner" and user:
         _render_planner_page(store, user)
     elif page == "Opgeslagen schema's" and user:
