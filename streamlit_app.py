@@ -100,8 +100,35 @@ def _inject_responsive_styles() -> None:
 
         .block-container {
             max-width: 1180px;
-            padding-top: 4.75rem !important;
+            padding-top: 3.65rem !important;
             padding-bottom: 2.5rem;
+        }
+
+        /*
+         * Compacte Streamlit-header. De sidebar-knop blijft beschikbaar,
+         * maar de gereserveerde balk neemt minder verticale ruimte in.
+         */
+        [data-testid="stHeader"] {
+            height: 3rem !important;
+            min-height: 3rem !important;
+            background: rgba(255, 255, 255, 0.96) !important;
+            box-shadow: none !important;
+        }
+
+        [data-testid="stDecoration"] {
+            display: none !important;
+        }
+
+        [data-testid="stSidebarCollapsedControl"] {
+            top: 0.22rem !important;
+            left: 0.45rem !important;
+        }
+
+        [data-testid="stSidebarCollapsedControl"] button {
+            width: 2.45rem !important;
+            height: 2.45rem !important;
+            min-height: 2.45rem !important;
+            padding: 0.25rem !important;
         }
 
         [data-testid="stToolbarActions"],
@@ -361,7 +388,23 @@ def _inject_responsive_styles() -> None:
 
         @media (max-width: 700px) {
             .block-container {
-                padding: 5.5rem 0.72rem 2.25rem !important;
+                padding: 3.65rem 0.72rem 2.25rem !important;
+            }
+
+            [data-testid="stHeader"] {
+                height: 2.85rem !important;
+                min-height: 2.85rem !important;
+            }
+
+            [data-testid="stSidebarCollapsedControl"] {
+                top: 0.15rem !important;
+                left: 0.32rem !important;
+            }
+
+            [data-testid="stSidebarCollapsedControl"] button {
+                width: 2.35rem !important;
+                height: 2.35rem !important;
+                min-height: 2.35rem !important;
             }
 
             h1 {
