@@ -154,63 +154,53 @@ def _inject_responsive_styles() -> None:
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 0.8rem;
-            margin: 0.05rem 0 0.9rem;
-            padding: 0.15rem 0;
+            gap: 0.7rem;
+            margin: 0.02rem 0 0.16rem;
+            padding: 0.05rem 0;
         }
 
         .tos-brand-title {
             color: var(--tc-green-dark);
-            font-size: clamp(1.55rem, 4vw, 2.25rem);
-            line-height: 1.08;
+            font-size: clamp(1.35rem, 3.5vw, 1.95rem);
+            line-height: 1.06;
             font-weight: 800;
             letter-spacing: -0.025em;
         }
 
         .tos-brand-logo {
-            width: clamp(3.25rem, 9vw, 4.6rem);
-            height: clamp(3.25rem, 9vw, 4.6rem);
+            width: clamp(2.75rem, 7.5vw, 3.75rem);
+            height: clamp(2.75rem, 7.5vw, 3.75rem);
             object-fit: contain;
             flex: 0 0 auto;
-            border-radius: 0.55rem;
-            box-shadow: 0 2px 8px rgba(7, 80, 63, 0.10);
+            border-radius: 0.48rem;
+            box-shadow: 0 2px 7px rgba(7, 80, 63, 0.09);
         }
 
-        .tos-event-title {
-            font-size: clamp(1.3rem, 3.3vw, 1.85rem);
-            line-height: 1.15;
-            font-weight: 700;
-            margin: 0.1rem 0 0.7rem;
-        }
-
-        .tos-event-meta {
-            display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 0.6rem;
-            margin-bottom: 1rem;
-        }
-
-        .tos-meta-item {
-            border: 1px solid var(--tos-border);
-            border-top: 3px solid var(--tc-green);
-            border-radius: 0.8rem;
-            padding: 0.62rem 0.75rem 0.68rem;
-            background: #ffffff;
-            min-width: 0;
-            box-shadow: 0 1px 3px rgba(7, 80, 63, 0.04);
-        }
-
-        .tos-meta-label {
+        .tos-event-summary {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.28rem;
             color: var(--tos-muted);
-            font-size: 0.78rem;
-            margin-bottom: 0.1rem;
+            font-size: 0.88rem;
+            line-height: 1.3;
+            margin: 0 0 0.72rem;
         }
 
-        .tos-meta-value {
+        .tos-event-summary strong {
+            color: var(--tc-green-dark);
             font-weight: 700;
-            font-size: 1.03rem;
-            line-height: 1.25;
-            overflow-wrap: anywhere;
+        }
+
+        .tos-event-summary-dot::before {
+            content: "·";
+            margin-right: 0.28rem;
+            color: #9ca3af;
+        }
+
+        .tos-event-summary-live {
+            color: var(--tc-green-dark);
+            font-weight: 650;
         }
 
         .tos-section-title {
@@ -638,33 +628,30 @@ def _inject_responsive_styles() -> None:
             }
 
             .tos-brand-header {
-                margin-bottom: 0.7rem;
+                margin-bottom: 0.08rem;
             }
 
             .tos-brand-title {
-                font-size: 1.62rem;
+                font-size: 1.43rem;
             }
 
             .tos-brand-logo {
-                width: 3.25rem;
-                height: 3.25rem;
+                width: 2.85rem;
+                height: 2.85rem;
             }
 
-            .tos-event-meta {
-                gap: 0.38rem;
+            .tos-event-summary {
+                font-size: 0.82rem;
+                margin-bottom: 0.48rem;
+                gap: 0.22rem;
             }
 
-            .tos-meta-item {
-                padding: 0.52rem 0.48rem;
-                border-radius: 0.65rem;
+            .tos-event-summary-dot::before {
+                margin-right: 0.22rem;
             }
 
-            .tos-meta-label {
-                font-size: 0.68rem;
-            }
-
-            .tos-meta-value {
-                font-size: 0.88rem;
+            .tos-section-title {
+                margin-top: 0.62rem;
             }
 
             .tos-schedule-grid {
@@ -804,24 +791,126 @@ def _public_brand_header_html() -> str:
     )
     return (
         '<header class="tos-brand-header">'
-        '<div class="tos-brand-title">T.C. Zuid TOS Avond</div>'
+        '<div class="tos-brand-title">T.C. Zuid TOS</div>'
         f'{logo_html}'
         '</header>'
     )
 
 
-def _public_meta_html(event_date: date, start_time: object, end_time: object, court_count: object) -> str:
-    items = (
-        ("Datum", event_date.strftime("%d-%m-%Y")),
-        ("Tijd", f"{start_time or ''}–{end_time or ''}"),
-        ("Banen", str(court_count)),
+DUTCH_WEEKDAYS = (
+    "maandag",
+    "dinsdag",
+    "woensdag",
+    "donderdag",
+    "vrijdag",
+    "zaterdag",
+    "zondag",
+)
+DUTCH_MONTHS = (
+    "",
+    "januari",
+    "februari",
+    "maart",
+    "april",
+    "mei",
+    "juni",
+    "juli",
+    "augustus",
+    "september",
+    "oktober",
+    "november",
+    "december",
+)
+
+
+def _public_day_label(event_date: date, today: date) -> str:
+    if event_date == today:
+        return "Vandaag"
+    if event_date == today + timedelta(days=1):
+        return "Morgen"
+    return (
+        f"{DUTCH_WEEKDAYS[event_date.weekday()].capitalize()} "
+        f"{event_date.day} {DUTCH_MONTHS[event_date.month]}"
     )
-    cards = "".join(
-        f'<div class="tos-meta-item"><div class="tos-meta-label">{escape(label)}</div>'
-        f'<div class="tos-meta-value">{escape(value)}</div></div>'
-        for label, value in items
+
+
+def _public_event_summary_html(parts: list[str], *, live: bool = False) -> str:
+    clean_parts = [str(part).strip() for part in parts if str(part).strip()]
+    if not clean_parts:
+        return ""
+    spans = [
+        f'<span{" class=\"tos-event-summary-live\"" if live and index == 0 else ""}>'
+        f'{escape(part)}</span>'
+        for index, part in enumerate(clean_parts)
+    ]
+    joined = "".join(
+        span if index == 0 else f'<span class="tos-event-summary-dot"></span>{span}'
+        for index, span in enumerate(spans)
     )
-    return f'<div class="tos-event-meta">{cards}</div>'
+    return f'<div class="tos-event-summary">{joined}</div>'
+
+
+@st.fragment(run_every=LIVE_REFRESH_SECONDS)
+def _render_public_event_summary_fragment(
+    rows: list[dict[str, object]],
+    event_date: date,
+    start_time: object,
+    end_time: object,
+    court_count: object,
+) -> None:
+    """Toon één compacte regel die vóór, tijdens en na de avond relevant blijft."""
+    now = datetime.now(LOCAL_TIMEZONE)
+    timed_rounds = _timed_rounds(rows, event_date) if rows else []
+    court_number = int(court_count) if str(court_count).isdigit() else court_count
+    court_label = (
+        f"{court_number} baan"
+        if court_number == 1
+        else f"{court_number} banen"
+    )
+
+    if timed_rounds:
+        first_start = timed_rounds[0]["start"]
+        final_end = timed_rounds[-1]["end"]
+        current_group, next_group = _find_live_rounds(timed_rounds, now)
+
+        if current_group is not None:
+            remaining = _minutes_label(current_group["end"] - now)
+            st.markdown(
+                _public_event_summary_html(
+                    [
+                        f"Ronde {current_group['round_number']} bezig",
+                        f"nog {remaining}",
+                        court_label,
+                    ],
+                    live=True,
+                ),
+                unsafe_allow_html=True,
+            )
+            return
+
+        if first_start <= now < final_end and next_group is not None:
+            starts_in = _minutes_label(next_group["start"] - now)
+            st.markdown(
+                _public_event_summary_html(
+                    [
+                        f"Volgende ronde over {starts_in}",
+                        court_label,
+                    ],
+                    live=True,
+                ),
+                unsafe_allow_html=True,
+            )
+            return
+
+    day_label = _public_day_label(event_date, now.date())
+    time_label = f"{start_time or ''}–{end_time or ''}".strip("–")
+    parts = [day_label, time_label, court_label]
+    if timed_rounds and now >= timed_rounds[-1]["end"]:
+        parts.append("afgelopen")
+    st.markdown(
+        _public_event_summary_html(parts),
+        unsafe_allow_html=True,
+    )
 
 
 def _participant_chips_html(names: list[str]) -> str:
@@ -1716,15 +1805,6 @@ def _render_public_page(store: SupabaseStore) -> None:
     event_date = _parse_date(schedule.get("event_date"), date.today())
     courts = schedule.get("courts") or []
     court_count: object = len(courts) if isinstance(courts, list) else "-"
-    st.markdown(
-        _public_meta_html(
-            event_date,
-            schedule.get("start_time", ""),
-            schedule.get("end_time", ""),
-            court_count,
-        ),
-        unsafe_allow_html=True,
-    )
 
     participants = schedule.get("participants_public") or []
     participant_names = (
@@ -1733,6 +1813,14 @@ def _render_public_page(store: SupabaseStore) -> None:
         else []
     )
     rows = schedule.get("schedule_public") or []
+
+    _render_public_event_summary_fragment(
+        rows if isinstance(rows, list) else [],
+        event_date,
+        schedule.get("start_time", ""),
+        schedule.get("end_time", ""),
+        court_count,
+    )
 
     st.markdown('<div class="tos-section-title">Jouw wedstrijden</div>', unsafe_allow_html=True)
     selected_player = st.pills(
