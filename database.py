@@ -39,6 +39,14 @@ class AuthenticatedUser:
         return self.role == "admin"
 
 
+@dataclass(frozen=True)
+class PersistentAuthSession:
+    """Applicatiegebruiker plus de geroteerde Supabase refresh-token."""
+
+    user: AuthenticatedUser
+    refresh_token: str
+
+
 def config_from_secrets(secrets: Mapping[str, Any]) -> SupabaseConfig:
     """Lees Supabase-instellingen uit ``st.secrets``.
 
@@ -100,32 +108,90 @@ class SupabaseStore:
     # ------------------------------------------------------------------
     # Authenticatie en profielen
     # ------------------------------------------------------------------
-    def sign_in(self, email: str, password: str) -> AuthenticatedUser:
-        """Controleer email/wachtwoord en laad het applicatieprofiel."""
-        auth_client = create_client(self.config.url, self.config.public_key)
-        try:
-            response = auth_client.auth.sign_in_with_password(
-                {"email": email.strip().lower(), "password": password}
-            )
-        except Exception as exc:  # Supabase geeft provider-specifieke exceptions terug.
-            raise AuthenticationError("E-mailadres of wachtwoord is onjuist.") from exc
+    def _persistent_session_from_response(
+        self,
+        response: Any,
+        *,
+        fallback_email: str = "",
+    ) -> PersistentAuthSession:
+        """Valideer een Supabase Auth-response en laad het applicatieprofiel."""
+        auth_user = getattr(response, "user", None)
+        auth_session = getattr(response, "session", None)
 
-        user = getattr(response, "user", None)
-        user_id = str(getattr(user, "id", ""))
-        user_email = str(getattr(user, "email", email)).strip().lower()
-        if not user_id:
-            raise AuthenticationError("Inloggen is niet gelukt.")
+        user_id = str(getattr(auth_user, "id", ""))
+        user_email = str(
+            getattr(auth_user, "email", fallback_email) or fallback_email
+        ).strip().lower()
+        refresh_token = str(getattr(auth_session, "refresh_token", "") or "")
+
+        if not user_id or not refresh_token:
+            raise AuthenticationError("De gebruikerssessie kon niet worden geladen.")
 
         profile = self.get_profile(user_id)
         if not profile or not bool(profile.get("active", False)):
             raise AuthenticationError("Dit account is niet actief.")
 
-        return AuthenticatedUser(
-            id=user_id,
-            email=str(profile.get("email") or user_email),
-            display_name=str(profile.get("display_name") or user_email),
-            role=str(profile.get("role") or "planner"),
+        return PersistentAuthSession(
+            user=AuthenticatedUser(
+                id=user_id,
+                email=str(profile.get("email") or user_email),
+                display_name=str(profile.get("display_name") or user_email),
+                role=str(profile.get("role") or "planner"),
+            ),
+            refresh_token=refresh_token,
         )
+
+    def sign_in_with_session(
+        self,
+        email: str,
+        password: str,
+    ) -> PersistentAuthSession:
+        """Log in en geef ook de refresh-token voor sessieherstel terug."""
+        normalized_email = email.strip().lower()
+        auth_client = create_client(self.config.url, self.config.public_key)
+        try:
+            response = auth_client.auth.sign_in_with_password(
+                {"email": normalized_email, "password": password}
+            )
+        except Exception as exc:
+            raise AuthenticationError("E-mailadres of wachtwoord is onjuist.") from exc
+
+        return self._persistent_session_from_response(
+            response,
+            fallback_email=normalized_email,
+        )
+
+    def sign_in(self, email: str, password: str) -> AuthenticatedUser:
+        """Achterwaarts compatibele login zonder sessietoken in het resultaat."""
+        return self.sign_in_with_session(email, password).user
+
+    def restore_session(self, refresh_token: str) -> PersistentAuthSession:
+        """Herstel en roteer een bestaande Supabase-sessie."""
+        token = str(refresh_token or "").strip()
+        if not token:
+            raise AuthenticationError("De opgeslagen sessie ontbreekt.")
+
+        auth_client = create_client(self.config.url, self.config.public_key)
+        try:
+            response = auth_client.auth.refresh_session(token)
+        except Exception as exc:
+            raise AuthenticationError(
+                "De opgeslagen sessie is verlopen of ongeldig."
+            ) from exc
+
+        return self._persistent_session_from_response(response)
+
+    def sign_out_session(self, refresh_token: str) -> None:
+        """Beëindig alleen de huidige Supabase-sessie, niet andere apparaten."""
+        token = str(refresh_token or "").strip()
+        if not token:
+            return
+
+        auth_client = create_client(self.config.url, self.config.public_key)
+        response = auth_client.auth.refresh_session(token)
+        # Supabase gebruikt standaard 'global'; expliciet local voorkomt dat
+        # uitloggen op de telefoon ook de desktopsessie beëindigt.
+        auth_client.auth.sign_out({"scope": "local"})
 
     def get_profile(self, user_id: str) -> dict[str, Any] | None:
         response = (
