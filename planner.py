@@ -22,6 +22,8 @@ class Player:
     ranking: float
     # Leeg/None betekent dat de speler vanaf de starttijd aanwezig is.
     available_from: time | None = None
+    # Leeg/None betekent dat de speler tot het einde van de sessie beschikbaar is.
+    available_until: time | None = None
 
 
 @dataclass(frozen=True)
@@ -34,10 +36,12 @@ class Match:
 @dataclass(frozen=True)
 class RoundPlan:
     matches: tuple[Match, ...]
-    # Vrijwillige rust nadat een speler aanwezig is.
+    # Vrijwillige rust terwijl een speler beschikbaar is.
     rest: tuple[str, ...]
     # Spelers die bij de start van deze ronde nog niet aanwezig zijn.
     unavailable: tuple[str, ...] = tuple()
+    # Spelers die deze volledige ronde niet meer kunnen spelen vanwege hun eindtijd.
+    unavailable_after: tuple[str, ...] = tuple()
 
 
 @dataclass(frozen=True)
@@ -45,6 +49,8 @@ class PlannerSettings:
     start_time: time
     end_time: time
     match_minutes: int
+    # Pauze tussen twee opeenvolgende wedstrijden. Na de laatste ronde is geen pauze nodig.
+    rest_minutes: int = 0
     search_restarts: int = 10
     beam_width: int = 12
     candidates_per_state: int = 70
@@ -73,32 +79,45 @@ def pair_key(a: str, b: str) -> tuple[str, str]:
     return tuple(sorted((a, b)))
 
 
-def calculate_rounds(settings: PlannerSettings) -> tuple[int, int]:
-    """Geef het aantal volledige rondes en het aantal onbenutte minuten terug."""
+def _session_minutes(settings: PlannerSettings) -> int:
+    """Geef de totale sessieduur in minuten, met ondersteuning voor over-middernacht."""
     base_date = date(2000, 1, 1)
     start_dt = datetime.combine(base_date, settings.start_time)
     end_dt = datetime.combine(base_date, settings.end_time)
     if end_dt <= start_dt:
         end_dt += timedelta(days=1)
+    return int((end_dt - start_dt).total_seconds() // 60)
 
-    total_minutes = int((end_dt - start_dt).total_seconds() // 60)
+
+def calculate_rounds(settings: PlannerSettings) -> tuple[int, int]:
+    """Geef het aantal volledige rondes en het aantal onbenutte minuten terug.
+
+    Tussen twee wedstrijden wordt ``rest_minutes`` ingepland. Na de laatste
+    wedstrijd is geen extra pauze nodig.
+    """
+    total_minutes = _session_minutes(settings)
     if settings.match_minutes <= 0:
         raise ValueError("Wedstrijdduur moet groter dan nul zijn.")
+    if settings.rest_minutes < 0:
+        raise ValueError("Pauzeduur mag niet negatief zijn.")
 
-    rounds = total_minutes // settings.match_minutes
-    unused_minutes = total_minutes % settings.match_minutes
+    cycle_minutes = settings.match_minutes + settings.rest_minutes
+    rounds = (total_minutes + settings.rest_minutes) // cycle_minutes
     if rounds < 1:
         raise ValueError("De beschikbare tijd is korter dan één wedstrijdduur.")
+
+    used_minutes = rounds * settings.match_minutes + max(0, rounds - 1) * settings.rest_minutes
+    unused_minutes = total_minutes - used_minutes
     return rounds, unused_minutes
 
 
 def round_times(settings: PlannerSettings, round_index: int) -> tuple[datetime, datetime]:
     base_date = date(2000, 1, 1)
+    cycle_minutes = settings.match_minutes + settings.rest_minutes
     start = datetime.combine(base_date, settings.start_time) + timedelta(
-        minutes=round_index * settings.match_minutes
+        minutes=round_index * cycle_minutes
     )
     return start, start + timedelta(minutes=settings.match_minutes)
-
 
 def _fairness_penalty(counts: Counter[str], names: Sequence[str], weight: float) -> float:
     values = [counts[name] for name in names]
@@ -320,53 +339,97 @@ def _availability_context(
 ) -> tuple[
     list[tuple[str, ...]],
     list[tuple[str, ...]],
+    list[tuple[str, ...]],
+    dict[str, int],
     dict[str, int],
     dict[str, int],
 ]:
-    """Bereken aanwezigheid per ronde.
+    """Bereken beschikbaarheid per ronde.
 
-    Een speler wordt beschikbaar in de eerste ronde waarvan de starttijd gelijk aan
-    of later dan ``available_from`` is. Verplichte afwezigheid telt niet als rust.
+    Een speler kan alleen in een ronde worden ingepland als de volledige wedstrijd
+    binnen diens venster ``available_from`` t/m ``available_until`` valt. Tijd voor
+    te late aankomst of eerder vertrek telt niet als een normale rustbeurt.
     """
     names = [player.name for player in players]
-    latest_round_start = (round_count - 1) * settings.match_minutes
-    availability_offset: dict[str, int] = {}
+    session_minutes = _session_minutes(settings)
+    cycle_minutes = settings.match_minutes + settings.rest_minutes
+
+    from_offsets: dict[str, int] = {}
+    until_offsets: dict[str, int] = {}
 
     for player in players:
-        available_time = player.available_from or settings.start_time
-        offset = _time_offset_minutes(settings.start_time, available_time)
-        if offset > latest_round_start:
+        from_time = player.available_from or settings.start_time
+        until_time = player.available_until or settings.end_time
+        from_offset = _time_offset_minutes(settings.start_time, from_time)
+        until_offset = _time_offset_minutes(settings.start_time, until_time)
+
+        if from_offset > session_minutes:
             raise ValueError(
-                f"De vanaf-tijd van {player.name} ({available_time:%H:%M}) ligt na "
-                "de start van de laatste speelronde."
+                f"De vanaf-tijd van {player.name} ({from_time:%H:%M}) ligt buiten de sessie."
             )
-        availability_offset[player.name] = offset
+        if until_offset > session_minutes:
+            raise ValueError(
+                f"De eindtijd van {player.name} ({until_time:%H:%M}) ligt buiten de sessie."
+            )
+        if until_offset <= from_offset:
+            raise ValueError(
+                f"De eindtijd van {player.name} moet later zijn dan de vanaf-tijd."
+            )
+
+        from_offsets[player.name] = from_offset
+        until_offsets[player.name] = until_offset
 
     available_by_round: list[tuple[str, ...]] = []
     unavailable_by_round: list[tuple[str, ...]] = []
+    unavailable_after_by_round: list[tuple[str, ...]] = []
     availability_rounds = {name: 0 for name in names}
     unavailable_counts = {name: 0 for name in names}
+    unavailable_after_counts = {name: 0 for name in names}
 
     for round_index in range(round_count):
-        round_offset = round_index * settings.match_minutes
+        round_start = round_index * cycle_minutes
+        round_end = round_start + settings.match_minutes
+
         available = tuple(
-            name for name in names if availability_offset[name] <= round_offset
+            name
+            for name in names
+            if from_offsets[name] <= round_start and round_end <= until_offsets[name]
         )
-        available_set = set(available)
-        unavailable = tuple(name for name in names if name not in available_set)
+        unavailable = tuple(
+            name for name in names if round_start < from_offsets[name]
+        )
+        unavailable_after = tuple(
+            name
+            for name in names
+            if name not in unavailable and round_end > until_offsets[name]
+        )
+
         available_by_round.append(available)
         unavailable_by_round.append(unavailable)
+        unavailable_after_by_round.append(unavailable_after)
 
         for name in available:
             availability_rounds[name] += 1
         for name in unavailable:
             unavailable_counts[name] += 1
+        for name in unavailable_after:
+            unavailable_after_counts[name] += 1
+
+    no_rounds = [name for name, count in availability_rounds.items() if count == 0]
+    if no_rounds:
+        raise ValueError(
+            "Deze deelnemer(s) hebben geen volledige speelronde binnen hun beschikbaarheid: "
+            + ", ".join(no_rounds)
+            + ". Pas vanaf-/eindtijd, wedstrijdduur of pauzeduur aan."
+        )
 
     return (
         available_by_round,
         unavailable_by_round,
+        unavailable_after_by_round,
         availability_rounds,
         unavailable_counts,
+        unavailable_after_counts,
     )
 
 def _build_fairness_targets(
@@ -451,6 +514,7 @@ def _extend_state(
     matches: tuple[Match, ...],
     resters: tuple[str, ...],
     unavailable: tuple[str, ...],
+    unavailable_after: tuple[str, ...],
     available_names: Sequence[str],
     all_names: Sequence[str],
     target_play: dict[str, float],
@@ -467,7 +531,12 @@ def _extend_state(
         score=state.score + arrangement_score,
     )
     new_state.rounds.append(
-        RoundPlan(matches=matches, rest=resters, unavailable=unavailable)
+        RoundPlan(
+            matches=matches,
+            rest=resters,
+            unavailable=unavailable,
+            unavailable_after=unavailable_after,
+        )
     )
 
     rest_set = set(resters)
@@ -520,7 +589,7 @@ def generate_schedule(
     courts: Sequence[str],
     settings: PlannerSettings,
 ) -> tuple[list[RoundPlan], dict[str, object]]:
-    """Genereer een schema met optionele aankomsttijden per speler."""
+    """Genereer een schema met individuele beschikbaarheidsvensters per speler."""
     if len(players) < 4:
         raise ValueError("Minimaal vier spelers zijn nodig.")
     if not courts:
@@ -537,6 +606,8 @@ def generate_schedule(
         raise ValueError("Niveaumix moet tussen 0 en 100 liggen.")
     if not 0 <= settings.team_difference_tolerance <= 1.5:
         raise ValueError("Tolerantie voor teamverschil moet tussen 0 en 1,5 liggen.")
+    if settings.rest_minutes < 0:
+        raise ValueError("Pauzeduur mag niet negatief zijn.")
 
     active_slots = len(courts) * 4
     if len(players) < active_slots:
@@ -550,8 +621,10 @@ def generate_schedule(
     (
         available_by_round,
         unavailable_by_round,
+        unavailable_after_by_round,
         availability_rounds,
         unavailable_counts,
+        unavailable_after_counts,
     ) = _availability_context(players, settings, rounds)
 
     for round_index, available in enumerate(available_by_round):
@@ -559,9 +632,10 @@ def generate_schedule(
             start, _ = round_times(settings, round_index)
             shortage = active_slots - len(available)
             raise ValueError(
-                f"Om {start:%H:%M} zijn slechts {len(available)} spelers aanwezig, "
+                f"Om {start:%H:%M} zijn slechts {len(available)} spelers beschikbaar, "
                 f"maar voor {len(courts)} banen zijn er {active_slots} nodig. "
-                f"Er ontbreken {shortage} speler(s). Pas een vanaf-tijd aan of selecteer minder banen."
+                f"Er ontbreken {shortage} speler(s). Pas een vanaf-/eindtijd aan, "
+                "pas de pauzeduur aan of selecteer minder banen."
             )
 
     play_targets, rest_targets = _build_fairness_targets(
@@ -592,6 +666,7 @@ def generate_schedule(
             next_states: list[SearchState] = []
             available_names = available_by_round[round_index]
             unavailable = unavailable_by_round[round_index]
+            unavailable_after = unavailable_after_by_round[round_index]
             rest_count = rest_counts_per_round[round_index]
             target_play = play_targets[round_index]
             target_rest = rest_targets[round_index]
@@ -639,6 +714,7 @@ def generate_schedule(
                                 matches,
                                 resters,
                                 unavailable,
+                                unavailable_after,
                                 available_names,
                                 names,
                                 target_play,
@@ -673,7 +749,7 @@ def generate_schedule(
     if best_state is None:
         raise RuntimeError(
             "Geen geldig schema gevonden. Probeer 'Uitgebreid zoeken', sta dubbele partners toe, "
-            "verkort de avond of pas het aantal spelers, aankomsttijden of banen aan."
+            "verkort de avond of pas het aantal spelers, beschikbaarheid, pauzeduur of banen aan."
         )
 
     late_players = [
@@ -681,6 +757,13 @@ def generate_schedule(
         for player in players
         if player.available_from is not None
         and _time_offset_minutes(settings.start_time, player.available_from) > 0
+    ]
+    early_leave_players = [
+        player.name
+        for player in players
+        if player.available_until is not None
+        and _time_offset_minutes(settings.start_time, player.available_until)
+        < _session_minutes(settings)
     ]
     rest_min = min(rest_counts_per_round) if rest_counts_per_round else 0
     rest_max = max(rest_counts_per_round) if rest_counts_per_round else 0
@@ -697,11 +780,14 @@ def generate_schedule(
         "play_counts": dict(best_state.play_counts),
         "rest_counts": dict(best_state.rest_counts),
         "unavailable_counts": unavailable_counts,
+        "unavailable_after_counts": unavailable_after_counts,
         "availability_rounds": availability_rounds,
         "target_play_counts": play_targets[-1],
         "partner_counts": dict(best_state.partner_counts),
         "opponent_counts": dict(best_state.opponent_counts),
         "late_players": late_players,
+        "early_leave_players": early_leave_players,
+        "rest_minutes": settings.rest_minutes,
         "level_mix": settings.level_mix,
         "team_difference_tolerance": settings.team_difference_tolerance,
     }
@@ -713,7 +799,7 @@ def schedule_rows(
     players: Sequence[Player],
     settings: PlannerSettings,
 ) -> list[dict[str, object]]:
-    """Maak tabelrijen voor Streamlit en Excel."""
+    """Maak tabelrijen voor de Streamlit-interface en opslag."""
     ranks = {player.name: float(player.ranking) for player in players}
     rows: list[dict[str, object]] = []
 
@@ -748,6 +834,11 @@ def schedule_rows(
                         if round_plan.unavailable
                         else "Niemand"
                     ),
+                    "Niet meer beschikbaar": (
+                        ", ".join(round_plan.unavailable_after)
+                        if round_plan.unavailable_after
+                        else "Niemand"
+                    ),
                 }
             )
     return rows
@@ -775,10 +866,12 @@ def player_statistics(
     play_counts = diagnostics["play_counts"]
     rest_counts = diagnostics["rest_counts"]
     unavailable_counts = diagnostics.get("unavailable_counts", {})
+    unavailable_after_counts = diagnostics.get("unavailable_after_counts", {})
     availability_rounds = diagnostics.get("availability_rounds", {})
     assert isinstance(play_counts, dict)
     assert isinstance(rest_counts, dict)
     assert isinstance(unavailable_counts, dict)
+    assert isinstance(unavailable_after_counts, dict)
     assert isinstance(availability_rounds, dict)
 
     result: list[dict[str, object]] = []
@@ -788,14 +881,23 @@ def player_statistics(
             if player.available_from is not None
             else "Vanaf start"
         )
+        until_label = (
+            player.available_until.strftime("%H:%M")
+            if player.available_until is not None
+            else "Tot einde"
+        )
         result.append(
             {
                 "Speler": player.name,
                 "Ranking": player.ranking,
                 "Beschikbaar vanaf": available_label,
+                "Beschikbaar tot": until_label,
                 "Wedstrijden": int(play_counts.get(player.name, 0)),
                 "Rustbeurten": int(rest_counts.get(player.name, 0)),
                 "Nog niet aanwezig": int(unavailable_counts.get(player.name, 0)),
+                "Niet meer beschikbaar": int(
+                    unavailable_after_counts.get(player.name, 0)
+                ),
                 "Beschikbare rondes": int(availability_rounds.get(player.name, 0)),
                 "Unieke partners": len(partners[player.name]),
                 "Unieke tegenstanders": len(opponents[player.name]),
