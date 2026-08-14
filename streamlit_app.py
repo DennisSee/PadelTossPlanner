@@ -2435,7 +2435,11 @@ def _render_planner_page(store: SupabaseStore, user: AuthenticatedUser) -> None:
 
     toolbar1, toolbar2 = st.columns([1, 3])
     with toolbar1:
-        if st.button("Gedeelde invoer opnieuw laden", width="stretch"):
+        if st.button(
+            "Gedeelde invoer opnieuw laden",
+            width="stretch",
+            help="Niet-opgeslagen wijzigingen in het formulier gaan hierbij verloren.",
+        ):
             st.session_state.pop("club_draft", None)
             st.session_state["club_draft_revision"] = (
                 int(st.session_state.get("club_draft_revision", 0)) + 1
@@ -2451,6 +2455,7 @@ def _render_planner_page(store: SupabaseStore, user: AuthenticatedUser) -> None:
                 f"Laatst opgeslagen door {updated_by or 'een planner'}"
                 f" · {updated_at or 'tijd onbekend'}"
             )
+
     default_title = str(draft.get("event_title") or "TOS Padelavond")
     default_date = _parse_date(draft.get("event_date"), date.today())
     default_start = _parse_time(draft.get("start_time"), time(20, 0))
@@ -2482,148 +2487,359 @@ def _render_planner_page(store: SupabaseStore, user: AuthenticatedUser) -> None:
     default_repeat = bool(draft.get("allow_repeat_partners", False))
     draft_players = _players_dataframe(draft.get("players"))
 
-    st.subheader("1. Avond, speeltijden en banen")
-    title_col, date_col = st.columns([2, 1])
-    with title_col:
-        event_title = st.text_input("Naam van de avond", value=default_title)
-    with date_col:
-        event_date = st.date_input("Datum", value=default_date)
-
-    time_col1, time_col2, time_col3 = st.columns(3)
-    with time_col1:
-        start_time = st.time_input("Starttijd", value=default_start, step=300)
-    with time_col2:
-        end_time = st.time_input("Eindtijd", value=default_end, step=300)
-    with time_col3:
-        match_minutes = st.selectbox(
-            "Wedstrijdduur",
-            options=[15, 20, 25, 30],
-            index=[15, 20, 25, 30].index(default_match),
-            format_func=lambda value: f"{value} minuten",
-        )
-
-    selected_courts = st.multiselect(
-        "Welke banen zijn beschikbaar?",
-        options=COURTS,
-        default=default_courts,
-        help="Iedere geselecteerde baan heeft per ronde vier spelers nodig.",
-    )
-    st.caption(
-        f"Geselecteerd: {len(selected_courts)} baan/banen — "
-        f"{len(selected_courts) * 4} spelers tegelijk op de baan."
-    )
-
-    st.subheader("2. Spelers en ranking")
-    st.caption(
-        "De teller werkt direct bij wanneer je Meedoen aan- of uitvinkt. "
-        "Gebruik zoeken en filteren bij een langere ledenlijst. "
-        "Klik op een kolomkop om de zichtbare rijen te sorteren."
-    )
-
+    # De ledenlijst blijft server-side in session_state staan. De data-editor zelf staat
+    # hieronder in één formulier, zodat losse vinkjes geen Streamlit-rerun veroorzaken.
     player_master = _get_player_master(user.id, draft, draft_players)
-    summary_placeholder = st.empty()
 
-    filter_col1, filter_col2 = st.columns([2, 1])
-    with filter_col1:
-        player_search = st.text_input(
-            "Zoek speler",
-            placeholder="Typ een naam…",
-            key=f"player_search_{user.id}",
-        )
-    with filter_col2:
-        player_filter = st.selectbox(
-            "Toon",
-            options=[
-                "Alle spelers",
-                "Alleen deelnemers",
-                "Niet geselecteerd",
-                "Later aanwezig",
-            ],
-            key=f"player_filter_{user.id}",
-        )
+    filter_options = [
+        "Alle spelers",
+        "Alleen deelnemers",
+        "Niet geselecteerd",
+        "Later aanwezig",
+    ]
+    applied_search_key = f"player_search_applied_{user.id}"
+    applied_filter_key = f"player_filter_applied_{user.id}"
+    filter_input_search_key = f"player_search_form_{user.id}"
+    filter_input_status_key = f"player_filter_form_{user.id}"
 
-    action_col1, action_col2, action_col3 = st.columns([1.15, 1, 1])
-    with action_col1:
-        with st.popover("Speler toevoegen", width="stretch"):
-            new_name = st.text_input(
-                "Naam",
-                key=f"new_player_name_{user.id}",
-            )
-            new_rank = st.number_input(
-                "Ranking",
-                min_value=1,
-                max_value=5,
-                value=3,
-                step=1,
-                key=f"new_player_rank_{user.id}",
-            )
-            new_active = st.checkbox(
-                "Direct op Meedoen zetten",
-                value=True,
-                key=f"new_player_active_{user.id}",
-            )
-            if st.button(
-                "Toevoegen aan ledenlijst",
-                type="primary",
-                width="stretch",
-                key=f"add_player_{user.id}",
-            ):
-                clean_name = str(new_name or "").strip()
-                existing_names = (
-                    player_master["Naam"]
-                    .fillna("")
-                    .astype(str)
-                    .str.strip()
-                    .str.casefold()
-                )
-                if not clean_name:
-                    st.error("Vul een naam in.")
-                elif clean_name.casefold() in set(existing_names):
-                    st.error("Deze speler staat al in de ledenlijst.")
-                else:
-                    added = pd.DataFrame(
-                        [
-                            {
-                                PLAYER_ROW_ID_COLUMN: secrets.token_hex(8),
-                                "Naam": clean_name,
-                                "Ranking": int(new_rank),
-                                "Meedoen": bool(new_active),
-                                "Vanaf tijd": None,
-                                PLAYER_DELETE_COLUMN: False,
-                            }
-                        ]
-                    )
-                    player_master = pd.concat(
-                        [player_master, added],
-                        ignore_index=True,
-                    )
-                    _set_player_master(user.id, player_master)
-                    _bump_player_editor_revision(user.id)
-                    st.rerun()
+    applied_search = str(st.session_state.get(applied_search_key, ""))
+    applied_filter = str(st.session_state.get(applied_filter_key, "Alle spelers"))
+    if applied_filter not in filter_options:
+        applied_filter = "Alle spelers"
+        st.session_state[applied_filter_key] = applied_filter
+
+    # De invoervelden mogen alvast een nieuw filter bevatten, maar de tabel blijft op het
+    # laatst toegepaste filter staan totdat een formulieractie wordt verzonden. Zo kan een
+    # editor-submit altijd veilig aan de rijen worden gekoppeld die de gebruiker zag.
+    st.session_state.setdefault(filter_input_search_key, applied_search)
+    st.session_state.setdefault(filter_input_status_key, applied_filter)
 
     visible_players = _filter_player_master(
         player_master,
-        player_search,
-        player_filter,
+        applied_search,
+        applied_filter,
     )
-
     visible_ids = set(
         visible_players[PLAYER_ROW_ID_COLUMN].fillna("").astype(str)
     )
-    with action_col2:
-        select_visible = st.button(
-            f"Zichtbare aanvinken ({len(visible_players)})",
-            width="stretch",
-            disabled=visible_players.empty,
-            key=f"select_visible_{user.id}",
+
+    _, _, editor_revision_key = _player_master_keys(user.id)
+    editor_revision = int(st.session_state.get(editor_revision_key, 0))
+    editor_filter_key = re.sub(
+        r"[^a-zA-Z0-9]+",
+        "-",
+        f"{applied_filter}-{applied_search}".strip().casefold(),
+    )[:80]
+
+    # Eén formulier voor alle plannerinvoer. Streamlit stuurt de widgetwaarden hierdoor
+    # pas naar Python wanneer de gebruiker bewust een actieknop indrukt. Vooral Meedoen-
+    # vinkjes kunnen daardoor snel achter elkaar worden gewijzigd zonder verspringende tabel.
+    with st.form(
+        f"planner_input_form_{user.id}",
+        border=False,
+        enter_to_submit=False,
+    ):
+        st.subheader("1. Avond, speeltijden en banen")
+        title_col, date_col = st.columns([2, 1])
+        with title_col:
+            event_title = st.text_input("Naam van de avond", value=default_title)
+        with date_col:
+            event_date = st.date_input("Datum", value=default_date)
+
+        time_col1, time_col2, time_col3 = st.columns(3)
+        with time_col1:
+            start_time = st.time_input("Starttijd", value=default_start, step=300)
+        with time_col2:
+            end_time = st.time_input("Eindtijd", value=default_end, step=300)
+        with time_col3:
+            match_minutes = st.selectbox(
+                "Wedstrijdduur",
+                options=[15, 20, 25, 30],
+                index=[15, 20, 25, 30].index(default_match),
+                format_func=lambda value: f"{value} minuten",
+            )
+
+        selected_courts = st.multiselect(
+            "Welke banen zijn beschikbaar?",
+            options=COURTS,
+            default=default_courts,
+            help="Iedere geselecteerde baan heeft per ronde vier spelers nodig.",
         )
-    with action_col3:
-        deselect_visible = st.button(
-            "Zichtbare uitvinken",
-            width="stretch",
-            disabled=visible_players.empty,
-            key=f"deselect_visible_{user.id}",
+        st.caption(
+            f"Geselecteerd: {len(selected_courts)} baan/banen — "
+            f"{len(selected_courts) * 4} spelers tegelijk op de baan."
         )
+
+        st.subheader("2. Spelers en ranking")
+        st.caption(
+            "Je kunt meerdere spelers achter elkaar aan- of uitvinken zonder dat de "
+            "pagina tussendoor ververst. Zoeken en filteren worden toegepast met "
+            "'Filter toepassen'. De deelnemersteller verandert pas na een formulieractie."
+        )
+
+        summary_placeholder = st.empty()
+        summary_placeholder.markdown(
+            _player_summary_html(player_master, selected_courts),
+            unsafe_allow_html=True,
+        )
+
+        filter_col1, filter_col2, filter_col3 = st.columns([1.7, 1, 0.72])
+        with filter_col1:
+            player_search = st.text_input(
+                "Zoek speler",
+                placeholder="Typ een naam…",
+                key=filter_input_search_key,
+            )
+        with filter_col2:
+            player_filter = st.selectbox(
+                "Toon",
+                options=filter_options,
+                key=filter_input_status_key,
+            )
+        with filter_col3:
+            st.write("")
+            apply_filter = st.form_submit_button(
+                "Filter toepassen",
+                width="stretch",
+                key=f"apply_player_filter_{user.id}",
+            )
+
+        action_col1, action_col2, action_col3 = st.columns([1.15, 1, 1])
+        with action_col1:
+            with st.popover("Speler toevoegen", width="stretch"):
+                new_name = st.text_input(
+                    "Naam",
+                    key=f"new_player_name_{user.id}",
+                )
+                new_rank = st.number_input(
+                    "Ranking",
+                    min_value=1,
+                    max_value=5,
+                    value=3,
+                    step=1,
+                    key=f"new_player_rank_{user.id}",
+                )
+                new_active = st.checkbox(
+                    "Direct op Meedoen zetten",
+                    value=True,
+                    key=f"new_player_active_{user.id}",
+                )
+                add_player = st.form_submit_button(
+                    "Toevoegen aan ledenlijst",
+                    type="primary",
+                    width="stretch",
+                    key=f"add_player_{user.id}",
+                )
+
+        with action_col2:
+            select_visible = st.form_submit_button(
+                f"Zichtbare aanvinken ({len(visible_players)})",
+                width="stretch",
+                disabled=visible_players.empty,
+                key=f"select_visible_{user.id}",
+            )
+        with action_col3:
+            deselect_visible = st.form_submit_button(
+                "Zichtbare uitvinken",
+                width="stretch",
+                disabled=visible_players.empty,
+                key=f"deselect_visible_{user.id}",
+            )
+
+        edited_visible = st.data_editor(
+            visible_players,
+            num_rows="fixed",
+            hide_index=True,
+            width="stretch",
+            column_order=(
+                "Naam",
+                "Ranking",
+                "Meedoen",
+                "Vanaf tijd",
+                PLAYER_DELETE_COLUMN,
+            ),
+            column_config={
+                PLAYER_ROW_ID_COLUMN: None,
+                "Naam": st.column_config.TextColumn("Naam", required=True),
+                "Ranking": st.column_config.NumberColumn(
+                    "Ranking",
+                    min_value=1,
+                    max_value=5,
+                    step=1,
+                    required=True,
+                ),
+                "Meedoen": st.column_config.CheckboxColumn(
+                    "Meedoen",
+                    default=False,
+                ),
+                "Vanaf tijd": st.column_config.TimeColumn(
+                    "Vanaf tijd",
+                    help=(
+                        "Optioneel. De speler doet mee vanaf de eerste ronde die op of "
+                        "na deze tijd begint. Leeg betekent vanaf de starttijd."
+                    ),
+                    required=False,
+                    min_value=start_time if end_time > start_time else None,
+                    max_value=end_time if end_time > start_time else None,
+                    format="HH:mm",
+                    step=300,
+                ),
+                PLAYER_DELETE_COLUMN: st.column_config.CheckboxColumn(
+                    "Verwijderen",
+                    help=(
+                        "Vink één of meer spelers aan en gebruik daarna de knop "
+                        "'Gemarkeerde spelers verwijderen'."
+                    ),
+                    default=False,
+                ),
+            },
+            key=(
+                f"{_player_editor_key(user.id, draft)}_"
+                f"{editor_revision}_{editor_filter_key}"
+            ),
+        )
+
+        delete_col, info_col = st.columns([1, 2])
+        with delete_col:
+            delete_players = st.form_submit_button(
+                "Gemarkeerde spelers verwijderen",
+                disabled=player_master.empty,
+                width="stretch",
+                key=f"delete_players_{user.id}",
+            )
+        with info_col:
+            st.caption(
+                f"Zichtbaar: {len(visible_players)} van {len(player_master)} spelers. "
+                "De filters veranderen alleen de weergave; weggefilterde spelers blijven bewaard."
+            )
+
+        with st.expander("Geavanceerde instellingen"):
+            search_profile = st.selectbox(
+                "Zoekkwaliteit",
+                options=list(SEARCH_PROFILES),
+                index=list(SEARCH_PROFILES).index(default_profile),
+            )
+            level_mix = st.slider(
+                "Variatie in niveaus",
+                min_value=0,
+                max_value=100,
+                value=default_level_mix,
+                step=10,
+                help=(
+                    "0 groepeert spelers zoveel mogelijk met vergelijkbare niveaus. "
+                    "100 maakt bewust meer gemengde banen, bijvoorbeeld 5+3 tegen "
+                    "5+3 of 5+3 tegen 4+4. De planner blijft de gemiddelde "
+                    "teamsterkte zo gelijk mogelijk houden."
+                ),
+            )
+            st.caption(
+                "0 = niveaus bij elkaar · 50 = gebalanceerde mix · "
+                "100 = veel niveauvariatie"
+            )
+            team_difference_tolerance = st.slider(
+                "Tolerantie voor teamverschil",
+                min_value=0.0,
+                max_value=1.5,
+                value=default_team_tolerance,
+                step=0.5,
+                help=(
+                    "Verschillen in gemiddelde teamsterkte tot en met deze waarde "
+                    "krijgen geen strafpunten. Bij 0,5 zijn bijvoorbeeld 4,0 tegen "
+                    "4,5 en 3,0 tegen 3,5 gewoon acceptabel. 0,0 is zeer strikt; "
+                    "1,0 of 1,5 geeft duidelijk meer vrijheid."
+                ),
+            )
+            st.caption(
+                "Aanbevolen: 0,5 · 0,0 = exact gelijk · 1,0–1,5 = losser"
+            )
+            allow_repeat_partners = st.checkbox(
+                "Dubbele partners toestaan wanneer nodig",
+                value=default_repeat,
+            )
+
+        button1, button2 = st.columns(2)
+        with button1:
+            save_input = st.form_submit_button(
+                "Alleen invoer opslaan",
+                width="stretch",
+                key=f"save_input_{user.id}",
+            )
+        with button2:
+            generate = st.form_submit_button(
+                "Schema genereren",
+                type="primary",
+                width="stretch",
+                key=f"generate_schedule_{user.id}",
+            )
+
+    form_submitted = any(
+        (
+            apply_filter,
+            add_player,
+            select_visible,
+            deselect_visible,
+            delete_players,
+            save_input,
+            generate,
+        )
+    )
+
+    if form_submitted:
+        # Alle wijzigingen uit de zichtbare editor komen in één keer binnen. Door de
+        # stabiele interne rij-ID blijven weggefilterde spelers volledig onaangeroerd.
+        player_master = _merge_visible_player_edits(
+            player_master,
+            edited_visible,
+        )
+        _set_player_master(user.id, player_master)
+
+        # Een nieuwe zoek-/filterkeuze wordt bij iedere bewuste formulieractie de
+        # toegepaste keuze. De actie zelf blijft altijd werken op de rijen die vóór
+        # de klik zichtbaar waren (visible_ids), zodat bulkacties voorspelbaar blijven.
+        st.session_state[applied_search_key] = str(player_search or "")
+        st.session_state[applied_filter_key] = (
+            str(player_filter)
+            if str(player_filter) in filter_options
+            else "Alle spelers"
+        )
+
+    if apply_filter:
+        _bump_player_editor_revision(user.id)
+        st.rerun()
+
+    if add_player:
+        clean_name = str(new_name or "").strip()
+        existing_names = (
+            player_master["Naam"]
+            .fillna("")
+            .astype(str)
+            .str.strip()
+            .str.casefold()
+        )
+        if not clean_name:
+            st.error("Vul een naam in.")
+        elif clean_name.casefold() in set(existing_names):
+            st.error("Deze speler staat al in de ledenlijst.")
+        else:
+            added = pd.DataFrame(
+                [
+                    {
+                        PLAYER_ROW_ID_COLUMN: secrets.token_hex(8),
+                        "Naam": clean_name,
+                        "Ranking": int(new_rank),
+                        "Meedoen": bool(new_active),
+                        "Vanaf tijd": None,
+                        PLAYER_DELETE_COLUMN: False,
+                    }
+                ]
+            )
+            player_master = pd.concat(
+                [player_master, added],
+                ignore_index=True,
+            )
+            _set_player_master(user.id, player_master)
+            _bump_player_editor_revision(user.id)
+            st.rerun()
 
     if select_visible or deselect_visible:
         mask = player_master[PLAYER_ROW_ID_COLUMN].astype(str).isin(visible_ids)
@@ -2632,161 +2848,21 @@ def _render_planner_page(store: SupabaseStore, user: AuthenticatedUser) -> None:
         _bump_player_editor_revision(user.id)
         st.rerun()
 
-    _, _, editor_revision_key = _player_master_keys(user.id)
-    editor_revision = int(st.session_state.get(editor_revision_key, 0))
-    editor_filter_key = re.sub(
-        r"[^a-zA-Z0-9]+",
-        "-",
-        f"{player_filter}-{player_search}".strip().casefold(),
-    )[:80]
-
-    edited_visible = st.data_editor(
-        visible_players,
-        num_rows="fixed",
-        hide_index=True,
-        width="stretch",
-        column_order=(
-            "Naam",
-            "Ranking",
-            "Meedoen",
-            "Vanaf tijd",
-            PLAYER_DELETE_COLUMN,
-        ),
-        column_config={
-            PLAYER_ROW_ID_COLUMN: None,
-            "Naam": st.column_config.TextColumn("Naam", required=True),
-            "Ranking": st.column_config.NumberColumn(
-                "Ranking",
-                min_value=1,
-                max_value=5,
-                step=1,
-                required=True,
-            ),
-            "Meedoen": st.column_config.CheckboxColumn(
-                "Meedoen",
-                default=False,
-            ),
-            "Vanaf tijd": st.column_config.TimeColumn(
-                "Vanaf tijd",
-                help=(
-                    "Optioneel. De speler doet mee vanaf de eerste ronde die op of "
-                    "na deze tijd begint. Leeg betekent vanaf de starttijd."
-                ),
-                required=False,
-                min_value=start_time if end_time > start_time else None,
-                max_value=end_time if end_time > start_time else None,
-                format="HH:mm",
-                step=300,
-            ),
-            PLAYER_DELETE_COLUMN: st.column_config.CheckboxColumn(
-                "Verwijderen",
-                help=(
-                    "Vink één of meer spelers aan en gebruik daarna de knop "
-                    "'Gemarkeerde spelers verwijderen'."
-                ),
-                default=False,
-            ),
-        },
-        key=(
-            f"{_player_editor_key(user.id, draft)}_"
-            f"{editor_revision}_{editor_filter_key}"
-        ),
-    )
-
-    player_master = _merge_visible_player_edits(
-        player_master,
-        edited_visible,
-    )
-    _set_player_master(user.id, player_master)
-
-    delete_count = int(
-        player_master[PLAYER_DELETE_COLUMN].fillna(False).astype(bool).sum()
-    )
-    delete_col, info_col = st.columns([1, 2])
-    with delete_col:
-        if st.button(
-            f"Gemarkeerde spelers verwijderen ({delete_count})",
-            disabled=delete_count == 0,
-            width="stretch",
-            key=f"delete_players_{user.id}",
-        ):
-            player_master = player_master[
-                ~player_master[PLAYER_DELETE_COLUMN].fillna(False).astype(bool)
-            ].copy()
+    if delete_players:
+        delete_mask = player_master[PLAYER_DELETE_COLUMN].fillna(False).astype(bool)
+        delete_count = int(delete_mask.sum())
+        if delete_count == 0:
+            st.warning(
+                "Markeer eerst één of meer spelers in de kolom Verwijderen en druk "
+                "daarna opnieuw op 'Gemarkeerde spelers verwijderen'."
+            )
+        else:
+            player_master = player_master[~delete_mask].copy()
             _set_player_master(user.id, player_master)
             _bump_player_editor_revision(user.id)
             st.rerun()
-    with info_col:
-        st.caption(
-            f"Zichtbaar: {len(visible_players)} van {len(player_master)} spelers. "
-            "De filters veranderen alleen de weergave; weggefilterde spelers blijven bewaard."
-        )
-
-    summary_placeholder.markdown(
-        _player_summary_html(player_master, selected_courts),
-        unsafe_allow_html=True,
-    )
 
     edited_players = player_master[PLAYER_EDITOR_COLUMNS].copy()
-
-    with st.expander("Geavanceerde instellingen"):
-        search_profile = st.selectbox(
-            "Zoekkwaliteit",
-            options=list(SEARCH_PROFILES),
-            index=list(SEARCH_PROFILES).index(default_profile),
-        )
-        level_mix = st.slider(
-            "Variatie in niveaus",
-            min_value=0,
-            max_value=100,
-            value=default_level_mix,
-            step=10,
-            help=(
-                "0 groepeert spelers zoveel mogelijk met vergelijkbare niveaus. "
-                "100 maakt bewust meer gemengde banen, bijvoorbeeld 5+3 tegen "
-                "5+3 of 5+3 tegen 4+4. De planner blijft de gemiddelde "
-                "teamsterkte zo gelijk mogelijk houden."
-            ),
-        )
-        st.caption(
-            "0 = niveaus bij elkaar · 50 = gebalanceerde mix · "
-            "100 = veel niveauvariatie"
-        )
-        team_difference_tolerance = st.slider(
-            "Tolerantie voor teamverschil",
-            min_value=0.0,
-            max_value=1.5,
-            value=default_team_tolerance,
-            step=0.5,
-            help=(
-                "Verschillen in gemiddelde teamsterkte tot en met deze waarde "
-                "krijgen geen strafpunten. Bij 0,5 zijn bijvoorbeeld 4,0 tegen "
-                "4,5 en 3,0 tegen 3,5 gewoon acceptabel. 0,0 is zeer strikt; "
-                "1,0 of 1,5 geeft duidelijk meer vrijheid."
-            ),
-        )
-        st.caption(
-            "Aanbevolen: 0,5 · 0,0 = exact gelijk · 1,0–1,5 = losser"
-        )
-        allow_repeat_partners = st.checkbox(
-            "Dubbele partners toestaan wanneer nodig",
-            value=default_repeat,
-        )
-
-    button1, button2 = st.columns(2)
-    with button1:
-        save_input = st.button(
-            "Alleen invoer opslaan",
-            width="stretch",
-            key=f"save_input_{user.id}",
-        )
-    with button2:
-        generate = st.button(
-            "Schema genereren",
-            type="primary",
-            width="stretch",
-            key=f"generate_schedule_{user.id}",
-        )
 
     if save_input or generate:
         payload = _draft_payload(
