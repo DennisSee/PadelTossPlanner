@@ -1637,8 +1637,29 @@ def _player_editor_key(user_id: str, draft: Mapping[str, Any]) -> str:
 
 
 PLAYER_EDITOR_COLUMNS = ["Naam", "Ranking", "Meedoen", "Vanaf tijd", "Tot tijd"]
+PLAYER_TIME_COLUMNS = ("Vanaf tijd", "Tot tijd")
 PLAYER_ROW_ID_COLUMN = "_row_id"
 PLAYER_DELETE_COLUMN = "Verwijderen"
+
+
+def _normalize_player_time_columns(frame: pd.DataFrame) -> pd.DataFrame:
+    """Houd tijdkolommen canoniek als ``datetime.time`` of ``None``.
+
+    Streamlit behandelt een volledig lege TimeColumn eerst als een kolom zonder
+    datatype. Wanneer daarna voor het eerst een tijd wordt ingevuld, kan de
+    frontend die waarde als tekst teruggeven. Zonder normalisatie wordt de kolom
+    bij de volgende rerun als ``string`` gezien, terwijl een TimeColumn alleen
+    ``time``, ``datetime`` of leeg accepteert.
+
+    Door zowel bestaande sessiestate als nieuwe editorwaarden hier te normaliseren
+    blijft de data-editor ook na de eerste ingevulde Vanaf/Tot-tijd geldig.
+    """
+    normalized = frame.copy()
+    for column in PLAYER_TIME_COLUMNS:
+        if column not in normalized.columns:
+            normalized[column] = None
+        normalized[column] = normalized[column].map(_parse_optional_time)
+    return normalized
 
 
 def _player_master_keys(user_id: str) -> tuple[str, str, str]:
@@ -1651,7 +1672,7 @@ def _player_master_keys(user_id: str) -> tuple[str, str, str]:
 
 def _prepare_player_master(frame: pd.DataFrame) -> pd.DataFrame:
     """Voeg interne rij-ID's en een verwijderkolom toe aan de ledenlijst."""
-    prepared = frame.copy().reset_index(drop=True)
+    prepared = _normalize_player_time_columns(frame).reset_index(drop=True)
     for column, default in (
         ("Naam", ""),
         ("Ranking", 3),
@@ -1696,13 +1717,19 @@ def _get_player_master(
     master = st.session_state.get(master_key)
     if not isinstance(master, pd.DataFrame):
         master = _prepare_player_master(initial_frame)
-        st.session_state[master_key] = master
+
+    # Ook bestaande sessies van vóór deze hotfix kunnen tekstwaarden zoals
+    # ``21:30`` bevatten. Normaliseer vóórdat de data-editor ze opnieuw ziet.
+    master = _normalize_player_time_columns(master).reset_index(drop=True)
+    st.session_state[master_key] = master
     return master.copy()
 
 
 def _set_player_master(user_id: str, frame: pd.DataFrame) -> None:
     master_key, _, _ = _player_master_keys(user_id)
-    st.session_state[master_key] = frame.copy().reset_index(drop=True)
+    st.session_state[master_key] = _normalize_player_time_columns(frame).reset_index(
+        drop=True
+    )
 
 
 def _bump_player_editor_revision(user_id: str) -> None:
@@ -1763,7 +1790,9 @@ def _merge_visible_player_edits(
         for column in (*PLAYER_EDITOR_COLUMNS, PLAYER_DELETE_COLUMN):
             merged.at[row_id, column] = row.get(column)
 
-    return merged.reset_index(drop=True)
+    # Een voorheen volledig lege TimeColumn kan door Streamlit na de eerste edit
+    # als tekst terugkomen. Zet die waarden direct terug naar echte tijden.
+    return _normalize_player_time_columns(merged.reset_index(drop=True))
 
 
 def _player_summary_html(
