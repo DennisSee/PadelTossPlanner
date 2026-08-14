@@ -25,7 +25,6 @@ from database import (
     SupabaseStore,
     config_from_secrets,
 )
-from excel_export import build_excel_bytes
 from planner import (
     Player,
     PlannerSettings,
@@ -47,16 +46,16 @@ COURTS = [
 
 DEFAULT_PLAYERS = pd.DataFrame(
     [
-        {"Naam": "Dennis", "Ranking": 4, "Meedoen": True, "Vanaf tijd": None},
-        {"Naam": "Marieke", "Ranking": 3, "Meedoen": True, "Vanaf tijd": None},
-        {"Naam": "Peter", "Ranking": 5, "Meedoen": True, "Vanaf tijd": None},
-        {"Naam": "Anita", "Ranking": 2, "Meedoen": True, "Vanaf tijd": None},
-        {"Naam": "Bjorn", "Ranking": 3, "Meedoen": True, "Vanaf tijd": None},
-        {"Naam": "Jeroen", "Ranking": 4, "Meedoen": True, "Vanaf tijd": None},
-        {"Naam": "Jim", "Ranking": 2, "Meedoen": True, "Vanaf tijd": None},
-        {"Naam": "Frans", "Ranking": 3, "Meedoen": True, "Vanaf tijd": None},
-        {"Naam": "Trever", "Ranking": 5, "Meedoen": True, "Vanaf tijd": None},
-        {"Naam": "Niels", "Ranking": 3, "Meedoen": True, "Vanaf tijd": None},
+        {"Naam": "Dennis", "Ranking": 4, "Meedoen": True, "Vanaf tijd": None, "Tot tijd": None},
+        {"Naam": "Marieke", "Ranking": 3, "Meedoen": True, "Vanaf tijd": None, "Tot tijd": None},
+        {"Naam": "Peter", "Ranking": 5, "Meedoen": True, "Vanaf tijd": None, "Tot tijd": None},
+        {"Naam": "Anita", "Ranking": 2, "Meedoen": True, "Vanaf tijd": None, "Tot tijd": None},
+        {"Naam": "Bjorn", "Ranking": 3, "Meedoen": True, "Vanaf tijd": None, "Tot tijd": None},
+        {"Naam": "Jeroen", "Ranking": 4, "Meedoen": True, "Vanaf tijd": None, "Tot tijd": None},
+        {"Naam": "Jim", "Ranking": 2, "Meedoen": True, "Vanaf tijd": None, "Tot tijd": None},
+        {"Naam": "Frans", "Ranking": 3, "Meedoen": True, "Vanaf tijd": None, "Tot tijd": None},
+        {"Naam": "Trever", "Ranking": 5, "Meedoen": True, "Vanaf tijd": None, "Tot tijd": None},
+        {"Naam": "Niels", "Ranking": 3, "Meedoen": True, "Vanaf tijd": None, "Tot tijd": None},
     ]
 )
 
@@ -70,7 +69,16 @@ SEARCH_PROFILES = {
     },
 }
 
-PUBLIC_COLUMNS = ["Ronde", "Tijd", "Baan", "Team 1", "Team 2", "Rust", "Nog niet aanwezig"]
+PUBLIC_COLUMNS = [
+    "Ronde",
+    "Tijd",
+    "Baan",
+    "Team 1",
+    "Team 2",
+    "Rust",
+    "Nog niet aanwezig",
+    "Niet meer beschikbaar",
+]
 PRIVATE_LEVEL_COLUMNS = ["Niveau T1", "Niveau T2", "Teamverschil"]
 LOCAL_TIMEZONE = ZoneInfo("Europe/Amsterdam")
 LIVE_SWITCH_LEAD_MINUTES = 2
@@ -1101,6 +1109,7 @@ def _public_round_card_html(
     first = round_rows[0] if round_rows else {}
     rest = _normalise_public_text(first.get('Rust'))
     unavailable = _normalise_public_text(first.get('Nog niet aanwezig'))
+    unavailable_after = _normalise_public_text(first.get('Niet meer beschikbaar'))
     footer_bits: list[str] = []
     if rest:
         footer_bits.append(
@@ -1110,6 +1119,11 @@ def _public_round_card_html(
         footer_bits.append(
             '<span class="tos-footer-chip tos-footer-away">'
             f'Nog niet aanwezig: {escape(unavailable)}</span>'
+        )
+    if unavailable_after:
+        footer_bits.append(
+            '<span class="tos-footer-chip tos-footer-away">'
+            f'Niet meer beschikbaar: {escape(unavailable_after)}</span>'
         )
     footer = (
         f'<div class="tos-round-footer">{"".join(footer_bits)}</div>'
@@ -1189,6 +1203,12 @@ def _personal_round_card_html(
         body = (
             '<span class="tos-status tos-status-rest">Rust</span>'
             '<div class="tos-matchup">Deze ronde heb je rust.</div>'
+        )
+    elif status == 'Niet meer beschikbaar':
+        card_class = 'tos-card-away'
+        body = (
+            '<span class="tos-status tos-status-away">Niet meer beschikbaar</span>'
+            '<div class="tos-matchup">Deze ronde valt na jouw ingestelde eindtijd.</div>'
         )
     else:
         card_class = 'tos-card-away'
@@ -1463,13 +1483,14 @@ def _get_store(config: SupabaseConfig) -> SupabaseStore:
 
 
 def _generate_schedule_once(
-    player_records: tuple[tuple[str, float, str], ...],
+    player_records: tuple[tuple[str, float, str, str], ...],
     courts: tuple[str, ...],
     start_hour: int,
     start_minute: int,
     end_hour: int,
     end_minute: int,
     match_minutes: int,
+    rest_minutes: int,
     search_profile: str,
     level_mix: int,
     team_difference_tolerance: float,
@@ -1482,14 +1503,16 @@ def _generate_schedule_once(
             name=name,
             ranking=ranking,
             available_from=_parse_optional_time(available_from),
+            available_until=_parse_optional_time(available_until),
         )
-        for name, ranking, available_from in player_records
+        for name, ranking, available_from, available_until in player_records
     ]
     profile = SEARCH_PROFILES[search_profile]
     settings = PlannerSettings(
         start_time=time(start_hour, start_minute),
         end_time=time(end_hour, end_minute),
         match_minutes=match_minutes,
+        rest_minutes=rest_minutes,
         allow_repeat_partners=allow_repeat_partners,
         level_mix=level_mix,
         team_difference_tolerance=team_difference_tolerance,
@@ -1499,12 +1522,10 @@ def _generate_schedule_once(
     rounds, diagnostics = generate_schedule(players, list(courts), settings)
     rows = schedule_rows(rounds, list(courts), players, settings)
     stats = player_statistics(rounds, players, diagnostics)
-    excel = build_excel_bytes(settings, players, list(courts), rounds, diagnostics)
     return {
         "schedule": rows,
         "statistics": stats,
         "diagnostics": diagnostics,
-        "excel": excel,
         "generation_seed": generation_seed,
     }
 
@@ -1557,7 +1578,7 @@ def _parse_optional_time(value: Any) -> time | None:
     try:
         return _time_from_value(value)
     except (TypeError, ValueError) as exc:
-        raise ValueError(f"Ongeldige vanaf-tijd: {text}.") from exc
+        raise ValueError(f"Ongeldige tijd: {text}.") from exc
 
 
 def _parse_date(value: Any, fallback: date) -> date:
@@ -1574,7 +1595,7 @@ def _players_dataframe(records: Any) -> pd.DataFrame:
     tonen we de voorbeeldspelers. Een bewust leeg opgeslagen JSON-array mag nooit de
     standaardlijst opnieuw activeren.
     """
-    columns = ["Naam", "Ranking", "Meedoen", "Vanaf tijd"]
+    columns = ["Naam", "Ranking", "Meedoen", "Vanaf tijd", "Tot tijd"]
 
     if records is None:
         return DEFAULT_PLAYERS.copy()
@@ -1589,10 +1610,12 @@ def _players_dataframe(records: Any) -> pd.DataFrame:
         ("Ranking", 3),
         ("Meedoen", True),
         ("Vanaf tijd", None),
+        ("Tot tijd", None),
     ):
         if column not in frame.columns:
             frame[column] = default
     frame["Vanaf tijd"] = frame["Vanaf tijd"].map(_parse_optional_time)
+    frame["Tot tijd"] = frame["Tot tijd"].map(_parse_optional_time)
     return frame[columns]
 
 
@@ -1613,7 +1636,7 @@ def _player_editor_key(user_id: str, draft: Mapping[str, Any]) -> str:
     return f"players_editor_{user_id}_{safe_revision}_{local_revision}"
 
 
-PLAYER_EDITOR_COLUMNS = ["Naam", "Ranking", "Meedoen", "Vanaf tijd"]
+PLAYER_EDITOR_COLUMNS = ["Naam", "Ranking", "Meedoen", "Vanaf tijd", "Tot tijd"]
 PLAYER_ROW_ID_COLUMN = "_row_id"
 PLAYER_DELETE_COLUMN = "Verwijderen"
 
@@ -1634,6 +1657,7 @@ def _prepare_player_master(frame: pd.DataFrame) -> pd.DataFrame:
         ("Ranking", 3),
         ("Meedoen", False),
         ("Vanaf tijd", None),
+        ("Tot tijd", None),
     ):
         if column not in prepared.columns:
             prepared[column] = default
@@ -1714,6 +1738,11 @@ def _filter_player_master(
             visible["Meedoen"].fillna(False)
             & visible["Vanaf tijd"].map(_parse_optional_time).notna()
         ]
+    elif status_filter == "Eerder weg":
+        visible = visible[
+            visible["Meedoen"].fillna(False)
+            & visible["Tot tijd"].map(_parse_optional_time).notna()
+        ]
 
     return visible.copy()
 
@@ -1748,6 +1777,9 @@ def _player_summary_html(
     later_count = int(
         active["Vanaf tijd"].map(_parse_optional_time).notna().sum()
     )
+    earlier_count = int(
+        active["Tot tijd"].map(_parse_optional_time).notna().sum()
+    )
     start_count = active_count - later_count
     capacity = len(selected_courts) * 4
 
@@ -1757,6 +1789,8 @@ def _player_summary_html(
     ]
     if later_count:
         items.append(f"{later_count} later aanwezig")
+    if earlier_count:
+        items.append(f"{earlier_count} eerder weg")
     items.append(f"{total_members} leden totaal")
 
     if capacity:
@@ -1787,6 +1821,7 @@ def _serialize_editor_rows(data: pd.DataFrame) -> list[dict[str, object]]:
         ranking_value = pd.to_numeric(row.get("Ranking"), errors="coerce")
         ranking = None if pd.isna(ranking_value) else int(ranking_value)
         available_from = _parse_optional_time(row.get("Vanaf tijd"))
+        available_until = _parse_optional_time(row.get("Tot tijd"))
         rows.append(
             {
                 "Naam": name,
@@ -1795,13 +1830,16 @@ def _serialize_editor_rows(data: pd.DataFrame) -> list[dict[str, object]]:
                 "Vanaf tijd": (
                     available_from.strftime("%H:%M") if available_from else None
                 ),
+                "Tot tijd": (
+                    available_until.strftime("%H:%M") if available_until else None
+                ),
             }
         )
     return rows
 
 
 def _parse_players(data: pd.DataFrame) -> list[Player]:
-    required_columns = {"Naam", "Ranking", "Meedoen", "Vanaf tijd"}
+    required_columns = {"Naam", "Ranking", "Meedoen", "Vanaf tijd", "Tot tijd"}
     if not required_columns.issubset(data.columns):
         raise ValueError("De spelerstabel mist één of meer verplichte kolommen.")
 
@@ -1832,6 +1870,7 @@ def _parse_players(data: pd.DataFrame) -> list[Player]:
                 name=str(row["Naam"]),
                 ranking=float(row["Ranking"]),
                 available_from=_parse_optional_time(row.get("Vanaf tijd")),
+                available_until=_parse_optional_time(row.get("Tot tijd")),
             )
         )
     return players
@@ -1900,6 +1939,24 @@ def _personal_schedule_rows(
             )
             continue
 
+        unavailable_after_names = (
+            _cell_names(round_rows[0].get("Niet meer beschikbaar"), ",")
+            if round_rows
+            else set()
+        )
+        if player_key in unavailable_after_names:
+            result.append(
+                {
+                    "Ronde": round_number,
+                    "Tijd": round_time,
+                    "Status": "Niet meer beschikbaar",
+                    "Baan": "—",
+                    "Team 1": "—",
+                    "Team 2": "—",
+                }
+            )
+            continue
+
         rest_names = _cell_names(round_rows[0].get("Rust"), ",") if round_rows else set()
         if player_key in rest_names:
             result.append(
@@ -1926,12 +1983,14 @@ def _diagnostics_for_storage(diagnostics: Mapping[str, object]) -> dict[str, obj
         "rest_count",
         "score",
         "level_mix",
+        "rest_minutes",
     ):
         result[key] = diagnostics.get(key)
     for key in (
         "play_counts",
         "rest_counts",
         "unavailable_counts",
+        "unavailable_after_counts",
         "availability_rounds",
     ):
         counts = diagnostics.get(key)
@@ -1943,6 +2002,9 @@ def _diagnostics_for_storage(diagnostics: Mapping[str, object]) -> dict[str, obj
     late_players = diagnostics.get("late_players")
     if isinstance(late_players, list):
         result["late_players"] = [str(name) for name in late_players]
+    early_leave_players = diagnostics.get("early_leave_players")
+    if isinstance(early_leave_players, list):
+        result["early_leave_players"] = [str(name) for name in early_leave_players]
     return result
 
 
@@ -2283,6 +2345,7 @@ def _draft_payload(
     start_time: time,
     end_time: time,
     match_minutes: int,
+    rest_minutes: int,
     selected_courts: list[str],
     edited_players: pd.DataFrame,
     search_profile: str,
@@ -2296,6 +2359,7 @@ def _draft_payload(
         "start_time": start_time.strftime("%H:%M"),
         "end_time": end_time.strftime("%H:%M"),
         "match_minutes": int(match_minutes),
+        "rest_minutes": int(rest_minutes),
         "selected_courts": list(selected_courts),
         "players": _serialize_editor_rows(edited_players),
         "search_profile": search_profile,
@@ -2315,11 +2379,12 @@ def _render_private_result(store: SupabaseStore, user: AuthenticatedUser) -> Non
 
     st.divider()
     st.success("Schema gegenereerd. De gedeelde invoer is voor alle planners opgeslagen.")
-    metric1, metric2, metric3, metric4 = st.columns(4)
+    metric1, metric2, metric3, metric4, metric5 = st.columns(5)
     metric1.metric("Rondes", diagnostics["rounds"])
     metric2.metric("Banen", diagnostics["courts_used"])
-    metric3.metric("Rusters per ronde", diagnostics["rest_count"])
-    metric4.metric("Onbenutte tijd", f"{diagnostics['unused_minutes']} min")
+    metric3.metric("Pauze", f"{int(diagnostics.get('rest_minutes', 0))} min")
+    metric4.metric("Rusters per ronde", diagnostics["rest_count"])
+    metric5.metric("Onbenutte tijd", f"{diagnostics['unused_minutes']} min")
     st.caption(
         f"Niveaumix: **{int(diagnostics.get('level_mix', 50))}/100** · "
         f"toegestaan teamverschil: **{float(diagnostics.get('team_difference_tolerance', 0.5)):.1f}** — "
@@ -2330,6 +2395,12 @@ def _render_private_result(store: SupabaseStore, user: AuthenticatedUser) -> Non
         st.info(
             "Later aanwezig: " + ", ".join(str(name) for name in late_players) + ". "
             "Afwezigheid vóór hun vanaf-tijd telt niet als een echte rustbeurt."
+        )
+    early_leave_players = diagnostics.get("early_leave_players")
+    if isinstance(early_leave_players, list) and early_leave_players:
+        st.info(
+            "Eerder weg: " + ", ".join(str(name) for name in early_leave_players) + ". "
+            "Rondes die niet volledig vóór hun eindtijd passen tellen niet als rust."
         )
 
     schema_tab, stats_tab = st.tabs(["Wedstrijdschema", "Spelerstatistiek"])
@@ -2351,13 +2422,6 @@ def _render_private_result(store: SupabaseStore, user: AuthenticatedUser) -> Non
         stats_df = pd.DataFrame(result["statistics"])
         st.dataframe(stats_df, hide_index=True, width="stretch")
 
-    st.download_button(
-        "Download schema als Excel",
-        data=result["excel"],
-        file_name="tos_padelschema.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        width="stretch",
-    )
 
     with st.container(border=True):
         st.subheader("Schema opslaan")
@@ -2415,6 +2479,7 @@ def _schedule_fingerprint(rows: object) -> tuple[tuple[str, ...], ...]:
         "Team 2",
         "Rust",
         "Nog niet aanwezig",
+        "Niet meer beschikbaar",
     )
     return tuple(
         tuple(str(row.get(column, "")) for column in columns)
@@ -2463,6 +2528,11 @@ def _render_planner_page(store: SupabaseStore, user: AuthenticatedUser) -> None:
     default_match = int(draft.get("match_minutes") or 20)
     if default_match not in [15, 20, 25, 30]:
         default_match = 20
+    try:
+        default_rest = int(draft.get("rest_minutes") or 0)
+    except (TypeError, ValueError):
+        default_rest = 0
+    default_rest = max(0, min(30, default_rest))
     draft_courts = draft.get("selected_courts")
     default_courts = (
         [court for court in draft_courts if court in COURTS]
@@ -2496,6 +2566,7 @@ def _render_planner_page(store: SupabaseStore, user: AuthenticatedUser) -> None:
         "Alleen deelnemers",
         "Niet geselecteerd",
         "Later aanwezig",
+        "Eerder weg",
     ]
     applied_search_key = f"player_search_applied_{user.id}"
     applied_filter_key = f"player_filter_applied_{user.id}"
@@ -2546,7 +2617,7 @@ def _render_planner_page(store: SupabaseStore, user: AuthenticatedUser) -> None:
         with date_col:
             event_date = st.date_input("Datum", value=default_date)
 
-        time_col1, time_col2, time_col3 = st.columns(3)
+        time_col1, time_col2, time_col3, time_col4 = st.columns(4)
         with time_col1:
             start_time = st.time_input("Starttijd", value=default_start, step=300)
         with time_col2:
@@ -2557,6 +2628,18 @@ def _render_planner_page(store: SupabaseStore, user: AuthenticatedUser) -> None:
                 options=[15, 20, 25, 30],
                 index=[15, 20, 25, 30].index(default_match),
                 format_func=lambda value: f"{value} minuten",
+            )
+        with time_col4:
+            rest_minutes = st.number_input(
+                "Pauze tussen potjes",
+                min_value=0,
+                max_value=30,
+                value=default_rest,
+                step=5,
+                help=(
+                    "Aantal minuten pauze tussen twee wedstrijden. Na de laatste "
+                    "wedstrijd wordt geen extra pauze ingepland."
+                ),
             )
 
         selected_courts = st.multiselect(
@@ -2656,6 +2739,7 @@ def _render_planner_page(store: SupabaseStore, user: AuthenticatedUser) -> None:
                 "Ranking",
                 "Meedoen",
                 "Vanaf tijd",
+                "Tot tijd",
                 PLAYER_DELETE_COLUMN,
             ),
             column_config={
@@ -2679,8 +2763,16 @@ def _render_planner_page(store: SupabaseStore, user: AuthenticatedUser) -> None:
                         "na deze tijd begint. Leeg betekent vanaf de starttijd."
                     ),
                     required=False,
-                    min_value=start_time if end_time > start_time else None,
-                    max_value=end_time if end_time > start_time else None,
+                    format="HH:mm",
+                    step=300,
+                ),
+                "Tot tijd": st.column_config.TimeColumn(
+                    "Tot tijd",
+                    help=(
+                        "Optioneel. Alleen wedstrijden die volledig op of vóór deze "
+                        "tijd eindigen worden ingepland. Leeg betekent tot het einde."
+                    ),
+                    required=False,
                     format="HH:mm",
                     step=300,
                 ),
@@ -2829,6 +2921,7 @@ def _render_planner_page(store: SupabaseStore, user: AuthenticatedUser) -> None:
                         "Ranking": int(new_rank),
                         "Meedoen": bool(new_active),
                         "Vanaf tijd": None,
+                        "Tot tijd": None,
                         PLAYER_DELETE_COLUMN: False,
                     }
                 ]
@@ -2871,6 +2964,7 @@ def _render_planner_page(store: SupabaseStore, user: AuthenticatedUser) -> None:
             start_time,
             end_time,
             match_minutes,
+            int(rest_minutes),
             selected_courts,
             edited_players,
             search_profile,
@@ -2923,6 +3017,9 @@ def _render_planner_page(store: SupabaseStore, user: AuthenticatedUser) -> None:
                     player.available_from.strftime("%H:%M")
                     if player.available_from
                     else "",
+                    player.available_until.strftime("%H:%M")
+                    if player.available_until
+                    else "",
                 )
                 for player in players
             )
@@ -2947,6 +3044,7 @@ def _render_planner_page(store: SupabaseStore, user: AuthenticatedUser) -> None:
                         end_hour=end_time.hour,
                         end_minute=end_time.minute,
                         match_minutes=match_minutes,
+                        rest_minutes=int(rest_minutes),
                         search_profile=search_profile,
                         level_mix=level_mix,
                         team_difference_tolerance=team_difference_tolerance,
@@ -2972,6 +3070,11 @@ def _render_planner_page(store: SupabaseStore, user: AuthenticatedUser) -> None:
                         "available_from": (
                             player.available_from.strftime("%H:%M")
                             if player.available_from
+                            else None
+                        ),
+                        "available_until": (
+                            player.available_until.strftime("%H:%M")
+                            if player.available_until
                             else None
                         ),
                     }
