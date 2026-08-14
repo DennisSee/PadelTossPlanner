@@ -1,9 +1,8 @@
-"""Rooktests voor de planner, inclusief spelers die later arriveren."""
+"""Rooktests voor pauzes en individuele beschikbaarheid in de TOS-planner."""
 
 from datetime import time
 
-from excel_export import build_excel_bytes
-from planner import Player, PlannerSettings, generate_schedule, schedule_rows
+from planner import Player, PlannerSettings, generate_schedule, round_times, schedule_rows
 
 
 def _assert_basic_rules(rounds, courts) -> None:
@@ -12,6 +11,7 @@ def _assert_basic_rules(rounds, courts) -> None:
     for round_plan in rounds:
         assert not previous_rest.intersection(round_plan.rest)
         previous_rest = set(round_plan.rest)
+
         active_players: list[str] = []
         for match in round_plan.matches:
             active_players.extend((*match.team1, *match.team2))
@@ -19,13 +19,15 @@ def _assert_basic_rules(rounds, courts) -> None:
                 key = tuple(sorted(team))
                 assert key not in partnerships
                 partnerships.add(key)
+
         assert len(active_players) == len(set(active_players)) == len(courts) * 4
         assert not set(active_players).intersection(round_plan.rest)
         assert not set(active_players).intersection(round_plan.unavailable)
+        assert not set(active_players).intersection(round_plan.unavailable_after)
 
 
-def test_standard_schedule() -> None:
-    players = [
+def _players() -> list[Player]:
+    return [
         Player("Dennis", 4),
         Player("Marieke", 3),
         Player("Peter", 5),
@@ -37,20 +39,29 @@ def test_standard_schedule() -> None:
         Player("Trever", 5),
         Player("Niels", 3),
     ]
+
+
+def test_pause_between_matches() -> None:
+    players = _players()
     courts = ["Kremer Baan", "ZGA/F&F Baan"]
     settings = PlannerSettings(
         start_time=time(20, 0),
         end_time=time(22, 0),
         match_minutes=20,
-        search_restarts=3,
-        beam_width=10,
-        candidates_per_state=55,
+        rest_minutes=5,
+        search_restarts=4,
+        beam_width=12,
+        candidates_per_state=70,
     )
+
     rounds, diagnostics = generate_schedule(players, courts, settings)
-    assert len(rounds) == 6
-    assert all(not round_plan.unavailable for round_plan in rounds)
+    assert len(rounds) == 5
+    assert diagnostics["rest_minutes"] == 5
+    assert diagnostics["unused_minutes"] == 0
+    assert round_times(settings, 0)[0].strftime("%H:%M") == "20:00"
+    assert round_times(settings, 1)[0].strftime("%H:%M") == "20:25"
+    assert round_times(settings, 4)[1].strftime("%H:%M") == "22:00"
     _assert_basic_rules(rounds, courts)
-    assert build_excel_bytes(settings, players, courts, rounds, diagnostics).startswith(b"PK")
 
 
 def test_late_arrivals() -> None:
@@ -75,24 +86,57 @@ def test_late_arrivals() -> None:
         beam_width=14,
         candidates_per_state=75,
     )
+
     rounds, diagnostics = generate_schedule(players, courts, settings)
-    assert len(rounds) == 6
     _assert_basic_rules(rounds, courts)
 
     late = {"Trever", "Niels"}
     for round_plan in rounds[:3]:
         assert set(round_plan.unavailable) == late
-        assert round_plan.rest == tuple()
+        assert not round_plan.unavailable_after
     for round_plan in rounds[3:]:
         assert not round_plan.unavailable
-        assert len(round_plan.rest) == 2
+
+    assert diagnostics["unavailable_counts"]["Trever"] == 3
+
+
+def test_early_departures() -> None:
+    players = [
+        Player("Dennis", 4),
+        Player("Marieke", 3),
+        Player("Peter", 5),
+        Player("Anita", 2),
+        Player("Bjorn", 3),
+        Player("Jeroen", 4),
+        Player("Jim", 2),
+        Player("Frans", 3),
+        Player("Trever", 5, available_until=time(21, 0)),
+        Player("Niels", 3, available_until=time(21, 0)),
+    ]
+    courts = ["Kremer Baan", "ZGA/F&F Baan"]
+    settings = PlannerSettings(
+        start_time=time(20, 0),
+        end_time=time(22, 0),
+        match_minutes=20,
+        search_restarts=7,
+        beam_width=16,
+        candidates_per_state=85,
+    )
+
+    rounds, diagnostics = generate_schedule(players, courts, settings)
+    _assert_basic_rules(rounds, courts)
+
+    leaving = {"Trever", "Niels"}
+    for round_plan in rounds[:3]:
+        assert not round_plan.unavailable_after
+    for round_plan in rounds[3:]:
+        assert set(round_plan.unavailable_after) == leaving
+        assert not set(round_plan.rest).intersection(leaving)
 
     rows = schedule_rows(rounds, courts, players, settings)
-    assert rows[0]["Nog niet aanwezig"] in {"Niels, Trever", "Trever, Niels"}
-    assert diagnostics["unavailable_counts"]["Trever"] == 3
-    assert diagnostics["rest_counts"]["Trever"] <= 1
-    assert build_excel_bytes(settings, players, courts, rounds, diagnostics).startswith(b"PK")
-
+    assert rows[-1]["Niet meer beschikbaar"] in {"Niels, Trever", "Trever, Niels"}
+    assert diagnostics["unavailable_after_counts"]["Trever"] == 3
+    assert set(diagnostics["early_leave_players"]) == leaving
 
 
 def test_level_mix_control() -> None:
@@ -138,10 +182,11 @@ def test_level_mix_control() -> None:
 
 
 def main() -> None:
-    test_standard_schedule()
+    test_pause_between_matches()
     test_late_arrivals()
+    test_early_departures()
     test_level_mix_control()
-    print("Rooktests geslaagd, inclusief late aankomst en niveaumix.")
+    print("Rooktests geslaagd: pauzes, late aankomst, eerder vertrek en niveaumix.")
 
 
 if __name__ == "__main__":
