@@ -23,9 +23,9 @@ Een planner kan:
 - inloggen met e-mailadres en wachtwoord;
 - de gedeelde spelerslijst en instellingen opslaan;
 - dezelfde clubinvoer op desktop en telefoon terugvinden;
-- schema's genereren en als Excel downloaden;
+- schema's genereren;
 - schema's privé opslaan of openbaar publiceren;
-- eigen opgeslagen schema's bekijken.
+- alle opgeslagen clubschema's bekijken en de publicatie van eigen schema's beheren.
 
 ### Beheerder
 
@@ -33,8 +33,7 @@ Een beheerder kan daarnaast:
 
 - planners en andere beheerders aanmaken;
 - accounts activeren en deactiveren;
-- alle opgeslagen schema's bekijken;
-- publicaties beheren.
+- publicaties van alle planners beheren.
 
 ## Technische opbouw
 
@@ -42,7 +41,7 @@ Een beheerder kan daarnaast:
 .
 ├── streamlit_app.py                 # Webinterface, publieke pagina en beheerschermen
 ├── planner.py                       # Plannings- en optimalisatielogica
-├── excel_export.py                  # Excel-download
+├── excel_export.py                  # Exportmodule; nog niet gekoppeld aan de webinterface
 ├── database.py                      # Supabase Auth en databasefuncties
 ├── supabase_schema.sql              # Tabellen, triggers en beveiliging
 ├── requirements.txt                 # Python-packages
@@ -71,8 +70,13 @@ Hiermee worden aangemaakt:
 
 - `profiles` voor rollen en accountstatus;
 - `planner_drafts` voor oudere persoonlijke concepten;
-- `club_drafts` voor de gedeelde spelerslijst en instellingen;
 - `schedules` voor opgeslagen en gepubliceerde schema's.
+
+Let op: de huidige applicatie gebruikt daarnaast `club_drafts` voor de gedeelde
+spelerslijst en instellingen. Die tabel staat niet in `supabase_schema.sql` en het
+hieronder genoemde migratiebestand is geen onderdeel van deze repository. Een nieuwe
+Supabase-installatie is daardoor nog niet volledig reproduceerbaar vanuit alleen deze
+checkout.
 
 Row Level Security wordt ingeschakeld. De tabellen hebben geen directe rechten voor anonieme of normale Supabase-clients; de Streamlit-server handelt de toegang af.
 
@@ -218,15 +222,16 @@ De eerste versie bevat nog geen:
 - automatische wachtwoordreset;
 - auditlog van wijzigingen;
 - meerdere clubs of afzonderlijke clubomgevingen;
-- verwijderknop voor opgeslagen schema's;
-- permanente login-cookie na een volledig vernieuwde browsersessie.
+- verwijderknop voor opgeslagen schema's.
 
 ## Update: gedeelde spelerslijst en persoonlijk openbaar schema
 
-Voor een bestaande installatie voer je één keer `supabase_migration_shared_draft.sql`
-uit via **Supabase > SQL Editor**. Daarna delen alle planners dezelfde laatst opgeslagen
-invoer. De plannerpagina toont wie de lijst het laatst heeft opgeslagen en bevat een knop
-om de nieuwste versie opnieuw te laden.
+De implementatie verwacht een tabel `club_drafts` en de eerdere installatie-instructie
+verwees daarvoor naar `supabase_migration_shared_draft.sql`. Dat migratiebestand ontbreekt
+momenteel in deze repository. Bestaande installaties kunnen de tabel al handmatig hebben;
+controleer dit vóór een nieuwe installatie en leg een toekomstige oplossing vast als een
+beoordeelbare Supabase-migration. De plannerpagina toont wie de lijst het laatst heeft
+opgeslagen en bevat een knop om de nieuwste versie opnieuw te laden.
 
 Op de openbare pagina kan een deelnemer zijn of haar naam kiezen. De tabel toont dan per
 ronde alleen de eigen wedstrijd of één duidelijke rustregel. Rankings en niveauwaarden
