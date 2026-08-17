@@ -2356,8 +2356,8 @@ def _load_club_draft(store: SupabaseStore) -> dict[str, Any]:
             st.session_state[cache_key] = {}
             if "club_drafts" in str(exc):
                 st.error(
-                    "De tabel voor gedeelde invoer ontbreekt nog. Voer eerst "
-                    "supabase_migration_shared_draft.sql uit in Supabase."
+                    "De tabel club_drafts voor gedeelde invoer ontbreekt. Controleer "
+                    "of de Supabase migrations uit supabase/migrations/ correct zijn toegepast."
                 )
             else:
                 st.warning(

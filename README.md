@@ -43,7 +43,9 @@ Een beheerder kan daarnaast:
 ├── planner.py                       # Plannings- en optimalisatielogica
 ├── excel_export.py                  # Exportmodule; nog niet gekoppeld aan de webinterface
 ├── database.py                      # Supabase Auth en databasefuncties
-├── supabase_schema.sql              # Tabellen, triggers en beveiliging
+├── supabase/
+│   ├── config.toml                  # Lokale Supabase-configuratie
+│   └── migrations/                  # Enige bron van waarheid voor het databaseschema
 ├── requirements.txt                 # Python-packages
 ├── test_planner.py                  # Rooktest van de planner
 ├── .gitignore
@@ -58,27 +60,45 @@ Streamlit Community Cloud garandeert niet dat lokaal opgeslagen bestanden behoud
 
 De Supabase secret/service key staat uitsluitend in Streamlit Secrets en nooit in GitHub. Alle tabeltoegang loopt server-side via de Streamlit-app.
 
-## 1. Supabase-project maken
+## 1. Supabase-database voorbereiden
 
-1. Maak een Supabase-project.
-2. Open **SQL Editor**.
-3. Open lokaal `supabase_schema.sql`.
-4. Kopieer de volledige inhoud naar de SQL Editor.
-5. Klik op **Run**.
+Installeer de Supabase CLI en Docker Desktop. Alle applicatietabellen, functies,
+triggers, indexes en beveiligingsinstellingen staan uitsluitend als versiebeheerbare
+migrations onder `supabase/migrations/`.
 
-Hiermee worden aangemaakt:
+Start de lokale Supabase-stack en bouw de database vanaf nul op:
 
-- `profiles` voor rollen en accountstatus;
-- `planner_drafts` voor oudere persoonlijke concepten;
-- `schedules` voor opgeslagen en gepubliceerde schema's.
+```bash
+supabase start
+supabase db reset --local
+```
 
-Let op: de huidige applicatie gebruikt daarnaast `club_drafts` voor de gedeelde
-spelerslijst en instellingen. Die tabel staat niet in `supabase_schema.sql` en het
-hieronder genoemde migratiebestand is geen onderdeel van deze repository. Een nieuwe
-Supabase-installatie is daardoor nog niet volledig reproduceerbaar vanuit alleen deze
-checkout.
+`supabase db reset --local` verwijdert en reconstrueert uitsluitend de lokale database
+en past alle migrations in volgorde toe. Gebruik dit commando nooit met remote
+databasecredentials.
 
-Row Level Security wordt ingeschakeld. De tabellen hebben geen directe rechten voor anonieme of normale Supabase-clients; de Streamlit-server handelt de toegang af.
+De migration
+`20260817151952_initial_production_baseline.sql` is een baseline van het schema dat al
+op de huidige productieomgeving aanwezig is. Voer deze migration daarom **niet opnieuw
+uit op de huidige productieomgeving**. Voor een nieuwe, lege omgeving kan de volledige
+migrationreeks via een vooraf beoordeelde Supabase CLI- of CI-workflow worden toegepast,
+nadat het exacte doelproject expliciet is bevestigd.
+
+Row Level Security is op alle vier applicatietabellen ingeschakeld. `anon` en
+`authenticated` hebben geen directe tabelrechten; de Streamlit-server handelt de
+toegang af via de server-side secret/service key.
+
+### Nieuwe schemawijzigingen
+
+Maak voor iedere toekomstige schemawijziging een nieuwe migration:
+
+```bash
+supabase migration new beschrijvende_naam
+```
+
+Wijzig een al toegepaste migration niet. Test iedere nieuwe migration eerst lokaal met
+`supabase db reset --local`. Voer schemawijzigingen niet handmatig uit via de SQL Editor
+en houd geen tweede schemabestand naast `supabase/migrations/` bij.
 
 ## 2. Eerste beheerder aanmaken
 
@@ -146,7 +166,8 @@ streamlit_app.py
 planner.py
 excel_export.py
 database.py
-supabase_schema.sql
+supabase/config.toml
+supabase/migrations/
 requirements.txt
 README.md
 .streamlit/config.toml
@@ -176,6 +197,13 @@ Na de eerste installatie van de nieuwe dependencies kan de app worden geopend.
 ## Lokaal starten
 
 Maak optioneel `.streamlit/secrets.toml` aan op basis van het voorbeeldbestand.
+
+Start eerst de lokale database en pas alle migrations vanaf nul toe:
+
+```bash
+supabase start
+supabase db reset --local
+```
 
 ```bash
 python -m venv .venv
@@ -226,12 +254,10 @@ De eerste versie bevat nog geen:
 
 ## Update: gedeelde spelerslijst en persoonlijk openbaar schema
 
-De implementatie verwacht een tabel `club_drafts` en de eerdere installatie-instructie
-verwees daarvoor naar `supabase_migration_shared_draft.sql`. Dat migratiebestand ontbreekt
-momenteel in deze repository. Bestaande installaties kunnen de tabel al handmatig hebben;
-controleer dit vóór een nieuwe installatie en leg een toekomstige oplossing vast als een
-beoordeelbare Supabase-migration. De plannerpagina toont wie de lijst het laatst heeft
-opgeslagen en bevat een knop om de nieuwste versie opnieuw te laden.
+De implementatie gebruikt `club_drafts` voor de gedeelde spelerslijst en instellingen.
+De tabel en bijbehorende beveiliging zijn onderdeel van de initiële Supabase-baseline.
+De plannerpagina toont wie de lijst het laatst heeft opgeslagen en bevat een knop om de
+nieuwste versie opnieuw te laden.
 
 Op de openbare pagina kan een deelnemer zijn of haar naam kiezen. De tabel toont dan per
 ronde alleen de eigen wedstrijd of één duidelijke rustregel. Rankings en niveauwaarden
@@ -254,9 +280,9 @@ Belangrijk gedrag:
 - de persoonlijke naamfilter toont ook de status **Nog niet aanwezig**.
 
 De vanaf-tijden worden als onderdeel van de gedeelde invoer opgeslagen in `club_drafts`.
-Daarvoor is geen nieuwe Supabase-migratie nodig, omdat de spelerslijst als JSON wordt
-opgeslagen. Vervang alleen `streamlit_app.py`, `planner.py`, `excel_export.py` en
-`test_planner.py`.
+Ze staan binnen de JSON-spelerslijst en vereisen daarom geen afzonderlijke kolom. Iedere
+toekomstige structurele wijziging aan deze opslag moet wel als nieuwe migration worden
+vastgelegd.
 
 ## Update: instelbare variatie in niveaus
 
@@ -270,6 +296,5 @@ Ook bij een hoge waarde blijft de gemiddelde teamsterkte de belangrijkste voorwa
 indeling zoals niveau `5 + 3` tegen `5 + 3` krijgt dus de voorkeur boven een eenzijdige
 wedstrijd. Zeer grote combinaties zoals `5 + 1` blijven extra strafpunten krijgen.
 
-De instelling wordt samen met de gedeelde invoer in `club_drafts` opgeslagen. Er is geen
-nieuwe Supabase-migratie nodig. Voor een bestaande installatie hoeven alleen
-`streamlit_app.py`, `planner.py` en `excel_export.py` te worden vervangen.
+De instelling wordt opgeslagen in `club_drafts.level_mix`; deze kolom is onderdeel van
+de initiële Supabase-baseline.
