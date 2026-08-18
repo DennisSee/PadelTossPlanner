@@ -19,6 +19,7 @@ from streamlit_cookies_manager import EncryptedCookieManager
 from authorization import (
     AuthorizationError,
     EVENT_MANAGEMENT_PAGE,
+    MEMBER_MANAGEMENT_PAGE,
     PUBLIC_PAGE,
     SignupReturnContext,
     default_page_for_role,
@@ -57,6 +58,13 @@ from event_management import (
     build_signup_url,
     generate_event_slug,
     public_base_url_from_secrets,
+)
+from member_management import (
+    MEMBER_SPORTS,
+    RANKING_VALUES,
+    MemberManagementError,
+    approval_transition_options,
+    is_ready_for_padel_tos,
 )
 from public_schedule_repository import PublicScheduleRepository
 from participant_auth import (
@@ -3961,6 +3969,216 @@ def _render_event_management_page(
                     st.error("De eventstatus kon niet veilig worden aangepast.")
 
 
+def _render_member_management_page(
+    store: AdminSupabaseStore,
+    user: AuthenticatedUser,
+) -> None:
+    """Beheer clubleden via de expliciet bevoorrechte planner/admin-store."""
+    try:
+        require_planner_role(user.role)
+    except AuthorizationError as exc:
+        st.error(str(exc))
+        return
+
+    approval_labels = {
+        "pending": "In afwachting",
+        "approved": "Goedgekeurd",
+        "rejected": "Afgewezen",
+    }
+    sport_labels = {"padel": "Padel", "tennis": "Tennis"}
+
+    st.title("Leden & niveaus")
+    st.caption(
+        "Beheer toelating, clublidstatus en sportspecifieke rankings. "
+        "Accountstatus blijft een afzonderlijk concept en wordt hier niet gewijzigd."
+    )
+
+    try:
+        approval_required = store.get_member_approval_setting()
+        members = store.list_club_members()
+    except Exception:
+        st.error("De leden- en approvalgegevens konden niet worden geladen.")
+        return
+
+    st.subheader("Nieuwe deelnemers")
+    with st.form("member_approval_setting"):
+        new_approval_required = st.checkbox(
+            "Nieuwe gebruikers handmatig goedkeuren",
+            value=approval_required,
+        )
+        st.caption(
+            "Deze instelling geldt alleen voor toekomstige onboarding en wijzigt "
+            "bestaande approval-statussen niet."
+        )
+        save_setting = st.form_submit_button("Instelling opslaan")
+    if save_setting:
+        try:
+            store.set_require_member_approval(new_approval_required)
+            st.success("De approval-instelling is opgeslagen.")
+            st.rerun()
+        except Exception:
+            st.error("De approval-instelling kon niet worden opgeslagen.")
+
+    st.subheader("Clubleden")
+    if not members:
+        st.info("Er zijn nog geen clubleden via self-onboarding aangemaakt.")
+        return
+
+    def ranking_text(profile: object) -> str:
+        if not isinstance(profile, Mapping) or profile.get("ranking") is None:
+            return "Ontbreekt"
+        suffix = "" if bool(profile.get("active")) else " (inactief)"
+        return f"{profile.get('ranking')}{suffix}"
+
+    overview_rows: list[dict[str, object]] = []
+    for member in members:
+        linked_profile = member.get("linked_profile")
+        linked_profile = linked_profile if isinstance(linked_profile, Mapping) else None
+        overview_rows.append(
+            {
+                "Naam": member.get("display_name"),
+                "Approval": approval_labels.get(
+                    str(member.get("approval_status")),
+                    "Onbekend",
+                ),
+                "Lid actief": "Ja" if member.get("active") else "Nee",
+                "Account": (
+                    str(linked_profile.get("email") or linked_profile.get("display_name"))
+                    if linked_profile
+                    else "Niet gekoppeld"
+                ),
+                "Account actief": (
+                    (
+                        "Ja" if linked_profile.get("active") else "Nee"
+                    )
+                    if linked_profile
+                    else "Niet gekoppeld"
+                ),
+                "Padelranking": ranking_text(member.get("padel_profile")),
+                "Tennisranking": ranking_text(member.get("tennis_profile")),
+                "Klaar voor padel-TOS": (
+                    "Ja" if is_ready_for_padel_tos(member) else "Nee"
+                ),
+            }
+        )
+    st.dataframe(pd.DataFrame(overview_rows), hide_index=True, width="stretch")
+    st.caption(
+        "De bestaande handmatige spelerslijst in club_drafts bevat geen stabiele "
+        "member-id. Daarom wordt die lijst hier niet automatisch gekoppeld op alleen naam."
+    )
+
+    st.subheader("Lid beheren")
+    for member in members:
+        member_id = str(member.get("id") or "")
+        display_name = str(member.get("display_name") or "Onbekend lid")
+        current_approval = str(member.get("approval_status") or "")
+        linked_profile = member.get("linked_profile")
+        linked_profile = linked_profile if isinstance(linked_profile, Mapping) else None
+        with st.expander(display_name, expanded=False):
+            account_text = "Niet gekoppeld"
+            if linked_profile:
+                account_state = "actief" if linked_profile.get("active") else "inactief"
+                account_text = (
+                    f"{linked_profile.get('email') or linked_profile.get('display_name')} "
+                    f"({account_state}, rol {linked_profile.get('role')})"
+                )
+            st.write(f"**Gekoppeld account:** {account_text}")
+            st.caption(
+                "Account actief, clublid actief en approval zijn afzonderlijke statussen. "
+                "Alleen de laatste twee worden op deze pagina beheerd."
+            )
+
+            with st.form(f"member_approval_{member_id}"):
+                try:
+                    approval_options = approval_transition_options(current_approval)
+                except MemberManagementError:
+                    st.error("Dit lid heeft een ongeldige approval-status.")
+                    approval_options = (current_approval,)
+                selected_approval = st.selectbox(
+                    "Approval-status",
+                    approval_options,
+                    format_func=lambda value: approval_labels.get(value, value),
+                    key=f"approval_status_{member_id}",
+                )
+                save_approval = st.form_submit_button("Approval opslaan")
+            if save_approval and selected_approval != current_approval:
+                try:
+                    store.set_member_approval(
+                        member_id,
+                        current_approval,
+                        selected_approval,
+                    )
+                    st.success("De approval-status is aangepast.")
+                    st.rerun()
+                except (MemberManagementError, RuntimeError, ValueError) as exc:
+                    st.error(str(exc))
+                except Exception:
+                    st.error("De approval-status kon niet veilig worden aangepast.")
+
+            with st.form(f"member_active_{member_id}"):
+                member_active = st.checkbox(
+                    "Clublid actief voor TOS",
+                    value=bool(member.get("active")),
+                    key=f"member_active_value_{member_id}",
+                )
+                save_member_active = st.form_submit_button("Lidstatus opslaan")
+            if save_member_active and member_active != bool(member.get("active")):
+                try:
+                    store.set_member_active(member_id, member_active)
+                    st.success("De clublidstatus is aangepast.")
+                    st.rerun()
+                except Exception:
+                    st.error("De clublidstatus kon niet worden aangepast.")
+
+            for sport in MEMBER_SPORTS:
+                profile_key = f"{sport}_profile"
+                sport_profile = member.get(profile_key)
+                sport_profile = (
+                    sport_profile if isinstance(sport_profile, Mapping) else None
+                )
+                current_ranking = (
+                    int(sport_profile["ranking"])
+                    if sport_profile and sport_profile.get("ranking") is not None
+                    else None
+                )
+                with st.form(f"member_sport_{member_id}_{sport}"):
+                    st.markdown(f"**{sport_labels[sport]}**")
+                    clear_ranking = st.checkbox(
+                        "Geen ranking / ranking expliciet wissen",
+                        value=current_ranking is None,
+                        key=f"clear_ranking_{member_id}_{sport}",
+                    )
+                    selected_ranking = st.selectbox(
+                        "Ranking",
+                        RANKING_VALUES,
+                        index=(current_ranking - 1 if current_ranking else 2),
+                        disabled=clear_ranking,
+                        key=f"ranking_{member_id}_{sport}",
+                    )
+                    sport_active = st.checkbox(
+                        "Sportprofiel actief",
+                        value=(bool(sport_profile.get("active")) if sport_profile else True),
+                        key=f"sport_active_{member_id}_{sport}",
+                    )
+                    save_sport_profile = st.form_submit_button(
+                        f"{sport_labels[sport]}profiel opslaan"
+                    )
+                if save_sport_profile:
+                    try:
+                        store.upsert_member_sport_profile(
+                            member_id,
+                            sport,
+                            None if clear_ranking else selected_ranking,
+                            sport_active,
+                        )
+                        st.success(f"Het {sport_labels[sport].lower()}profiel is opgeslagen.")
+                        st.rerun()
+                    except (MemberManagementError, RuntimeError, ValueError) as exc:
+                        st.error(str(exc))
+                    except Exception:
+                        st.error("Het sportprofiel kon niet veilig worden opgeslagen.")
+
+
 def _render_saved_page(
     store: AdminSupabaseStore,
     user: AuthenticatedUser,
@@ -4242,6 +4460,8 @@ def main() -> None:
                 st.error(str(exc))
                 return
             _render_event_management_page(store, user, public_base_url)
+        elif page == MEMBER_MANAGEMENT_PAGE:
+            _render_member_management_page(store, user)
         elif page == "Opgeslagen schema's":
             _render_saved_page(store, user)
         elif page == "Gebruikersbeheer":

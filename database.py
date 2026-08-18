@@ -14,6 +14,11 @@ from supabase import Client, create_client
 from supabase.lib.client_options import SyncClientOptions
 
 from authorization import can_access_admin, can_access_planner
+from member_management import (
+    validate_approval_transition,
+    validate_ranking,
+    validate_sport,
+)
 from participant_auth import (
     OAuthAuthorization,
     ParticipantAuthFlowError,
@@ -284,6 +289,138 @@ class AdminSupabaseStore:
             .eq("id", user_id)
             .execute()
         )
+
+    # ------------------------------------------------------------------
+    # Bevoorrecht leden-, approval- en rankingbeheer
+    # ------------------------------------------------------------------
+    def list_club_members(self) -> list[dict[str, Any]]:
+        """Combineer clubidentiteit, accountkoppeling en sportprofielen voor beheer."""
+        members = _response_data(
+            self.admin.table("club_members")
+            .select(
+                "id,display_name,approval_status,active,created_at,updated_at"
+            )
+            .order("display_name")
+            .execute()
+        )
+        profiles = _response_data(
+            self.admin.table("profiles")
+            .select("id,email,display_name,role,active,member_id")
+            .execute()
+        )
+        sport_profiles = _response_data(
+            self.admin.table("member_sport_profiles")
+            .select("member_id,sport,ranking,active,created_at,updated_at")
+            .execute()
+        )
+
+        profiles_by_member = {
+            str(profile["member_id"]): profile
+            for profile in profiles
+            if profile.get("member_id")
+        }
+        sports_by_member: dict[str, dict[str, dict[str, Any]]] = {}
+        for sport_profile in sport_profiles:
+            member_id = str(sport_profile.get("member_id") or "")
+            sport = str(sport_profile.get("sport") or "")
+            if member_id and sport in {"padel", "tennis"}:
+                sports_by_member.setdefault(member_id, {})[sport] = sport_profile
+
+        result: list[dict[str, Any]] = []
+        for member in members:
+            member_id = str(member.get("id") or "")
+            linked_profile = profiles_by_member.get(member_id)
+            member_sports = sports_by_member.get(member_id, {})
+            result.append(
+                {
+                    **member,
+                    "linked_profile": linked_profile,
+                    "padel_profile": member_sports.get("padel"),
+                    "tennis_profile": member_sports.get("tennis"),
+                }
+            )
+        return result
+
+    def get_member_approval_setting(self) -> bool:
+        response = (
+            self.admin.table("club_settings")
+            .select("require_member_approval")
+            .eq("id", "club")
+            .limit(1)
+            .execute()
+        )
+        rows = _response_data(response)
+        if not rows:
+            raise RuntimeError("De clubinstelling voor approval ontbreekt.")
+        return bool(rows[0].get("require_member_approval"))
+
+    def set_require_member_approval(self, required: bool) -> None:
+        response = (
+            self.admin.table("club_settings")
+            .update({"require_member_approval": bool(required)})
+            .eq("id", "club")
+            .execute()
+        )
+        if not _response_data(response):
+            raise RuntimeError("De approval-instelling kon niet worden aangepast.")
+
+    def set_member_active(self, member_id: str, active: bool) -> None:
+        if not str(member_id or "").strip():
+            raise ValueError("Een member-id is vereist.")
+        response = (
+            self.admin.table("club_members")
+            .update({"active": bool(active)})
+            .eq("id", member_id)
+            .execute()
+        )
+        if not _response_data(response):
+            raise RuntimeError("De lidstatus kon niet worden aangepast.")
+
+    def set_member_approval(
+        self,
+        member_id: str,
+        current_status: str,
+        target_status: str,
+    ) -> None:
+        if not str(member_id or "").strip():
+            raise ValueError("Een member-id is vereist.")
+        normalized_target = validate_approval_transition(current_status, target_status)
+        response = (
+            self.admin.table("club_members")
+            .update({"approval_status": normalized_target})
+            .eq("id", member_id)
+            .eq("approval_status", current_status)
+            .execute()
+        )
+        if not _response_data(response):
+            raise RuntimeError(
+                "De approval-status is intussen gewijzigd; laad de pagina opnieuw."
+            )
+
+    def upsert_member_sport_profile(
+        self,
+        member_id: str,
+        sport: str,
+        ranking: int | None,
+        active: bool,
+    ) -> dict[str, Any]:
+        if not str(member_id or "").strip():
+            raise ValueError("Een member-id is vereist.")
+        record = {
+            "member_id": member_id,
+            "sport": validate_sport(sport),
+            "ranking": validate_ranking(ranking),
+            "active": bool(active),
+        }
+        response = (
+            self.admin.table("member_sport_profiles")
+            .upsert(record, on_conflict="member_id,sport")
+            .execute()
+        )
+        rows = _response_data(response)
+        if not rows:
+            raise RuntimeError("Het sportprofiel kon niet worden opgeslagen.")
+        return rows[0]
 
     # ------------------------------------------------------------------
     # TOS-eventbeheer voor planners en beheerders

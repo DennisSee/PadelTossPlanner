@@ -8,6 +8,7 @@ def test_application_modules_import() -> None:
         "authorization",
         "database",
         "event_management",
+        "member_management",
         "participant_auth",
         "participant_registration",
         "public_schedule_repository",

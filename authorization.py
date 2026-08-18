@@ -12,6 +12,7 @@ PLANNER_PAGE = "Planner"
 SAVED_SCHEDULES_PAGE = "Opgeslagen schema's"
 USER_MANAGEMENT_PAGE = "Gebruikersbeheer"
 EVENT_MANAGEMENT_PAGE = "TOS-avonden"
+MEMBER_MANAGEMENT_PAGE = "Leden & niveaus"
 
 PLANNER_ROLES = frozenset({"planner", "admin"})
 ADMIN_ROLES = frozenset({"admin"})
@@ -69,7 +70,14 @@ def can_access_admin(role: str) -> bool:
 def navigation_pages_for_role(role: str | None) -> tuple[str, ...]:
     pages = [PUBLIC_PAGE]
     if role and can_access_planner(role):
-        pages.extend((PLANNER_PAGE, EVENT_MANAGEMENT_PAGE, SAVED_SCHEDULES_PAGE))
+        pages.extend(
+            (
+                PLANNER_PAGE,
+                EVENT_MANAGEMENT_PAGE,
+                MEMBER_MANAGEMENT_PAGE,
+                SAVED_SCHEDULES_PAGE,
+            )
+        )
     if role and can_access_admin(role):
         pages.append(USER_MANAGEMENT_PAGE)
     return tuple(pages)

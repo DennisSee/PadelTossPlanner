@@ -26,6 +26,7 @@ def test_every_planner_route_has_a_direct_role_guard() -> None:
         "_render_private_result",
         "_render_planner_page",
         "_render_event_management_page",
+        "_render_member_management_page",
         "_render_saved_page",
     ):
         assert "require_planner_role" in _function_calls(function_name)
@@ -57,6 +58,33 @@ def test_event_management_route_uses_only_the_guarded_admin_store() -> None:
         "create_tos_event",
         "update_tos_event",
         "set_tos_event_status",
+    }.issubset(attributes)
+
+
+def test_member_management_route_uses_only_guarded_admin_methods() -> None:
+    calls = _function_calls("_render_member_management_page")
+    assert "require_planner_role" in calls
+    assert "_get_user_registration_repository" not in calls
+
+    tree = ast.parse(APP_PATH.read_text(encoding="utf-8"))
+    function = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef)
+        and node.name == "_render_member_management_page"
+    )
+    attributes = {
+        node.func.attr
+        for node in ast.walk(function)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+    }
+    assert {
+        "list_club_members",
+        "get_member_approval_setting",
+        "set_require_member_approval",
+        "set_member_approval",
+        "set_member_active",
+        "upsert_member_sport_profile",
     }.issubset(attributes)
 
 

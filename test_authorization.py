@@ -5,6 +5,7 @@ import pytest
 from authorization import (
     AuthorizationError,
     EVENT_MANAGEMENT_PAGE,
+    MEMBER_MANAGEMENT_PAGE,
     PLANNER_PAGE,
     PUBLIC_PAGE,
     SAVED_SCHEDULES_PAGE,
@@ -24,6 +25,7 @@ def test_participant_has_no_planner_or_admin_pages() -> None:
     assert not can_access_page("participant", PLANNER_PAGE)
     assert not can_access_page("participant", SAVED_SCHEDULES_PAGE)
     assert not can_access_page("participant", EVENT_MANAGEMENT_PAGE)
+    assert not can_access_page("participant", MEMBER_MANAGEMENT_PAGE)
     assert not can_access_page("participant", USER_MANAGEMENT_PAGE)
     with pytest.raises(AuthorizationError):
         require_planner_role("participant")
@@ -36,6 +38,7 @@ def test_planner_has_planner_pages_but_no_admin_page() -> None:
         PUBLIC_PAGE,
         PLANNER_PAGE,
         EVENT_MANAGEMENT_PAGE,
+        MEMBER_MANAGEMENT_PAGE,
         SAVED_SCHEDULES_PAGE,
     )
     assert default_page_for_role("planner") == PLANNER_PAGE
@@ -49,6 +52,7 @@ def test_admin_has_planner_and_admin_functionality() -> None:
         PUBLIC_PAGE,
         PLANNER_PAGE,
         EVENT_MANAGEMENT_PAGE,
+        MEMBER_MANAGEMENT_PAGE,
         SAVED_SCHEDULES_PAGE,
         USER_MANAGEMENT_PAGE,
     )

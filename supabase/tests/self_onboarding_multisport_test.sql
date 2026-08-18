@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(69);
+select plan(73);
 
 select has_table('public', 'club_settings', 'club_settings bestaat');
 select has_table('public', 'member_sport_profiles', 'member_sport_profiles bestaat');
@@ -113,8 +113,24 @@ select ok(
     'participant hoeft sportprofielen in C1 niet te lezen'
 );
 select ok(
+    not has_table_privilege('authenticated', 'public.member_sport_profiles', 'UPDATE'),
+    'participant kan rankings en sportstatus niet wijzigen'
+);
+select ok(
+    not has_table_privilege('authenticated', 'public.club_members', 'UPDATE'),
+    'participant kan approval en clublidstatus niet wijzigen'
+);
+select ok(
     has_table_privilege('service_role', 'public.club_settings', 'UPDATE'),
     'service-side beheer kan de approval-setting later wijzigen'
+);
+select ok(
+    has_table_privilege('service_role', 'public.member_sport_profiles', 'UPDATE'),
+    'service-side beheer kan sportspecifieke rankings wijzigen'
+);
+select ok(
+    has_table_privilege('service_role', 'public.club_members', 'UPDATE'),
+    'service-side beheer kan approval en clublidstatus wijzigen'
 );
 
 insert into auth.users (
