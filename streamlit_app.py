@@ -20,6 +20,7 @@ from authorization import (
     AuthorizationError,
     EVENT_MANAGEMENT_PAGE,
     MEMBER_MANAGEMENT_PAGE,
+    PLANNER_PAGE,
     PUBLIC_PAGE,
     SignupReturnContext,
     default_page_for_role,
@@ -65,6 +66,12 @@ from member_management import (
     MemberManagementError,
     approval_transition_options,
     is_ready_for_padel_tos,
+)
+from planner_registration_import import (
+    IMPORT_METADATA_FIELDS,
+    PlannerRegistrationImportError,
+    build_registration_import_preview,
+    merge_registration_import,
 )
 from public_schedule_repository import PublicScheduleRepository
 from participant_auth import (
@@ -1684,7 +1691,14 @@ def _players_dataframe(records: Any) -> pd.DataFrame:
     tonen we de voorbeeldspelers. Een bewust leeg opgeslagen JSON-array mag nooit de
     standaardlijst opnieuw activeren.
     """
-    columns = ["Naam", "Ranking", "Meedoen", "Vanaf tijd", "Tot tijd"]
+    columns = [
+        "Naam",
+        "Ranking",
+        "Meedoen",
+        "Vanaf tijd",
+        "Tot tijd",
+        *IMPORT_METADATA_FIELDS,
+    ]
 
     if records is None:
         return DEFAULT_PLAYERS.copy()
@@ -1700,6 +1714,7 @@ def _players_dataframe(records: Any) -> pd.DataFrame:
         ("Meedoen", True),
         ("Vanaf tijd", None),
         ("Tot tijd", None),
+        *((column, None) for column in IMPORT_METADATA_FIELDS),
     ):
         if column not in frame.columns:
             frame[column] = default
@@ -1768,6 +1783,7 @@ def _prepare_player_master(frame: pd.DataFrame) -> pd.DataFrame:
         ("Meedoen", False),
         ("Vanaf tijd", None),
         ("Tot tijd", None),
+        *((column, None) for column in IMPORT_METADATA_FIELDS),
     ):
         if column not in prepared.columns:
             prepared[column] = default
@@ -1780,6 +1796,7 @@ def _prepare_player_master(frame: pd.DataFrame) -> pd.DataFrame:
         [
             PLAYER_ROW_ID_COLUMN,
             *PLAYER_EDITOR_COLUMNS,
+            *IMPORT_METADATA_FIELDS,
             PLAYER_DELETE_COLUMN,
         ]
     ]
@@ -1940,19 +1957,25 @@ def _serialize_editor_rows(data: pd.DataFrame) -> list[dict[str, object]]:
         ranking = None if pd.isna(ranking_value) else int(ranking_value)
         available_from = _parse_optional_time(row.get("Vanaf tijd"))
         available_until = _parse_optional_time(row.get("Tot tijd"))
-        rows.append(
-            {
-                "Naam": name,
-                "Ranking": ranking,
-                "Meedoen": bool(row.get("Meedoen", False)),
-                "Vanaf tijd": (
-                    available_from.strftime("%H:%M") if available_from else None
-                ),
-                "Tot tijd": (
-                    available_until.strftime("%H:%M") if available_until else None
-                ),
-            }
-        )
+        serialized: dict[str, object] = {
+            "Naam": name,
+            "Ranking": ranking,
+            "Meedoen": bool(row.get("Meedoen", False)),
+            "Vanaf tijd": (
+                available_from.strftime("%H:%M") if available_from else None
+            ),
+            "Tot tijd": (
+                available_until.strftime("%H:%M") if available_until else None
+            ),
+        }
+        for field in IMPORT_METADATA_FIELDS:
+            value = row.get(field)
+            if value is None or pd.isna(value):
+                continue
+            normalized = str(value).strip()
+            if normalized:
+                serialized[field] = normalized
+        rows.append(serialized)
     return rows
 
 
@@ -1992,6 +2015,46 @@ def _parse_players(data: pd.DataFrame) -> list[Player]:
             )
         )
     return players
+
+
+def _private_player_records(
+    players: list[Player],
+    data: pd.DataFrame,
+) -> list[dict[str, object]]:
+    """Bewaar identitymetadata naast private spelers zonder ``planner.py`` te koppelen."""
+    active_rows = data[data["Meedoen"].fillna(False)].copy()
+    active_rows["Naam"] = active_rows["Naam"].fillna("").astype(str).str.strip()
+    active_rows = active_rows[active_rows["Naam"] != ""]
+    if len(active_rows) != len(players):
+        raise RuntimeError("De private spelersmetadata sluit niet aan op de plannerinvoer.")
+
+    records: list[dict[str, object]] = []
+    for player, (_, row) in zip(players, active_rows.iterrows(), strict=True):
+        if str(row["Naam"]) != player.name:
+            raise RuntimeError("De private spelersvolgorde is onverwacht gewijzigd.")
+        record: dict[str, object] = {
+            "name": player.name,
+            "ranking": player.ranking,
+            "available_from": (
+                player.available_from.strftime("%H:%M")
+                if player.available_from
+                else None
+            ),
+            "available_until": (
+                player.available_until.strftime("%H:%M")
+                if player.available_until
+                else None
+            ),
+        }
+        for field in IMPORT_METADATA_FIELDS:
+            value = row.get(field)
+            if value is None or pd.isna(value):
+                continue
+            normalized = str(value).strip()
+            if normalized:
+                record[field] = normalized
+        records.append(record)
+    return records
 
 
 def _public_schedule_rows(rows: list[dict[str, object]]) -> list[dict[str, object]]:
@@ -3117,6 +3180,9 @@ def _render_planner_page(
     flash_message = st.session_state.pop("planner_flash_message", None)
     if flash_message:
         st.success(str(flash_message))
+    import_warning = st.session_state.pop("planner_import_warning", None)
+    if import_warning:
+        st.warning(str(import_warning))
 
     toolbar1, toolbar2 = st.columns([1, 3])
     with toolbar1:
@@ -3575,7 +3641,9 @@ def _render_planner_page(
             _bump_player_editor_revision(user.id)
             st.rerun()
 
-    edited_players = player_master[PLAYER_EDITOR_COLUMNS].copy()
+    edited_players = player_master[
+        [*PLAYER_EDITOR_COLUMNS, *IMPORT_METADATA_FIELDS]
+    ].copy()
 
     if save_input or generate:
         payload = _draft_payload(
@@ -3683,23 +3751,7 @@ def _render_planner_page(
             st.session_state["planner_result"] = {
                 **generated,
                 "owner_id": user.id,
-                "players": [
-                    {
-                        "name": player.name,
-                        "ranking": player.ranking,
-                        "available_from": (
-                            player.available_from.strftime("%H:%M")
-                            if player.available_from
-                            else None
-                        ),
-                        "available_until": (
-                            player.available_until.strftime("%H:%M")
-                            if player.available_until
-                            else None
-                        ),
-                    }
-                    for player in players
-                ],
+                "players": _private_player_records(players, edited_players),
                 "metadata": payload,
             }
         except (ValueError, RuntimeError) as exc:
@@ -3728,6 +3780,154 @@ def _saved_schedule_label(item: Mapping[str, Any]) -> str:
         f"{item.get('title', 'Schema')} · {item.get('created_by_name', '')} · "
         f"{status} · {short_id}"
     )
+
+
+def _render_event_registration_import(
+    store: AdminSupabaseStore,
+    user: AuthenticatedUser,
+    event: Mapping[str, object],
+) -> None:
+    """Toon een expliciete preview en importeer daarna alleen identity-veilige rijen."""
+    try:
+        require_planner_role(user.role)
+    except AuthorizationError as exc:
+        st.error(str(exc))
+        return
+
+    event_id = str(event.get("id") or "")
+    st.markdown("**Aanmeldingen naar planner**")
+    if str(event.get("sport") or "") != "padel":
+        st.info(
+            "Registraties voor dit tennis-event blijven bewaard, maar de huidige "
+            "planner en import ondersteunen uitsluitend padel."
+        )
+        return
+
+    preview_state_key = "registration_import_preview_event"
+    if st.button(
+        "Importpreview laden / vernieuwen",
+        key=f"load_registration_import_{event_id}",
+    ):
+        st.session_state[preview_state_key] = event_id
+    if st.session_state.get(preview_state_key) != event_id:
+        st.caption(
+            "Er wordt niets gewijzigd bij het laden van de preview. Import volgt pas "
+            "na afzonderlijke bevestiging."
+        )
+        return
+
+    try:
+        registrations = store.list_event_registrations_for_import(event_id)
+        draft = store.load_club_draft() or {}
+        stored_players = draft.get("players", [])
+        if not isinstance(stored_players, list) or not all(
+            isinstance(row, Mapping) for row in stored_players
+        ):
+            raise PlannerRegistrationImportError(
+                "De bestaande spelerslijst heeft een ongeldig formaat."
+            )
+        current_rows = [dict(row) for row in stored_players]
+        preview = build_registration_import_preview(
+            event,
+            registrations,
+            current_rows,
+        )
+    except PlannerRegistrationImportError as exc:
+        st.error(str(exc))
+        return
+    except Exception:
+        st.error("De registratiepreview kon niet veilig worden geladen.")
+        return
+
+    metric_attending, metric_ready, metric_blocked, metric_declined = st.columns(4)
+    metric_attending.metric("Aangemeld", preview.attending_count)
+    metric_ready.metric("Klaar", preview.ready_count)
+    metric_blocked.metric("Geblokkeerd", preview.blocked_count)
+    metric_declined.metric("Afgezegd", preview.declined_count)
+
+    preview_rows = [
+        {
+            "Naam": candidate.display_name or "Onbekend",
+            "Reactie": candidate.response,
+            "Vanaf": (
+                candidate.available_from.strftime("%H:%M")
+                if candidate.available_from
+                else ("Eventstart" if candidate.response == "attending" else "—")
+            ),
+            "Tot": (
+                candidate.available_until.strftime("%H:%M")
+                if candidate.available_until
+                else ("Eventeinde" if candidate.response == "attending" else "—")
+            ),
+            "Approval": candidate.approval_status or "Onbekend",
+            "Lid actief": "Ja" if candidate.member_active else "Nee",
+            "Padelprofiel actief": (
+                "Ja" if candidate.padel_profile_active else "Nee"
+            ),
+            "Padelranking": (
+                candidate.padel_ranking
+                if candidate.padel_ranking is not None
+                else "Ontbreekt"
+            ),
+            "Importstatus": candidate.status,
+            "Toelichting": candidate.reason,
+        }
+        for candidate in preview.candidates
+    ]
+    if preview_rows:
+        st.dataframe(pd.DataFrame(preview_rows), hide_index=True, width="stretch")
+    else:
+        st.info("Voor dit event zijn nog geen registraties aanwezig.")
+
+    st.caption(
+        "Bij herimport worden alleen regels met dezelfde member_id gecontroleerd "
+        "bijgewerkt. Handmatige regels worden nooit verwijderd of op alleen naam gekoppeld."
+    )
+    import_confirmed = st.button(
+        "Deelnemers overnemen naar planner",
+        type="primary",
+        disabled=preview.ready_count == 0,
+        key=f"confirm_registration_import_{event_id}",
+    )
+    if not import_confirmed:
+        return
+
+    merge_result = merge_registration_import(current_rows, preview)
+    try:
+        saved_draft = store.save_imported_club_draft_players(
+            user.id,
+            user.display_name,
+            list(merge_result.rows),
+            expected_updated_at=(
+                str(draft.get("updated_at"))
+                if draft.get("updated_at")
+                else None
+            ),
+        )
+    except RuntimeError as exc:
+        st.error(str(exc))
+        return
+    except Exception:
+        st.error("De deelnemers konden niet veilig naar de planner worden overgenomen.")
+        return
+
+    st.session_state["club_draft"] = saved_draft
+    st.session_state["club_draft_revision"] = (
+        int(st.session_state.get("club_draft_revision", 0)) + 1
+    )
+    st.session_state["planner_flash_message"] = (
+        f"Registratie-import voltooid: {merge_result.added} toegevoegd, "
+        f"{merge_result.updated} bijgewerkt en {merge_result.unchanged} al actueel."
+    )
+    if merge_result.skipped:
+        st.session_state["planner_import_warning"] = "Overgeslagen: " + "; ".join(
+            f"{name or 'Onbekend'} ({reason})"
+            for name, reason in merge_result.skipped
+        )
+    else:
+        st.session_state.pop("planner_import_warning", None)
+    st.session_state["navigation_page"] = PLANNER_PAGE
+    st.rerun()
 
 
 def _render_event_management_page(
@@ -3891,6 +4091,7 @@ def _render_event_management_page(
                 "De slug, sport, datum en tijden blijven na creatie vast. "
                 "Annuleer een fout event en maak een vervangend event."
             )
+            _render_event_registration_import(store, user, event)
 
             existing_deadline = event.get("signup_deadline")
             deadline_local = (

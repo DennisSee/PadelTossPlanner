@@ -121,6 +121,25 @@ door de participant tijdens onboarding ingevuld. `tos_events.sport` maakt ieder 
 event expliciet padel of tennis. De huidige planner en interface blijven uitsluitend de
 bestaande padelflow uitvoeren; tennisplannerlogica is nog niet geïmplementeerd.
 
+### Registraties gecontroleerd naar de padelplanner overnemen
+
+Planner en admin kunnen bij een padel-event eerst een read-only registratiepreview laden.
+Alleen attending, goedgekeurde en actieve leden met een actief padelprofiel en ranking
+1–5 zijn importeerbaar. De import wordt pas na een afzonderlijke bevestiging uitgevoerd.
+
+De import voegt samen met de bestaande `club_drafts.players`-JSON en vervangt nooit de
+volledige handmatige lijst. Een bestaande self-signupregel wordt uitsluitend gevonden via
+de stabiele `member_id`; een gelijke naam zonder identitymetadata geeft een waarschuwing en
+wordt niet stilzwijgend gekoppeld. Legacyregels zonder `member_id` blijven geldig. Bij een
+expliciete herimport worden gekoppelde regels bijgewerkt, maar afmeldingen en geblokkeerde
+leden verwijderen geen bestaande handmatige regel.
+
+De optionele `member_id`, `user_id`, `registration_id` en `source_event_id` blijven in de
+private `club_drafts.players`-regel aanwezig. Bij het genereren en opslaan van een schema
+wordt dezelfde metadata ook in het private `schedules.players_private` opgenomen. Deze
+identitymetadata wordt niet naar de publieke scheduleprojectie gekopieerd en kan later als
+basis dienen voor speelgeschiedenis zonder `planner.py` database-afhankelijk te maken.
+
 ### Nieuwe schemawijzigingen
 
 Maak voor iedere toekomstige schemawijziging een nieuwe migration:

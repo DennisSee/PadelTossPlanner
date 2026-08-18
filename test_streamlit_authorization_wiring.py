@@ -39,6 +39,7 @@ def test_admin_route_has_a_direct_admin_guard() -> None:
 def test_event_management_route_uses_only_the_guarded_admin_store() -> None:
     calls = _function_calls("_render_event_management_page")
     assert "require_planner_role" in calls
+    assert "_render_event_registration_import" in calls
     assert "_get_user_registration_repository" not in calls
 
     tree = ast.parse(APP_PATH.read_text(encoding="utf-8"))
@@ -58,6 +59,32 @@ def test_event_management_route_uses_only_the_guarded_admin_store() -> None:
         "create_tos_event",
         "update_tos_event",
         "set_tos_event_status",
+    }.issubset(attributes)
+
+
+def test_registration_import_has_direct_guard_and_no_participant_repository() -> None:
+    calls = _function_calls("_render_event_registration_import")
+    assert "require_planner_role" in calls
+    assert "build_registration_import_preview" in calls
+    assert "merge_registration_import" in calls
+    assert "_get_user_registration_repository" not in calls
+
+    tree = ast.parse(APP_PATH.read_text(encoding="utf-8"))
+    function = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef)
+        and node.name == "_render_event_registration_import"
+    )
+    attributes = {
+        node.func.attr
+        for node in ast.walk(function)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+    }
+    assert {
+        "list_event_registrations_for_import",
+        "load_club_draft",
+        "save_imported_club_draft_players",
     }.issubset(attributes)
 
 

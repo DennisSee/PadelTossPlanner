@@ -11,6 +11,7 @@ def test_application_modules_import() -> None:
         "member_management",
         "participant_auth",
         "participant_registration",
+        "planner_registration_import",
         "public_schedule_repository",
         "registration_repository",
         "streamlit_app",

@@ -469,6 +469,70 @@ class AdminSupabaseStore:
         rows = _response_data(response)
         return rows[0] if rows else None
 
+    def list_event_registrations_for_import(
+        self,
+        event_id: str,
+    ) -> list[dict[str, Any]]:
+        """Laad uitsluitend de beheerdata die de pure plannerimport nodig heeft."""
+        registrations = _response_data(
+            self.admin.table("registrations")
+            .select(
+                "id,event_id,user_id,member_id,response,available_from,"
+                "available_until,source,created_at,updated_at"
+            )
+            .eq("event_id", event_id)
+            .order("created_at")
+            .execute()
+        )
+        member_ids = sorted(
+            {
+                str(registration.get("member_id") or "")
+                for registration in registrations
+                if registration.get("member_id")
+            }
+        )
+        if not member_ids:
+            return []
+
+        members = _response_data(
+            self.admin.table("club_members")
+            .select("id,display_name,approval_status,active")
+            .in_("id", member_ids)
+            .execute()
+        )
+        padel_profiles = _response_data(
+            self.admin.table("member_sport_profiles")
+            .select("member_id,sport,ranking,active")
+            .in_("member_id", member_ids)
+            .eq("sport", "padel")
+            .execute()
+        )
+        members_by_id = {
+            str(member.get("id") or ""): member for member in members
+        }
+        padel_by_member = {
+            str(profile.get("member_id") or ""): profile
+            for profile in padel_profiles
+        }
+        result: list[dict[str, Any]] = []
+        for registration in registrations:
+            member_id = str(registration.get("member_id") or "")
+            member = members_by_id.get(member_id, {})
+            padel_profile = padel_by_member.get(member_id, {})
+            result.append(
+                {
+                    **registration,
+                    "display_name": member.get("display_name"),
+                    "approval_status": member.get("approval_status"),
+                    "member_active": bool(member.get("active", False)),
+                    "padel_profile_active": bool(
+                        padel_profile.get("active", False)
+                    ),
+                    "padel_ranking": padel_profile.get("ranking"),
+                }
+            )
+        return result
+
     def create_tos_event(self, payload: Mapping[str, Any]) -> dict[str, Any]:
         allowed_fields = {
             "slug",
@@ -559,6 +623,37 @@ class AdminSupabaseStore:
         )
         rows = _response_data(response)
         return rows[0] if rows else record
+
+    def save_imported_club_draft_players(
+        self,
+        user_id: str,
+        display_name: str,
+        players: list[Mapping[str, Any]],
+        *,
+        expected_updated_at: str | None,
+    ) -> dict[str, Any]:
+        """Wijzig alleen players en voorkom overschrijven van een nieuwere clubdraft."""
+        record = {
+            "players": [dict(player) for player in players],
+            "updated_by": user_id,
+            "updated_by_name": display_name,
+        }
+        table = self.admin.table("club_drafts")
+        if expected_updated_at:
+            response = (
+                table.update(record)
+                .eq("id", "club")
+                .eq("updated_at", expected_updated_at)
+                .execute()
+            )
+        else:
+            response = table.insert({"id": "club", **record}).execute()
+        rows = _response_data(response)
+        if not rows:
+            raise RuntimeError(
+                "De gedeelde plannerinvoer is intussen gewijzigd; laad de preview opnieuw."
+            )
+        return rows[0]
 
     # Oude persoonlijke concepten blijven beschikbaar voor compatibiliteit.
     def load_draft(self, user_id: str) -> dict[str, Any] | None:
