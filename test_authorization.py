@@ -6,6 +6,8 @@ from authorization import (
     AuthorizationError,
     EVENT_MANAGEMENT_PAGE,
     MEMBER_MANAGEMENT_PAGE,
+    MY_TOS_PAGE,
+    OPEN_TOS_PAGE,
     PLANNER_PAGE,
     PUBLIC_PAGE,
     SAVED_SCHEDULES_PAGE,
@@ -14,14 +16,22 @@ from authorization import (
     default_page_for_role,
     navigation_pages_for_role,
     require_admin_role,
+    require_participant_role,
     require_planner_role,
     signup_context_from_query_params,
 )
 
 
 def test_participant_has_no_planner_or_admin_pages() -> None:
-    assert navigation_pages_for_role("participant") == (PUBLIC_PAGE,)
-    assert default_page_for_role("participant") == PUBLIC_PAGE
+    assert navigation_pages_for_role("participant") == (
+        MY_TOS_PAGE,
+        OPEN_TOS_PAGE,
+        PUBLIC_PAGE,
+    )
+    assert default_page_for_role("participant") == MY_TOS_PAGE
+    assert can_access_page("participant", MY_TOS_PAGE)
+    assert can_access_page("participant", OPEN_TOS_PAGE)
+    assert can_access_page("participant", PUBLIC_PAGE)
     assert not can_access_page("participant", PLANNER_PAGE)
     assert not can_access_page("participant", SAVED_SCHEDULES_PAGE)
     assert not can_access_page("participant", EVENT_MANAGEMENT_PAGE)
@@ -31,6 +41,7 @@ def test_participant_has_no_planner_or_admin_pages() -> None:
         require_planner_role("participant")
     with pytest.raises(AuthorizationError):
         require_admin_role("participant")
+    require_participant_role("participant")
 
 
 def test_planner_has_planner_pages_but_no_admin_page() -> None:
@@ -43,6 +54,8 @@ def test_planner_has_planner_pages_but_no_admin_page() -> None:
     )
     assert default_page_for_role("planner") == PLANNER_PAGE
     require_planner_role("planner")
+    with pytest.raises(AuthorizationError):
+        require_participant_role("planner")
     with pytest.raises(AuthorizationError):
         require_admin_role("planner")
 
@@ -58,6 +71,8 @@ def test_admin_has_planner_and_admin_functionality() -> None:
     )
     require_planner_role("admin")
     require_admin_role("admin")
+    with pytest.raises(AuthorizationError):
+        require_participant_role("admin")
 
 
 def test_signup_return_context_accepts_only_known_safe_route() -> None:

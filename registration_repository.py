@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Callable
 from uuid import UUID
 
@@ -15,6 +15,11 @@ from database import PersistentAuthSession
 PUBLIC_SIGNUP_EVENT_COLUMNS = (
     "id,slug,title,sport,starts_at,ends_at,signup_deadline,status"
 )
+OWN_UPCOMING_REGISTRATION_COLUMNS = (
+    "id,event_id,response,available_from,available_until,"
+    "tos_events!inner(id,slug,title,sport,starts_at,ends_at,signup_deadline,status)"
+)
+ATTENDEE_NAMES_RPC = "participant_event_attendee_names"
 
 
 def _first_row(response: Any) -> dict[str, Any] | None:
@@ -24,6 +29,31 @@ def _first_row(response: Any) -> dict[str, Any] | None:
     if isinstance(data, dict):
         return data
     return None
+
+
+def _rows(response: Any) -> list[dict[str, Any]]:
+    data = getattr(response, "data", None)
+    if not isinstance(data, list):
+        return []
+    return [row for row in data if isinstance(row, dict)]
+
+
+def _timestamp_sort_value(value: object) -> datetime:
+    raw = str(value or "").strip()
+    try:
+        parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return datetime.max.replace(tzinfo=timezone.utc)
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _registration_event(registration: dict[str, Any]) -> dict[str, Any]:
+    event = registration.get("tos_events")
+    if isinstance(event, list):
+        event = event[0] if event else None
+    return event if isinstance(event, dict) else {}
 
 
 class PublicSignupEventRepository:
@@ -54,7 +84,6 @@ class PublicSignupEventRepository:
             .execute()
         )
         return _first_row(response)
-
 
 class UserScopedRegistrationRepository:
     """Nieuwe client per gebruiker; PostgREST ontvangt diens access-token.
@@ -136,6 +165,82 @@ class UserScopedRegistrationRepository:
             .execute()
         )
         return _first_row(response)
+
+    def get_event_by_slug(self, event_slug: str) -> dict[str, Any] | None:
+        """Lees een open event of eventdata van een eigen bestaande registratie."""
+        slug = str(event_slug or "").strip()
+        if not is_valid_event_slug(slug):
+            raise ValueError("Ongeldige TOS-eventslug.")
+
+        response = (
+            self._client.table("tos_events")
+            .select(PUBLIC_SIGNUP_EVENT_COLUMNS)
+            .eq("slug", slug)
+            .limit(1)
+            .execute()
+        )
+        return _first_row(response)
+
+    def list_open_events(
+        self,
+        *,
+        now: datetime | None = None,
+    ) -> list[dict[str, Any]]:
+        """Lees alleen toekomstige events waarvan self-signup nog open is."""
+        current = now or datetime.now(timezone.utc)
+        if current.tzinfo is None or current.utcoffset() is None:
+            raise ValueError("De referentietijd moet een tijdzone bevatten.")
+        timestamp = current.astimezone(timezone.utc).isoformat()
+        response = (
+            self._client.table("tos_events")
+            .select(PUBLIC_SIGNUP_EVENT_COLUMNS)
+            .eq("status", "open")
+            .gte("ends_at", timestamp)
+            .or_(f"signup_deadline.is.null,signup_deadline.gte.{timestamp}")
+            .execute()
+        )
+        return sorted(
+            _rows(response),
+            key=lambda event: _timestamp_sort_value(event.get("starts_at")),
+        )
+
+    def list_own_upcoming_registrations(
+        self,
+        *,
+        now: datetime | None = None,
+    ) -> list[dict[str, Any]]:
+        """Lees eigen registraties met minimale eventdata, ook na sluiten."""
+        current = now or datetime.now(timezone.utc)
+        if current.tzinfo is None or current.utcoffset() is None:
+            raise ValueError("De referentietijd moet een tijdzone bevatten.")
+        timestamp = current.astimezone(timezone.utc).isoformat()
+        response = (
+            self._client.table("registrations")
+            .select(OWN_UPCOMING_REGISTRATION_COLUMNS)
+            .eq("user_id", self._user_id)
+            .gte("tos_events.ends_at", timestamp)
+            .execute()
+        )
+        return sorted(
+            _rows(response),
+            key=lambda registration: _timestamp_sort_value(
+                _registration_event(registration).get("starts_at")
+            ),
+        )
+
+    def list_event_attendee_names(self, event_id: str) -> list[str]:
+        """Lees uitsluitend veilige display names via de databaseprojectie."""
+        normalized_event_id = str(UUID(str(event_id)))
+        response = self._client.rpc(
+            ATTENDEE_NAMES_RPC,
+            {"p_event_id": normalized_event_id},
+        ).execute()
+        names: list[str] = []
+        for row in _rows(response):
+            name = str(row.get("display_name") or "").strip()
+            if name:
+                names.append(name)
+        return names
 
     def get_own_registration(self, event_id: str) -> dict[str, Any] | None:
         normalized_event_id = str(UUID(str(event_id)))

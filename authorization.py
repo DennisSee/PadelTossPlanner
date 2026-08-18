@@ -8,6 +8,8 @@ from typing import Mapping
 
 
 PUBLIC_PAGE = "Openbaar schema"
+MY_TOS_PAGE = "Mijn TOS"
+OPEN_TOS_PAGE = "Open TOS-avonden"
 PLANNER_PAGE = "Planner"
 SAVED_SCHEDULES_PAGE = "Opgeslagen schema's"
 USER_MANAGEMENT_PAGE = "Gebruikersbeheer"
@@ -16,6 +18,7 @@ MEMBER_MANAGEMENT_PAGE = "Leden & niveaus"
 
 PLANNER_ROLES = frozenset({"planner", "admin"})
 ADMIN_ROLES = frozenset({"admin"})
+PARTICIPANT_ROLES = frozenset({"participant"})
 _EVENT_SLUG_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 
 
@@ -67,7 +70,14 @@ def can_access_admin(role: str) -> bool:
     return role in ADMIN_ROLES
 
 
+def can_access_participant(role: str) -> bool:
+    return role in PARTICIPANT_ROLES
+
+
 def navigation_pages_for_role(role: str | None) -> tuple[str, ...]:
+    if role and can_access_participant(role):
+        return (MY_TOS_PAGE, OPEN_TOS_PAGE, PUBLIC_PAGE)
+
     pages = [PUBLIC_PAGE]
     if role and can_access_planner(role):
         pages.extend(
@@ -84,6 +94,8 @@ def navigation_pages_for_role(role: str | None) -> tuple[str, ...]:
 
 
 def default_page_for_role(role: str | None) -> str:
+    if role and can_access_participant(role):
+        return MY_TOS_PAGE
     return PLANNER_PAGE if role and can_access_planner(role) else PUBLIC_PAGE
 
 
@@ -99,3 +111,8 @@ def require_planner_role(role: str) -> None:
 def require_admin_role(role: str) -> None:
     if not can_access_admin(role):
         raise AuthorizationError("Alleen beheerders hebben toegang.")
+
+
+def require_participant_role(role: str) -> None:
+    if not can_access_participant(role):
+        raise AuthorizationError("Alleen deelnemers hebben toegang.")

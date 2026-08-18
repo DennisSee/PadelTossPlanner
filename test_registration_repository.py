@@ -5,6 +5,8 @@ from typing import Any
 
 from database import AuthenticatedUser, PersistentAuthSession
 from registration_repository import (
+    ATTENDEE_NAMES_RPC,
+    OWN_UPCOMING_REGISTRATION_COLUMNS,
     PUBLIC_SIGNUP_EVENT_COLUMNS,
     PublicSignupEventRepository,
     UserScopedRegistrationRepository,
@@ -26,6 +28,14 @@ class _Query:
 
     def limit(self, value: int) -> "_Query":
         self.calls.append(("limit", value))
+        return self
+
+    def gte(self, column: str, value: object) -> "_Query":
+        self.calls.append((f"gte:{column}", value))
+        return self
+
+    def or_(self, filters: str) -> "_Query":
+        self.calls.append(("or", filters))
         return self
 
     def insert(self, payload: dict[str, object]) -> "_Query":
@@ -221,6 +231,150 @@ def test_read_methods_filter_to_current_user_and_safe_public_fields() -> None:
     }
     assert ("eq:user_id", user_id) in client.queries["registrations"].calls
     assert ("eq:status", "open") in client.queries["tos_events"].calls
+
+
+def test_participant_event_lists_are_explicit_filtered_and_chronological() -> None:
+    from datetime import datetime, timezone
+
+    user_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    first_event_id = "10000000-0000-4000-8000-000000000001"
+    second_event_id = "10000000-0000-4000-8000-000000000002"
+    client = _UserClient(
+        {
+            "tos_events": [
+                {
+                    "id": second_event_id,
+                    "slug": "later-event",
+                    "starts_at": "2099-08-02T18:00:00+00:00",
+                },
+                {
+                    "id": first_event_id,
+                    "slug": "eerste-event",
+                    "starts_at": "2099-08-01T18:00:00+00:00",
+                },
+            ]
+        }
+    )
+    repository = UserScopedRegistrationRepository(
+        "https://project.example.test",
+        "publishable-test-key",
+        _session(user_id, "access-a"),
+        client_factory=lambda _url, _key: client,  # type: ignore[arg-type]
+    )
+    now = datetime(2099, 7, 1, tzinfo=timezone.utc)
+
+    events = repository.list_open_events(now=now)
+
+    assert [event["id"] for event in events] == [first_event_id, second_event_id]
+    calls = client.queries["tos_events"].calls
+    assert ("select", PUBLIC_SIGNUP_EVENT_COLUMNS) in calls
+    assert "*" not in PUBLIC_SIGNUP_EVENT_COLUMNS
+    assert ("eq:status", "open") in calls
+    assert any(name == "gte:ends_at" for name, _value in calls)
+    assert any(name == "or" and "signup_deadline" in value for name, value in calls)
+
+
+def test_own_upcoming_registrations_use_rls_identity_and_minimal_event_join() -> None:
+    from datetime import datetime, timezone
+
+    user_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    client = _UserClient(
+        {
+            "registrations": [
+                {
+                    "id": "20000000-0000-4000-8000-000000000002",
+                    "event_id": "10000000-0000-4000-8000-000000000002",
+                    "response": "declined",
+                    "tos_events": {
+                        "starts_at": "2099-09-02T18:00:00+00:00",
+                        "status": "closed",
+                    },
+                },
+                {
+                    "id": "20000000-0000-4000-8000-000000000001",
+                    "event_id": "10000000-0000-4000-8000-000000000001",
+                    "response": "attending",
+                    "tos_events": {
+                        "starts_at": "2099-09-01T18:00:00+00:00",
+                        "status": "open",
+                    },
+                },
+            ]
+        }
+    )
+    repository = UserScopedRegistrationRepository(
+        "https://project.example.test",
+        "publishable-test-key",
+        _session(user_id, "access-a"),
+        client_factory=lambda _url, _key: client,  # type: ignore[arg-type]
+    )
+
+    registrations = repository.list_own_upcoming_registrations(
+        now=datetime(2099, 8, 1, tzinfo=timezone.utc)
+    )
+
+    assert [row["id"] for row in registrations] == [
+        "20000000-0000-4000-8000-000000000001",
+        "20000000-0000-4000-8000-000000000002",
+    ]
+    calls = client.queries["registrations"].calls
+    assert ("select", OWN_UPCOMING_REGISTRATION_COLUMNS) in calls
+    assert "*" not in OWN_UPCOMING_REGISTRATION_COLUMNS
+    assert ("eq:user_id", user_id) in calls
+    assert any(name == "gte:tos_events.ends_at" for name, _value in calls)
+
+
+def test_attendee_names_use_only_narrow_rpc_and_display_name_result() -> None:
+    user_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    event_id = "10000000-0000-4000-8000-000000000001"
+    client = _UserClient(
+        {
+            f"rpc:{ATTENDEE_NAMES_RPC}": [
+                {"display_name": "Dennis"},
+                {"display_name": "Marieke"},
+            ]
+        }
+    )
+    repository = UserScopedRegistrationRepository(
+        "https://project.example.test",
+        "publishable-test-key",
+        _session(user_id, "access-a"),
+        client_factory=lambda _url, _key: client,  # type: ignore[arg-type]
+    )
+
+    assert repository.list_event_attendee_names(event_id) == ["Dennis", "Marieke"]
+    assert client.rpc_calls == [
+        (ATTENDEE_NAMES_RPC, {"p_event_id": event_id})
+    ]
+    assert client.queries == {}
+
+
+def test_authenticated_event_read_relies_on_rls_without_forcing_open_status() -> None:
+    user_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    client = _UserClient(
+        {
+            "tos_events": [
+                {
+                    "id": "10000000-0000-4000-8000-000000000001",
+                    "slug": "eigen-gesloten-event",
+                    "status": "closed",
+                }
+            ]
+        }
+    )
+    repository = UserScopedRegistrationRepository(
+        "https://project.example.test",
+        "publishable-test-key",
+        _session(user_id, "access-a"),
+        client_factory=lambda _url, _key: client,  # type: ignore[arg-type]
+    )
+
+    event = repository.get_event_by_slug("eigen-gesloten-event")
+
+    assert event is not None and event["status"] == "closed"
+    calls = client.queries["tos_events"].calls
+    assert ("eq:slug", "eigen-gesloten-event") in calls
+    assert not any(name == "eq:status" for name, _value in calls)
 
 
 def test_self_onboarding_uses_only_the_user_scoped_rpc() -> None:

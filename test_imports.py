@@ -10,6 +10,7 @@ def test_application_modules_import() -> None:
         "event_management",
         "member_management",
         "participant_auth",
+        "participant_dashboard",
         "participant_registration",
         "planner_registration_import",
         "public_schedule_repository",

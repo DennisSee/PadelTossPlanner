@@ -163,11 +163,26 @@ def test_participant_signup_route_uses_only_user_scoped_repository() -> None:
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
     }
     assert "get_own_profile" in attributes
-    assert "get_open_event_by_slug" in attributes
+    assert "get_event_by_slug" in attributes
     assert "self_onboard_member" in attributes
     assert "get_own_registration" in attributes
     assert "save_own_registration" in attributes
     assert not {"insert", "update", "upsert", "delete"} & attributes
+
+
+def test_participant_dashboard_routes_have_direct_guards_and_no_admin_store() -> None:
+    for function_name in (
+        "_render_participant_home_page",
+        "_render_open_tos_page",
+    ):
+        calls = _function_calls(function_name)
+        assert "require_participant_role" in calls
+        assert "_get_admin_store" not in calls
+
+    home_calls = _function_calls("_render_participant_home_page")
+    assert "_load_participant_dashboard_data" in home_calls
+    open_calls = _function_calls("_render_open_tos_page")
+    assert "_load_participant_dashboard_data" in open_calls
 
 
 def test_oauth_callback_runs_before_restore_and_uses_current_query_api() -> None:

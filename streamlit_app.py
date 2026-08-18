@@ -20,12 +20,15 @@ from authorization import (
     AuthorizationError,
     EVENT_MANAGEMENT_PAGE,
     MEMBER_MANAGEMENT_PAGE,
+    MY_TOS_PAGE,
+    OPEN_TOS_PAGE,
     PLANNER_PAGE,
     PUBLIC_PAGE,
     SignupReturnContext,
     default_page_for_role,
     navigation_pages_for_role,
     require_admin_role,
+    require_participant_role,
     require_planner_role,
     signup_context_from_query_params,
 )
@@ -110,6 +113,14 @@ from participant_registration import (
     parse_supabase_timestamp,
     registration_availability,
     registration_initial_values,
+)
+from participant_dashboard import (
+    attendee_names_preview,
+    event_status_label,
+    registration_cta_label,
+    registration_event,
+    registration_response_label,
+    registrations_by_event_id,
 )
 from registration_repository import (
     PublicSignupEventRepository,
@@ -2899,10 +2910,16 @@ def _render_participant_signup_page(
     """Mobiele participantflow voor onboarding en de eigen TOS-aanmelding."""
     st.markdown(_public_brand_header_html(), unsafe_allow_html=True)
 
+    session = _current_auth_session()
+    repository: UserScopedRegistrationRepository | None = None
     try:
-        event = _get_public_signup_event_repository(
-            public_config
-        ).get_open_event_by_slug(context.event_slug)
+        if session is None:
+            event = _get_public_signup_event_repository(
+                public_config
+            ).get_open_event_by_slug(context.event_slug)
+        else:
+            repository = _get_user_registration_repository(public_config, session)
+            event = repository.get_event_by_slug(context.event_slug)
     except Exception:
         st.error("De TOS-avond kon niet worden geladen.")
         return
@@ -2916,16 +2933,20 @@ def _render_participant_signup_page(
     if st.button("← Terug", key="leave_signup_route", type="tertiary"):
         st.session_state.pop("signup_return_context", None)
         st.session_state.pop(PARTICIPANT_OTP_EMAIL_STATE, None)
+        st.session_state["navigation_page"] = (
+            default_page_for_role(session.user.role) if session else PUBLIC_PAGE
+        )
         _clear_oauth_pending_cookies(cookies)
         _replace_query_params({})
         st.rerun()
 
-    session = _current_auth_session()
     if session is None:
         _render_participant_auth_options(auth_service, cookies, context)
         return
 
-    repository = _get_user_registration_repository(public_config, session)
+    if repository is None:
+        st.error("Je deelnemerssessie kon niet veilig worden geladen.")
+        return
     try:
         profile = repository.get_own_profile()
     except Exception:
@@ -2940,20 +2961,6 @@ def _render_participant_signup_page(
     if profile_role != session.user.role:
         st.error("De actuele accountrol kon niet betrouwbaar worden vastgesteld.")
         return
-
-    try:
-        authenticated_event = repository.get_open_event_by_slug(context.event_slug)
-    except Exception:
-        st.error("De TOS-avond kon niet veilig worden geladen.")
-        return
-
-    if (
-        not authenticated_event
-        or str(authenticated_event.get("id") or "") != str(event.get("id") or "")
-    ):
-        st.info("Deze TOS-avond is niet beschikbaar of niet meer open voor aanmelding.")
-        return
-    event = authenticated_event
 
     link_status = participant_link_status(profile)
     if link_status == PARTICIPANT_STATUS_NOT_PARTICIPANT:
@@ -3026,6 +3033,13 @@ def _render_participant_signup_page(
         f"Ingelogd als {member.get('display_name') or session.user.display_name}"
     )
     if not event_allows_self_service(event):
+        status = str(event.get("status") or "")
+        if status == "cancelled":
+            closed_reason = "Deze TOS-avond is geannuleerd."
+        elif status == "closed":
+            closed_reason = "De inschrijving voor deze TOS-avond is gesloten."
+        else:
+            closed_reason = "De aanmelddeadline is verstreken."
         if registration:
             current_choice = (
                 "Ik doe mee"
@@ -3033,10 +3047,10 @@ def _render_participant_signup_page(
                 else "Ik doe niet mee"
             )
             st.info(
-                f"Je huidige keuze is: {current_choice}. De aanmelddeadline is verstreken."
+                f"Je huidige keuze is: {current_choice}. {closed_reason}"
             )
         else:
-            st.info("De aanmelddeadline is verstreken.")
+            st.info(closed_reason)
         return
 
     try:
@@ -3134,6 +3148,242 @@ def _format_local_datetime(
     local_value = parsed.astimezone(LOCAL_TIMEZONE)
     pattern = "%d-%m-%Y %H:%M:%S" if include_seconds else "%d-%m-%Y %H:%M"
     return local_value.strftime(pattern)
+
+
+def _navigate_to_signup(event_slug: object) -> None:
+    """Open uitsluitend de bestaande gevalideerde interne signup-route."""
+    context = signup_context_from_query_params(
+        {"page": "signup", "event": str(event_slug or "")}
+    )
+    if context is None:
+        st.error("Deze aanmeldlink is niet geldig.")
+        return
+    st.session_state["signup_return_context"] = context
+    _replace_query_params(context.query_params)
+    st.rerun()
+
+
+def _event_title_and_time(event: Mapping[str, object]) -> tuple[str, str]:
+    window = event_window(event)
+    title = f"{event_sport_label(event)} · {event.get('title') or 'TOS-avond'}"
+    timing = (
+        f"{format_event_date(event)} · "
+        f"{window.local_start:%H:%M} – {window.local_end:%H:%M}"
+    )
+    return title, timing
+
+
+def _render_own_registration_card(
+    registration: Mapping[str, object],
+    *,
+    key_prefix: str,
+) -> None:
+    event = registration_event(registration)
+    if not event:
+        st.warning("De eventdata van deze aanmelding zijn niet beschikbaar.")
+        return
+    try:
+        title, timing = _event_title_and_time(event)
+    except ParticipantRegistrationError:
+        st.warning("De tijden van deze TOS-avond zijn niet beschikbaar.")
+        return
+
+    with st.container(border=True):
+        st.markdown(f"**{title}**")
+        st.caption(timing)
+        response = str(registration.get("response") or "")
+        if response == REGISTRATION_ATTENDING:
+            try:
+                available_from = parse_supabase_timestamp(
+                    registration.get("available_from"),
+                    field_name="beschikbaarheid vanaf",
+                ).astimezone(LOCAL_TIMEZONE)
+                available_until = parse_supabase_timestamp(
+                    registration.get("available_until"),
+                    field_name="beschikbaarheid tot",
+                ).astimezone(LOCAL_TIMEZONE)
+                st.write(
+                    f"Je doet mee van {available_from:%H:%M} tot "
+                    f"{available_until:%H:%M}."
+                )
+            except ParticipantRegistrationError:
+                st.write("Je doet mee.")
+        else:
+            st.write(registration_response_label(response))
+
+        st.caption(event_status_label(event.get("status")))
+        if event.get("signup_deadline"):
+            st.caption(
+                "Aanmelden kan tot "
+                + _format_local_datetime(event.get("signup_deadline"))
+            )
+        if st.button(
+            "Aanmelding bekijken/wijzigen",
+            key=f"{key_prefix}_{registration.get('id')}",
+            width="stretch",
+        ):
+            _navigate_to_signup(event.get("slug"))
+
+
+def _render_open_event_card(
+    repository: UserScopedRegistrationRepository,
+    event: Mapping[str, object],
+    own_registrations: Mapping[str, Mapping[str, Any]],
+    *,
+    key_prefix: str,
+) -> None:
+    try:
+        title, timing = _event_title_and_time(event)
+    except ParticipantRegistrationError:
+        st.warning("De tijden van deze TOS-avond zijn niet beschikbaar.")
+        return
+
+    event_id = str(event.get("id") or "")
+    try:
+        attendee_names = repository.list_event_attendee_names(event_id)
+    except Exception:
+        attendee_names = []
+        names_available = False
+    else:
+        names_available = True
+
+    with st.container(border=True):
+        st.markdown(f"**{title}**")
+        st.caption(timing)
+        if event.get("signup_deadline"):
+            st.caption(
+                "Aanmelden tot "
+                + _format_local_datetime(event.get("signup_deadline"))
+            )
+        if names_available:
+            count = len(attendee_names)
+            st.write(f"{count} deelnemer{'s' if count != 1 else ''}")
+            preview = attendee_names_preview(attendee_names)
+            if preview:
+                st.caption(preview)
+        else:
+            st.caption("De deelnemerslijst is tijdelijk niet beschikbaar.")
+
+        if st.button(
+            registration_cta_label(event_id, own_registrations),
+            key=f"{key_prefix}_{event_id}",
+            width="stretch",
+        ):
+            _navigate_to_signup(event.get("slug"))
+
+
+def _load_participant_dashboard_data(
+    repository: UserScopedRegistrationRepository,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    registrations = repository.list_own_upcoming_registrations()
+    open_events = repository.list_open_events()
+    return registrations, open_events
+
+
+def _render_participant_home_page(
+    repository: UserScopedRegistrationRepository,
+    schedule_repository: PublicScheduleRepository,
+    user: AuthenticatedUser,
+) -> None:
+    """Compact participantdashboard met eigen TOS, open events en schema."""
+    try:
+        require_participant_role(user.role)
+    except AuthorizationError as exc:
+        st.error(str(exc))
+        return
+
+    try:
+        member = repository.get_linked_club_member()
+        registrations, open_events = _load_participant_dashboard_data(repository)
+    except Exception:
+        st.error("Je TOS-overzicht kon niet veilig worden geladen.")
+        return
+
+    display_name = str((member or {}).get("display_name") or user.display_name)
+    st.markdown(_public_brand_header_html(), unsafe_allow_html=True)
+    st.title(f"Hoi {display_name}")
+
+    st.subheader("Mijn komende TOS")
+    if registrations:
+        for registration in registrations:
+            _render_own_registration_card(
+                registration,
+                key_prefix="my_tos_registration",
+            )
+    else:
+        st.info("Je bent nog niet aangemeld voor een komende TOS.")
+
+    st.subheader("Open voor inschrijving")
+    if open_events:
+        own_by_event = registrations_by_event_id(registrations)
+        for event in open_events[:3]:
+            _render_open_event_card(
+                repository,
+                event,
+                own_by_event,
+                key_prefix="home_open_event",
+            )
+        if len(open_events) > 3 and st.button(
+            "Bekijk alle open TOS-avonden",
+            key="home_all_open_events",
+            width="stretch",
+        ):
+            st.session_state["navigation_page"] = OPEN_TOS_PAGE
+            st.rerun()
+    else:
+        st.info("Er staan nu geen TOS-avonden open voor inschrijving.")
+
+    st.subheader("Openbaar schema")
+    try:
+        schedule = schedule_repository.latest_published_schedule()
+    except Exception:
+        st.caption("Het gepubliceerde schema is tijdelijk niet beschikbaar.")
+    else:
+        if schedule:
+            event_date = _parse_date(schedule.get("event_date"), date.today())
+            st.write(f"Het laatste gepubliceerde schema is van {event_date:%d-%m-%Y}.")
+            if st.button(
+                "Bekijk openbaar schema",
+                key="home_public_schedule",
+                width="stretch",
+            ):
+                st.session_state["navigation_page"] = PUBLIC_PAGE
+                st.rerun()
+        else:
+            st.caption("Er is nog geen gepubliceerd schema.")
+
+
+def _render_open_tos_page(
+    repository: UserScopedRegistrationRepository,
+    user: AuthenticatedUser,
+) -> None:
+    """Toon alle events waarvoor de participant zichzelf nu kan aanmelden."""
+    try:
+        require_participant_role(user.role)
+    except AuthorizationError as exc:
+        st.error(str(exc))
+        return
+
+    st.markdown(_public_brand_header_html(), unsafe_allow_html=True)
+    st.title("Open TOS-avonden")
+    try:
+        registrations, open_events = _load_participant_dashboard_data(repository)
+    except Exception:
+        st.error("De open TOS-avonden konden niet veilig worden geladen.")
+        return
+
+    if not open_events:
+        st.info("Er staan nu geen TOS-avonden open voor inschrijving.")
+        return
+
+    own_by_event = registrations_by_event_id(registrations)
+    for event in open_events:
+        _render_open_event_card(
+            repository,
+            event,
+            own_by_event,
+            key_prefix="open_tos_event",
+        )
 
 
 def _render_public_page(
@@ -4865,13 +5115,29 @@ def main() -> None:
             options = list(navigation_pages_for_role(user.role))
             current_page = st.session_state.get("navigation_page")
             if current_page not in options:
-                st.session_state["navigation_page"] = PUBLIC_PAGE
+                st.session_state["navigation_page"] = default_page_for_role(
+                    user.role
+                )
             page = st.radio("Navigatie", options, key="navigation_page")
         else:
             page = PUBLIC_PAGE
             st.info("Bezoekers zien alleen deelnemers en het gepubliceerde schema.")
 
-    if page == PUBLIC_PAGE:
+    if page in {MY_TOS_PAGE, OPEN_TOS_PAGE}:
+        session = _current_auth_session()
+        if user is None or session is None:
+            st.error("Log opnieuw in om je TOS-overzicht te bekijken.")
+            return
+        repository = _get_user_registration_repository(public_config, session)
+        if page == MY_TOS_PAGE:
+            _render_participant_home_page(
+                repository,
+                public_schedule_repository,
+                user,
+            )
+        else:
+            _render_open_tos_page(repository, user)
+    elif page == PUBLIC_PAGE:
         _render_public_page(public_schedule_repository, cookies)
     elif user and user.can_plan:
         try:
