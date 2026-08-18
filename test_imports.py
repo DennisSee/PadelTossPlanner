@@ -16,5 +16,6 @@ def test_application_modules_import() -> None:
         "public_schedule_repository",
         "registration_repository",
         "streamlit_app",
+        "ui_design",
     ):
         assert importlib.import_module(module_name) is not None

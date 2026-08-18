@@ -126,6 +126,11 @@ from registration_repository import (
     PublicSignupEventRepository,
     UserScopedRegistrationRepository,
 )
+from ui_design import (
+    app_header_html,
+    design_system_stylesheet,
+    sidebar_account_html,
+)
 
 
 LOGGER = logging.getLogger(__name__)
@@ -202,8 +207,8 @@ st.set_page_config(
 )
 
 
-def _inject_responsive_styles() -> None:
-    """Compacte, mobielvriendelijke vormgeving voor de publieke pagina."""
+def _inject_app_styles() -> None:
+    """Injecteer component-CSS en daarna één centrale globale designlaag."""
     st.markdown(
         """
         <style>
@@ -1018,6 +1023,10 @@ def _inject_responsive_styles() -> None:
         """,
         unsafe_allow_html=True,
     )
+    st.markdown(
+        design_system_stylesheet(),
+        unsafe_allow_html=True,
+    )
 
 
 @st.cache_data(show_spinner=False)
@@ -1030,19 +1039,10 @@ def _club_logo_data_uri() -> str:
     return f"data:image/png;base64,{encoded}"
 
 
-def _public_brand_header_html() -> str:
-    logo_uri = _club_logo_data_uri()
-    logo_html = (
-        f'<img class="tos-brand-logo" src="{logo_uri}" '
-        'alt="Logo Tennisclub Zuid Doetinchem">'
-        if logo_uri
-        else ""
-    )
-    return (
-        '<header class="tos-brand-header">'
-        '<div class="tos-brand-title">T.C. Zuid TOS</div>'
-        f'{logo_html}'
-        '</header>'
+def _public_brand_header_html(page_title: str | None = None) -> str:
+    return app_header_html(
+        _club_logo_data_uri(),
+        page_title=page_title,
     )
 
 
@@ -2618,15 +2618,21 @@ def _render_login(
     user = _current_user()
     with st.sidebar:
         if user:
-            st.header("Account")
-            st.write(f"Ingelogd als **{user.display_name}**")
             role_label = {
                 "admin": "Beheerder",
                 "planner": "Planner",
                 "participant": "Deelnemer",
             }.get(user.role, "Onbekende rol")
-            st.caption(role_label)
-            if st.button("Uitloggen", width="stretch"):
+            st.markdown(
+                sidebar_account_html(user.display_name, role_label),
+                unsafe_allow_html=True,
+            )
+            if st.button(
+                "Uitloggen",
+                key="sidebar_logout",
+                type="secondary",
+                width="stretch",
+            ):
                 try:
                     current_session = _current_auth_session()
                     refresh_token = (
@@ -2643,6 +2649,7 @@ def _render_login(
                 _clear_oauth_pending_cookies(cookies)
                 _clear_auth_session_state()
                 st.rerun()
+            st.divider()
             return
 
         # Houd het openbare scherm rustig: de zijbalk start ingeklapt en de
@@ -2908,7 +2915,10 @@ def _render_participant_signup_page(
     context: SignupReturnContext,
 ) -> None:
     """Mobiele participantflow voor onboarding en de eigen TOS-aanmelding."""
-    st.markdown(_public_brand_header_html(), unsafe_allow_html=True)
+    st.markdown(
+        _public_brand_header_html("Aanmelden"),
+        unsafe_allow_html=True,
+    )
 
     session = _current_auth_session()
     repository: UserScopedRegistrationRepository | None = None
@@ -3300,7 +3310,6 @@ def _render_participant_home_page(
         return
 
     display_name = str((member or {}).get("display_name") or user.display_name)
-    st.markdown(_public_brand_header_html(), unsafe_allow_html=True)
     st.title(f"Hoi {display_name}")
 
     st.subheader("Mijn komende TOS")
@@ -3364,7 +3373,6 @@ def _render_open_tos_page(
         st.error(str(exc))
         return
 
-    st.markdown(_public_brand_header_html(), unsafe_allow_html=True)
     st.title("Open TOS-avonden")
     try:
         registrations, open_events = _load_participant_dashboard_data(repository)
@@ -3390,7 +3398,6 @@ def _render_public_page(
     repository: PublicScheduleRepository,
     cookies: EncryptedCookieManager,
 ) -> None:
-    st.markdown(_public_brand_header_html(), unsafe_allow_html=True)
     try:
         schedule = repository.latest_published_schedule()
     except Exception:
@@ -5065,7 +5072,7 @@ def _render_user_management(
 
 
 def main() -> None:
-    _inject_responsive_styles()
+    _inject_app_styles()
 
     try:
         public_config = public_config_from_secrets(st.secrets)
@@ -5122,6 +5129,11 @@ def main() -> None:
         else:
             page = PUBLIC_PAGE
             st.info("Bezoekers zien alleen deelnemers en het gepubliceerde schema.")
+
+    st.markdown(
+        _public_brand_header_html(page),
+        unsafe_allow_html=True,
+    )
 
     if page in {MY_TOS_PAGE, OPEN_TOS_PAGE}:
         session = _current_auth_session()
