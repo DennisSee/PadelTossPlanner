@@ -8,6 +8,7 @@ from registration_repository import (
     ATTENDEE_NAMES_RPC,
     OWN_UPCOMING_REGISTRATION_COLUMNS,
     PUBLIC_SIGNUP_EVENT_COLUMNS,
+    UPDATE_DISPLAY_NAME_RPC,
     PublicSignupEventRepository,
     UserScopedRegistrationRepository,
 )
@@ -406,6 +407,59 @@ def test_self_onboarding_uses_only_the_user_scoped_rpc() -> None:
         ("self_onboard_member", {"p_display_name": "Lid A"})
     ]
     assert client.queries == {}
+
+
+def test_display_name_update_uses_only_user_scoped_rpc_without_identity_fields() -> None:
+    user_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    member_id = "11111111-1111-4111-8111-111111111111"
+    client = _UserClient(
+        {
+            f"rpc:{UPDATE_DISPLAY_NAME_RPC}": [
+                {
+                    "profile_id": user_id,
+                    "member_id": member_id,
+                    "display_name": "Dennis Seesing",
+                }
+            ]
+        }
+    )
+    repository = UserScopedRegistrationRepository(
+        "https://project.example.test",
+        "publishable-test-key",
+        _session(user_id, "access-a"),
+        client_factory=lambda _url, _key: client,  # type: ignore[arg-type]
+    )
+
+    result = repository.update_own_display_name("  Dennis Seesing  ")
+
+    assert result["display_name"] == "Dennis Seesing"
+    assert client.rpc_calls == [
+        (UPDATE_DISPLAY_NAME_RPC, {"new_display_name": "Dennis Seesing"})
+    ]
+    assert not {"user_id", "member_id", "profile_id"} & set(
+        client.rpc_calls[0][1]
+    )
+    assert client.queries == {}
+
+
+def test_display_name_update_rejects_invalid_local_input_before_rpc() -> None:
+    client = _UserClient()
+    repository = UserScopedRegistrationRepository(
+        "https://project.example.test",
+        "publishable-test-key",
+        _session("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "access-a"),
+        client_factory=lambda _url, _key: client,  # type: ignore[arg-type]
+    )
+
+    for invalid_name in ("   ", "x" * 121, "Dennis\nSeesing"):
+        try:
+            repository.update_own_display_name(invalid_name)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("Ongeldige profielnaam is lokaal geaccepteerd.")
+
+    assert client.rpc_calls == []
 
 
 def test_create_and_update_send_only_self_service_registration_fields() -> None:

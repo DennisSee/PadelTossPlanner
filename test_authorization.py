@@ -6,6 +6,7 @@ from authorization import (
     AuthorizationError,
     EVENT_MANAGEMENT_PAGE,
     MEMBER_MANAGEMENT_PAGE,
+    MY_PROFILE_PAGE,
     MY_TOS_PAGE,
     OPEN_TOS_PAGE,
     PLANNER_PAGE,
@@ -26,11 +27,13 @@ def test_participant_has_no_planner_or_admin_pages() -> None:
     assert navigation_pages_for_role("participant") == (
         MY_TOS_PAGE,
         OPEN_TOS_PAGE,
+        MY_PROFILE_PAGE,
         PUBLIC_PAGE,
     )
     assert default_page_for_role("participant") == MY_TOS_PAGE
     assert can_access_page("participant", MY_TOS_PAGE)
     assert can_access_page("participant", OPEN_TOS_PAGE)
+    assert can_access_page("participant", MY_PROFILE_PAGE)
     assert can_access_page("participant", PUBLIC_PAGE)
     assert not can_access_page("participant", PLANNER_PAGE)
     assert not can_access_page("participant", SAVED_SCHEDULES_PAGE)
@@ -56,6 +59,7 @@ def test_planner_has_planner_pages_but_no_admin_page() -> None:
     require_planner_role("planner")
     with pytest.raises(AuthorizationError):
         require_participant_role("planner")
+    assert not can_access_page("planner", MY_PROFILE_PAGE)
     with pytest.raises(AuthorizationError):
         require_admin_role("planner")
 
@@ -73,6 +77,7 @@ def test_admin_has_planner_and_admin_functionality() -> None:
     require_admin_role("admin")
     with pytest.raises(AuthorizationError):
         require_participant_role("admin")
+    assert not can_access_page("admin", MY_PROFILE_PAGE)
 
 
 def test_signup_return_context_accepts_only_known_safe_route() -> None:

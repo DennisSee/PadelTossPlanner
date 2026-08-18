@@ -140,6 +140,25 @@ def design_system_stylesheet() -> str:
             display: none !important;
         }
 
+        /*
+         * CookieManager.sync_cookies moet gemount blijven om login- en PKCE-cookies
+         * te synchroniseren. Alleen de onzichtbare Streamlit-wrapper verdwijnt uit
+         * de flex-layout, zodat die vóór de appheader geen verticale gap reserveert.
+         */
+        [data-testid="stElementContainer"]:has(
+            [data-testid="stCustomComponentV1"]
+            iframe[title$="CookieManager.sync_cookies"]
+        ) {
+            position: absolute !important;
+            width: 1px !important;
+            height: 1px !important;
+            min-height: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: hidden !important;
+            clip-path: inset(50%);
+        }
+
         h1, h2, h3, h4 {
             color: var(--tc-green-dark);
             letter-spacing: -0.018em;

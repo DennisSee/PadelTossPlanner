@@ -174,6 +174,7 @@ def test_participant_dashboard_routes_have_direct_guards_and_no_admin_store() ->
     for function_name in (
         "_render_participant_home_page",
         "_render_open_tos_page",
+        "_render_participant_profile_page",
     ):
         calls = _function_calls(function_name)
         assert "require_participant_role" in calls
@@ -183,6 +184,8 @@ def test_participant_dashboard_routes_have_direct_guards_and_no_admin_store() ->
     assert "_load_participant_dashboard_data" in home_calls
     open_calls = _function_calls("_render_open_tos_page")
     assert "_load_participant_dashboard_data" in open_calls
+    profile_calls = _function_calls("_render_participant_profile_page")
+    assert "_refresh_participant_session_display_name" in profile_calls
 
 
 def test_oauth_callback_runs_before_restore_and_uses_current_query_api() -> None:

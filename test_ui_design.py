@@ -54,6 +54,19 @@ def test_layout_has_bounded_desktop_width_and_mobile_first_breakpoints() -> None
     assert "min-height: 2.85rem" in stylesheet
 
 
+def test_cookie_component_footprint_fix_is_narrow_and_keeps_component_mounted() -> None:
+    stylesheet = design_system_stylesheet()
+    assert 'iframe[title$="CookieManager.sync_cookies"]' in stylesheet
+    assert '[data-testid="stElementContainer"]:has(' in stylesheet
+    assert "position: absolute !important" in stylesheet
+    assert "iframe {" not in stylesheet
+    assert '[data-testid="stCustomComponentV1"] {' not in stylesheet
+    assert "display: none" not in stylesheet.split(
+        'iframe[title$="CookieManager.sync_cookies"]',
+        1,
+    )[1].split("}", 1)[0]
+
+
 def test_global_styles_cover_navigation_focus_cards_buttons_and_badges() -> None:
     stylesheet = design_system_stylesheet()
     assert '[data-testid="stSidebar"]' in stylesheet

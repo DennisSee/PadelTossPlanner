@@ -30,6 +30,13 @@ def test_global_design_system_is_injected_exactly_once() -> None:
     assert _name_calls("_inject_app_styles").count("design_system_stylesheet") == 1
     assert _name_calls("main").count("_inject_app_styles") == 1
     assert "_inject_responsive_styles" not in SOURCE
+    injection_source = ast.get_source_segment(
+        SOURCE,
+        _function("_inject_app_styles"),
+    )
+    assert injection_source is not None
+    assert injection_source.count("st.html(") == 2
+    assert "st.markdown(" not in injection_source
 
 
 def test_one_reusable_header_is_used_by_signup_and_regular_page_shell() -> None:

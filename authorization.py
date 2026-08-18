@@ -10,6 +10,7 @@ from typing import Mapping
 PUBLIC_PAGE = "Openbaar schema"
 MY_TOS_PAGE = "Mijn TOS"
 OPEN_TOS_PAGE = "Open TOS-avonden"
+MY_PROFILE_PAGE = "Mijn profiel"
 PLANNER_PAGE = "Planner"
 SAVED_SCHEDULES_PAGE = "Opgeslagen schema's"
 USER_MANAGEMENT_PAGE = "Gebruikersbeheer"
@@ -76,7 +77,7 @@ def can_access_participant(role: str) -> bool:
 
 def navigation_pages_for_role(role: str | None) -> tuple[str, ...]:
     if role and can_access_participant(role):
-        return (MY_TOS_PAGE, OPEN_TOS_PAGE, PUBLIC_PAGE)
+        return (MY_TOS_PAGE, OPEN_TOS_PAGE, MY_PROFILE_PAGE, PUBLIC_PAGE)
 
     pages = [PUBLIC_PAGE]
     if role and can_access_planner(role):

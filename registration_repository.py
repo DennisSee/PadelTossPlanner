@@ -20,6 +20,7 @@ OWN_UPCOMING_REGISTRATION_COLUMNS = (
     "tos_events!inner(id,slug,title,sport,starts_at,ends_at,signup_deadline,status)"
 )
 ATTENDEE_NAMES_RPC = "participant_event_attendee_names"
+UPDATE_DISPLAY_NAME_RPC = "update_my_display_name"
 
 
 def _first_row(response: Any) -> dict[str, Any] | None:
@@ -150,6 +151,28 @@ class UserScopedRegistrationRepository:
         if member is None:
             raise RuntimeError("Self-onboarding leverde geen clublidstatus op.")
         return member
+
+    def update_own_display_name(self, display_name: str) -> dict[str, Any]:
+        """Wijzig uitsluitend de eigen gekoppelde profiel- en ledennaam via RPC."""
+        normalized_name = str(display_name or "").strip()
+        if not 1 <= len(normalized_name) <= 120:
+            raise ValueError("De naam moet tussen 1 en 120 tekens bevatten.")
+        if any(
+            ord(character) < 32 or ord(character) == 127
+            for character in normalized_name
+        ):
+            raise ValueError("De naam bevat ongeldige tekens.")
+
+        response = self._client.rpc(
+            UPDATE_DISPLAY_NAME_RPC,
+            {"new_display_name": normalized_name},
+        ).execute()
+        profile = _first_row(response)
+        if profile is None:
+            raise RuntimeError(
+                "De bijgewerkte profielnaam kon niet worden teruggelezen."
+            )
+        return profile
 
     def get_open_event_by_slug(self, event_slug: str) -> dict[str, Any] | None:
         slug = str(event_slug or "").strip()

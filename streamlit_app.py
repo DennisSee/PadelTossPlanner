@@ -6,6 +6,7 @@ import base64
 import logging
 import re
 import secrets
+from dataclasses import replace
 from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 from html import escape
@@ -20,6 +21,7 @@ from authorization import (
     AuthorizationError,
     EVENT_MANAGEMENT_PAGE,
     MEMBER_MANAGEMENT_PAGE,
+    MY_PROFILE_PAGE,
     MY_TOS_PAGE,
     OPEN_TOS_PAGE,
     PLANNER_PAGE,
@@ -193,6 +195,8 @@ PARTICIPANT_AUTH_NOTICE_STATE = "participant_auth_notice"
 PARTICIPANT_OAUTH_PROVIDER_STATE = "participant_oauth_provider"
 PARTICIPANT_OAUTH_SYNC_RUNS_STATE = "participant_oauth_sync_runs"
 PARTICIPANT_ROOT_LOGIN_STATE = "participant_root_login"
+PARTICIPANT_PROFILE_NOTICE_STATE = "participant_profile_notice"
+PARTICIPANT_REGISTRATION_NOTICE_STATE = "participant_registration_notice"
 PREFERRED_PLAYER_COOKIE_NAME = "preferred_player_name"
 AUTH_COOKIE_PREFIX = "tc-zuid-tos/"
 
@@ -214,7 +218,7 @@ st.set_page_config(
 
 def _inject_app_styles() -> None:
     """Injecteer component-CSS en daarna één centrale globale designlaag."""
-    st.markdown(
+    st.html(
         """
         <style>
         :root {
@@ -1026,12 +1030,8 @@ def _inject_app_styles() -> None:
         }
         </style>
         """,
-        unsafe_allow_html=True,
     )
-    st.markdown(
-        design_system_stylesheet(),
-        unsafe_allow_html=True,
-    )
+    st.html(design_system_stylesheet())
 
 
 @st.cache_data(show_spinner=False)
@@ -2580,6 +2580,8 @@ def _clear_auth_session_state() -> None:
         PARTICIPANT_OAUTH_PROVIDER_STATE,
         PARTICIPANT_OAUTH_SYNC_RUNS_STATE,
         PARTICIPANT_ROOT_LOGIN_STATE,
+        PARTICIPANT_PROFILE_NOTICE_STATE,
+        PARTICIPANT_REGISTRATION_NOTICE_STATE,
         "planner_result",
         "last_saved_schedule_id",
     ):
@@ -2624,6 +2626,25 @@ def _current_user() -> AuthenticatedUser | None:
         return session.user
     user = st.session_state.get("auth_user")
     return user if isinstance(user, AuthenticatedUser) else None
+
+
+def _refresh_participant_session_display_name(
+    profile: Mapping[str, object],
+) -> AuthenticatedUser:
+    """Ververs alleen de zichtbare naam en behoud de geroteerde auth-tokens."""
+    session = _current_auth_session()
+    profile_id = str(profile.get("id") or "")
+    display_name = str(profile.get("display_name") or "").strip()
+    if session is None or profile_id != session.user.id or not display_name:
+        raise RuntimeError("De actuele profielnaam kon niet veilig worden ververst.")
+
+    updated_user = replace(session.user, display_name=display_name)
+    updated_session = replace(session, user=updated_user)
+    _set_auth_session(
+        updated_session,
+        persisted=bool(st.session_state.get("auth_persisted", False)),
+    )
+    return updated_user
 
 
 def _render_login(
@@ -2964,6 +2985,17 @@ def _render_signup_event_summary(event: Mapping[str, object]) -> bool:
     return True
 
 
+def _finish_participant_registration_save(*, was_existing: bool) -> None:
+    """Sluit een geslaagde signup-taak af en voorkom deeplink-heropening."""
+    st.session_state[PARTICIPANT_REGISTRATION_NOTICE_STATE] = (
+        "Aanmelding gewijzigd" if was_existing else "Aanmelding opgeslagen"
+    )
+    st.session_state.pop("signup_return_context", None)
+    st.session_state["navigation_page"] = MY_TOS_PAGE
+    _replace_query_params({})
+    st.rerun()
+
+
 def _render_participant_signup_page(
     auth_service: SupabaseAuthService,
     public_config: PublicSupabaseConfig,
@@ -3177,12 +3209,9 @@ def _render_participant_signup_page(
                 normalized_until,
                 registration_id=str((registration or {}).get("id") or "") or None,
             )
-            confirmation = (
-                "Je doet mee. Je aanmelding is opgeslagen."
-                if selected_response == REGISTRATION_ATTENDING
-                else "Je doet niet mee. Je aanmelding is opgeslagen."
+            _finish_participant_registration_save(
+                was_existing=registration is not None,
             )
-            st.success(confirmation)
         except (ParticipantRegistrationError, ValueError, RuntimeError) as exc:
             st.error(str(exc))
         except Exception:
@@ -3445,6 +3474,13 @@ def _render_participant_home_page(
         st.error(str(exc))
         return
 
+    registration_notice = st.session_state.pop(
+        PARTICIPANT_REGISTRATION_NOTICE_STATE,
+        None,
+    )
+    if registration_notice:
+        st.toast(str(registration_notice), icon="✅")
+
     try:
         member = repository.get_linked_club_member()
         registrations, open_events = _load_participant_dashboard_data(repository)
@@ -3535,6 +3571,80 @@ def _render_open_tos_page(
             own_by_event,
             key_prefix="open_tos_event",
         )
+
+
+def _render_participant_profile_page(
+    repository: UserScopedRegistrationRepository,
+    user: AuthenticatedUser,
+) -> None:
+    """Laat een participant uitsluitend de eigen zichtbare clubnaam beheren."""
+    try:
+        require_participant_role(user.role)
+    except AuthorizationError as exc:
+        st.error(str(exc))
+        return
+
+    profile_notice = st.session_state.pop(PARTICIPANT_PROFILE_NOTICE_STATE, None)
+    if profile_notice:
+        st.toast(str(profile_notice), icon="✅")
+
+    try:
+        profile = repository.get_own_profile()
+        member = repository.get_linked_club_member()
+    except Exception:
+        st.error("Je profiel kon niet veilig worden geladen.")
+        return
+
+    if (
+        not profile
+        or str(profile.get("id") or "") != user.id
+        or str(profile.get("role") or "") != "participant"
+    ):
+        st.error("Je eigen deelnemersprofiel ontbreekt of is niet toegankelijk.")
+        return
+    if not member or str(profile.get("member_id") or "") != str(
+        member.get("id") or ""
+    ):
+        st.info("Maak eerst je eigen clubprofiel aan voordat je je naam wijzigt.")
+        return
+
+    current_name = str(
+        member.get("display_name") or profile.get("display_name") or ""
+    )
+    st.title("Mijn profiel")
+    st.caption("Deze naam is zichtbaar voor andere ingelogde deelnemers.")
+    with st.form("participant_profile_form"):
+        st.text_input(
+            "E-mailadres",
+            value=user.email,
+            disabled=True,
+        )
+        display_name = st.text_input(
+            "Naam",
+            value=current_name,
+            max_chars=120,
+        )
+        save_name = st.form_submit_button(
+            "Naam opslaan",
+            type="primary",
+            width="stretch",
+        )
+
+    if not save_name:
+        return
+
+    try:
+        repository.update_own_display_name(display_name)
+        refreshed_profile = repository.get_own_profile()
+        if refreshed_profile is None:
+            raise RuntimeError("De bijgewerkte profielnaam kon niet worden geladen.")
+        _refresh_participant_session_display_name(refreshed_profile)
+        st.session_state[PARTICIPANT_PROFILE_NOTICE_STATE] = "Naam opgeslagen"
+        st.rerun()
+    except (ValueError, RuntimeError) as exc:
+        st.error(str(exc))
+    except Exception:
+        st.error("Je naam kon niet veilig worden opgeslagen.")
 
 
 def _render_public_page(
@@ -5284,7 +5394,7 @@ def main() -> None:
         unsafe_allow_html=True,
     )
 
-    if page in {MY_TOS_PAGE, OPEN_TOS_PAGE}:
+    if page in {MY_TOS_PAGE, OPEN_TOS_PAGE, MY_PROFILE_PAGE}:
         session = _current_auth_session()
         if user is None or session is None:
             st.error("Log opnieuw in om je TOS-overzicht te bekijken.")
@@ -5296,8 +5406,10 @@ def main() -> None:
                 public_schedule_repository,
                 user,
             )
-        else:
+        elif page == OPEN_TOS_PAGE:
             _render_open_tos_page(repository, user)
+        else:
+            _render_participant_profile_page(repository, user)
     elif page == PUBLIC_PAGE:
         if user is None:
             _render_participant_root_login_cta()
