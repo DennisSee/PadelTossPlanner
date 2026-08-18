@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(47);
+select plan(52);
 
 select has_table('public', 'club_members', 'club_members bestaat');
 select has_table('public', 'tos_events', 'tos_events bestaat');
@@ -198,6 +198,51 @@ select ok(
         'INSERT'
     ),
     'authenticated kan user_id niet aanleveren'
+);
+select ok(
+    not has_column_privilege(
+        'authenticated',
+        'public.registrations',
+        'member_id',
+        'INSERT'
+    ),
+    'authenticated kan member_id niet aanleveren'
+);
+select ok(
+    not has_column_privilege(
+        'authenticated',
+        'public.registrations',
+        'source',
+        'INSERT'
+    ),
+    'authenticated kan source niet aanleveren'
+);
+select ok(
+    not has_column_privilege(
+        'authenticated',
+        'public.registrations',
+        'user_id',
+        'UPDATE'
+    ),
+    'authenticated kan user_id niet wijzigen'
+);
+select ok(
+    not has_column_privilege(
+        'authenticated',
+        'public.registrations',
+        'member_id',
+        'UPDATE'
+    ),
+    'authenticated kan member_id niet wijzigen'
+);
+select ok(
+    not has_column_privilege(
+        'authenticated',
+        'public.registrations',
+        'source',
+        'UPDATE'
+    ),
+    'authenticated kan source niet wijzigen'
 );
 
 set local role authenticated;

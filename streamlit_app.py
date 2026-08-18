@@ -65,6 +65,17 @@ from participant_auth import (
     parse_oauth_callback,
     participant_link_status,
 )
+from participant_registration import (
+    ParticipantRegistrationError,
+    REGISTRATION_ATTENDING,
+    REGISTRATION_DECLINED,
+    event_allows_self_service,
+    event_sport_label,
+    event_window,
+    format_event_date,
+    registration_availability,
+    registration_initial_values,
+)
 from registration_repository import UserScopedRegistrationRepository
 
 
@@ -2579,7 +2590,7 @@ def _render_participant_signup_page(
     cookies: EncryptedCookieManager,
     context: SignupReturnContext,
 ) -> None:
-    """Mobiele C1-route; het echte registratieformulier volgt pas in Fase C2."""
+    """Mobiele participantflow voor onboarding en de eigen TOS-aanmelding."""
     st.markdown(_public_brand_header_html(), unsafe_allow_html=True)
     st.caption(f"Aanmeldpagina · {context.event_slug}")
 
@@ -2621,7 +2632,17 @@ def _render_participant_signup_page(
         st.info("Deze TOS-avond is niet beschikbaar of niet meer open voor aanmelding.")
         return
 
-    st.subheader(str(event.get("title") or "TOS Padelavond"))
+    try:
+        window = event_window(event)
+    except ParticipantRegistrationError:
+        st.error("De tijden van deze TOS-avond konden niet veilig worden geladen.")
+        return
+
+    st.subheader(str(event.get("title") or "TOS-avond"))
+    st.caption(f"{event_sport_label(event)} · {format_event_date(event)}")
+    st.markdown(
+        f"**{window.local_start:%H:%M} – {window.local_end:%H:%M}**"
+    )
 
     link_status = participant_link_status(profile)
     if link_status == PARTICIPANT_STATUS_NOT_PARTICIPANT:
@@ -2681,10 +2702,100 @@ def _render_participant_signup_page(
         st.warning("De ledenkoppeling is nog niet beschikbaar. Neem contact op met de beheerder.")
         return
 
-    st.success(
-        f"Ingelogd als {member.get('display_name') or session.user.display_name}. "
-        "Je account is klaar voor het aanmeldformulier in Fase C2."
+    try:
+        registration = repository.get_own_registration(str(event.get("id") or ""))
+    except (ValueError, RuntimeError):
+        st.error("Je huidige aanmelding kon niet veilig worden geladen.")
+        return
+    except Exception:
+        st.error("Je huidige aanmelding is tijdelijk niet beschikbaar.")
+        return
+
+    st.caption(
+        f"Ingelogd als {member.get('display_name') or session.user.display_name}"
     )
+    if not event_allows_self_service(event):
+        if registration:
+            current_choice = (
+                "Ik doe mee"
+                if registration.get("response") == REGISTRATION_ATTENDING
+                else "Ik doe niet mee"
+            )
+            st.info(
+                f"Je huidige keuze is: {current_choice}. De aanmelddeadline is verstreken."
+            )
+        else:
+            st.info("De aanmelddeadline is verstreken.")
+        return
+
+    try:
+        initial_response, initial_from, initial_until = registration_initial_values(
+            event,
+            registration,
+        )
+    except ParticipantRegistrationError:
+        st.error("De huidige aanmelding bevat ongeldige tijden.")
+        return
+
+    response_options = (REGISTRATION_ATTENDING, REGISTRATION_DECLINED)
+    selected_response = st.radio(
+        "Jouw keuze",
+        response_options,
+        index=response_options.index(initial_response),
+        format_func=lambda value: (
+            "Ik doe mee" if value == REGISTRATION_ATTENDING else "Ik doe niet mee"
+        ),
+        horizontal=True,
+        key=f"registration_response_{context.event_slug}_{session.user.id}",
+    )
+
+    with st.form(f"registration_form_{context.event_slug}_{session.user.id}"):
+        available_from: time | None = None
+        available_until: time | None = None
+        if selected_response == REGISTRATION_ATTENDING:
+            from_column, until_column = st.columns(2)
+            with from_column:
+                available_from = st.time_input(
+                    "Vanaf",
+                    value=initial_from,
+                    step=300,
+                )
+            with until_column:
+                available_until = st.time_input(
+                    "Tot",
+                    value=initial_until,
+                    step=300,
+                )
+        save_registration = st.form_submit_button(
+            "Aanmelding opslaan",
+            width="stretch",
+        )
+
+    if save_registration:
+        try:
+            normalized_from, normalized_until = registration_availability(
+                event,
+                selected_response,
+                available_from,
+                available_until,
+            )
+            repository.save_own_registration(
+                str(event.get("id") or ""),
+                selected_response,
+                normalized_from,
+                normalized_until,
+                registration_id=str((registration or {}).get("id") or "") or None,
+            )
+            confirmation = (
+                "Je doet mee. Je aanmelding is opgeslagen."
+                if selected_response == REGISTRATION_ATTENDING
+                else "Je doet niet mee. Je aanmelding is opgeslagen."
+            )
+            st.success(confirmation)
+        except (ParticipantRegistrationError, ValueError, RuntimeError) as exc:
+            st.error(str(exc))
+        except Exception:
+            st.error("Je aanmelding kon niet veilig worden opgeslagen.")
 
 
 def _format_local_datetime(

@@ -84,6 +84,8 @@ def test_participant_signup_route_uses_only_user_scoped_repository() -> None:
     assert "get_own_profile" in attributes
     assert "get_open_event_by_slug" in attributes
     assert "self_onboard_member" in attributes
+    assert "get_own_registration" in attributes
+    assert "save_own_registration" in attributes
     assert not {"insert", "update", "upsert", "delete"} & attributes
 
 

@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(63);
+select plan(69);
 
 select has_table('public', 'club_settings', 'club_settings bestaat');
 select has_table('public', 'member_sport_profiles', 'member_sport_profiles bestaat');
@@ -628,6 +628,164 @@ select throws_ok(
     null,
     'club_settings blijft een minimale singleton'
 );
+
+update public.tos_events
+set status = 'open'
+where slug = 'future-tennis-event';
+
+set local role authenticated;
+select set_config(
+    'request.jwt.claim.sub',
+    'a1000000-0000-4000-8000-000000000001',
+    true
+);
+select lives_ok(
+    $sql$
+        insert into public.registrations (event_id, response)
+        select id, 'attending'
+        from public.tos_events
+        where slug = 'future-tennis-event'
+    $sql$,
+    'approved participant gebruikt dezelfde registratieflow voor tennis'
+);
+select results_eq(
+    $sql$
+        select event.sport,
+               registration.response,
+               registration.available_from,
+               registration.available_until
+        from public.registrations as registration
+        join public.tos_events as event on event.id = registration.event_id
+        where event.slug = 'future-tennis-event'
+    $sql$,
+    $sql$
+        values (
+            'tennis',
+            'attending',
+            '2099-08-01 20:00:00+00'::timestamptz,
+            '2099-08-01 22:00:00+00'::timestamptz
+        )
+    $sql$,
+    'tennisregistratie krijgt dezelfde database-side standaardtijden'
+);
+select lives_ok(
+    $sql$
+        update public.registrations
+        set response = 'declined'
+        where event_id = (
+            select id from public.tos_events where slug = 'future-tennis-event'
+        )
+    $sql$,
+    'eigen tennisregistratie kan generiek worden afgemeld'
+);
+select results_eq(
+    $sql$
+        select response, available_from, available_until
+        from public.registrations
+        where event_id = (
+            select id from public.tos_events where slug = 'future-tennis-event'
+        )
+    $sql$,
+    $sql$values ('declined', null::timestamptz, null::timestamptz)$sql$,
+    'afmelden verwijdert beschikbaarheid database-side'
+);
+select set_config('request.jwt.claim.sub', '', true);
+reset role;
+
+insert into auth.users (
+    id,
+    aud,
+    role,
+    email,
+    raw_app_meta_data,
+    raw_user_meta_data,
+    created_at,
+    updated_at
+)
+values
+    (
+        'e1000000-0000-4000-8000-000000000005',
+        'authenticated',
+        'authenticated',
+        'rejected-c2@example.test',
+        '{}'::jsonb,
+        '{"display_name":"Rejected C2"}'::jsonb,
+        now(),
+        now()
+    ),
+    (
+        'f1000000-0000-4000-8000-000000000006',
+        'authenticated',
+        'authenticated',
+        'inactive-c2@example.test',
+        '{}'::jsonb,
+        '{"display_name":"Inactive C2"}'::jsonb,
+        now(),
+        now()
+    );
+
+insert into public.club_members (id, display_name, approval_status, active)
+values
+    (
+        'e2000000-0000-4000-8000-000000000005',
+        'Rejected C2',
+        'rejected',
+        true
+    ),
+    (
+        'f2000000-0000-4000-8000-000000000006',
+        'Inactive C2',
+        'approved',
+        false
+    );
+
+update public.profiles
+set member_id = case id
+    when 'e1000000-0000-4000-8000-000000000005'::uuid
+        then 'e2000000-0000-4000-8000-000000000005'::uuid
+    when 'f1000000-0000-4000-8000-000000000006'::uuid
+        then 'f2000000-0000-4000-8000-000000000006'::uuid
+end
+where id in (
+    'e1000000-0000-4000-8000-000000000005',
+    'f1000000-0000-4000-8000-000000000006'
+);
+
+set local role authenticated;
+select set_config(
+    'request.jwt.claim.sub',
+    'e1000000-0000-4000-8000-000000000005',
+    true
+);
+select throws_ok(
+    $sql$
+        insert into public.registrations (event_id, response)
+        select id, 'attending'
+        from public.tos_events
+        where slug = 'future-tennis-event'
+    $sql$,
+    '42501',
+    'Een goedgekeurde actieve ledenkoppeling is vereist voor zelf-aanmelding.',
+    'rejected participant kan niet registreren'
+);
+select set_config(
+    'request.jwt.claim.sub',
+    'f1000000-0000-4000-8000-000000000006',
+    true
+);
+select throws_ok(
+    $sql$
+        insert into public.registrations (event_id, response)
+        select id, 'attending'
+        from public.tos_events
+        where slug = 'future-tennis-event'
+    $sql$,
+    '42501',
+    'Een goedgekeurde actieve ledenkoppeling is vereist voor zelf-aanmelding.',
+    'inactieve participant kan niet registreren'
+);
+select set_config('request.jwt.claim.sub', '', true);
+reset role;
 
 select * from finish();
 rollback;

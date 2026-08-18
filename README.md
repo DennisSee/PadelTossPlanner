@@ -23,6 +23,8 @@ aanmeldroute kan die gebruiker eenmalig een eigen, sportneutraal clublidprofiel
 aanmaken. Standaard is dit profiel direct goedgekeurd; de clubinstelling
 `require_member_approval` kan toekomstige onboardings op `pending` laten starten.
 Deze instelling verandert nooit automatisch de status van bestaande leden.
+Een goedgekeurd, actief lid kan op dezelfde mobiele route de eigen TOS-aanmelding
+opslaan of wijzigen totdat het event sluit of de aanmelddeadline verstrijkt.
 
 ### Planner
 
@@ -52,6 +54,7 @@ Een beheerder kan daarnaast:
 ├── excel_export.py                  # Exportmodule; nog niet gekoppeld aan de webinterface
 ├── database.py                      # Supabase Auth en databasefuncties
 ├── participant_auth.py              # OAuth/PKCE-, OTP- en callbackvalidatie
+├── participant_registration.py      # Tijdzone- en formulierlogica voor self-service
 ├── registration_repository.py       # User-scoped participanttoegang via RLS/RPC
 ├── supabase/
 │   ├── config.toml                  # Lokale Supabase-configuratie

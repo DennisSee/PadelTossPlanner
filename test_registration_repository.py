@@ -24,6 +24,14 @@ class _Query:
         self.calls.append(("limit", value))
         return self
 
+    def insert(self, payload: dict[str, object]) -> "_Query":
+        self.calls.append(("insert", payload))
+        return self
+
+    def update(self, payload: dict[str, object]) -> "_Query":
+        self.calls.append(("update", payload))
+        return self
+
     def execute(self) -> SimpleNamespace:
         return SimpleNamespace(data=self.response_data)
 
@@ -134,7 +142,13 @@ def test_read_methods_filter_to_current_user_and_safe_public_fields() -> None:
             "tos_events": [
                 {"id": event_id, "slug": "vrijdag-tos", "sport": "padel"}
             ],
-            "registrations": [{"event_id": event_id, "user_id": user_id}],
+            "registrations": [
+                {
+                    "id": "20000000-0000-4000-8000-000000000001",
+                    "event_id": event_id,
+                    "response": "attending",
+                }
+            ],
         }
     )
     repository = UserScopedRegistrationRepository(
@@ -157,8 +171,9 @@ def test_read_methods_filter_to_current_user_and_safe_public_fields() -> None:
         "sport": "padel",
     }
     assert repository.get_own_registration(event_id) == {
+        "id": "20000000-0000-4000-8000-000000000001",
         "event_id": event_id,
-        "user_id": user_id,
+        "response": "attending",
     }
     assert ("eq:user_id", user_id) in client.queries["registrations"].calls
     assert ("eq:status", "open") in client.queries["tos_events"].calls
@@ -193,3 +208,104 @@ def test_self_onboarding_uses_only_the_user_scoped_rpc() -> None:
         ("self_onboard_member", {"p_display_name": "Lid A"})
     ]
     assert client.queries == {}
+
+
+def test_create_and_update_send_only_self_service_registration_fields() -> None:
+    from datetime import datetime, timezone
+
+    user_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    event_id = "10000000-0000-4000-8000-000000000001"
+    registration_id = "20000000-0000-4000-8000-000000000001"
+    client = _UserClient(
+        {
+            "registrations": [
+                {
+                    "id": registration_id,
+                    "event_id": event_id,
+                    "response": "attending",
+                }
+            ]
+        }
+    )
+    repository = UserScopedRegistrationRepository(
+        "https://project.example.test",
+        "publishable-test-key",
+        _session(user_id, "access-a"),
+        client_factory=lambda _url, _key: client,  # type: ignore[arg-type]
+    )
+    available_from = datetime(2099, 8, 1, 18, 30, tzinfo=timezone.utc)
+    available_until = datetime(2099, 8, 1, 20, 0, tzinfo=timezone.utc)
+
+    repository.create_own_registration(
+        event_id,
+        "attending",
+        available_from,
+        available_until,
+    )
+    insert_payload = dict(client.queries["registrations"].calls)["insert"]
+    assert set(insert_payload) == {
+        "event_id",
+        "response",
+        "available_from",
+        "available_until",
+    }
+    assert not {"user_id", "member_id", "source"} & set(insert_payload)
+
+    repository.update_own_registration(
+        registration_id,
+        "declined",
+        available_from,
+        available_until,
+    )
+    update_query = client.queries["registrations"]
+    update_payload = dict(update_query.calls)["update"]
+    assert update_payload == {
+        "response": "declined",
+        "available_from": None,
+        "available_until": None,
+    }
+    assert ("eq:id", registration_id) in update_query.calls
+    assert ("eq:user_id", user_id) in update_query.calls
+
+
+def test_save_dispatches_between_create_and_own_update() -> None:
+    user_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    event_id = "10000000-0000-4000-8000-000000000001"
+    registration_id = "20000000-0000-4000-8000-000000000001"
+    client = _UserClient(
+        {
+            "registrations": [
+                {
+                    "id": registration_id,
+                    "event_id": event_id,
+                    "response": "attending",
+                }
+            ]
+        }
+    )
+    repository = UserScopedRegistrationRepository(
+        "https://project.example.test",
+        "publishable-test-key",
+        _session(user_id, "access-a"),
+        client_factory=lambda _url, _key: client,  # type: ignore[arg-type]
+    )
+
+    repository.save_own_registration(event_id, "attending", None, None)
+    assert (
+        "insert",
+        {
+            "event_id": event_id,
+            "response": "attending",
+            "available_from": None,
+            "available_until": None,
+        },
+    ) in client.queries["registrations"].calls
+
+    repository.save_own_registration(
+        event_id,
+        "declined",
+        None,
+        None,
+        registration_id=registration_id,
+    )
+    assert ("eq:id", registration_id) in client.queries["registrations"].calls
