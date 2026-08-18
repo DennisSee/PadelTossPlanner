@@ -116,10 +116,8 @@ from participant_registration import (
 )
 from participant_dashboard import (
     attendee_names_preview,
-    event_status_label,
     registration_cta_label,
     registration_event,
-    registration_response_label,
     registrations_by_event_id,
 )
 from registration_repository import (
@@ -129,6 +127,11 @@ from registration_repository import (
 from ui_design import (
     app_header_html,
     design_system_stylesheet,
+    participant_attendee_names_html,
+    participant_count_html,
+    participant_deadline_html,
+    participant_event_header_html,
+    participant_registration_status_html,
     sidebar_account_html,
 )
 
@@ -2760,6 +2763,7 @@ def _render_confirmed_oauth_link(
         pending.authorization_url,
         key=f"participant_oauth_redirect_{provider}",
         width="stretch",
+        type="primary",
     )
     if st.button(
         "Andere manier kiezen",
@@ -2841,6 +2845,7 @@ def _render_participant_auth_options(
             requested = st.form_submit_button(
                 "Stuur mij een inlogcode",
                 width="stretch",
+                type="primary",
             )
         if requested:
             try:
@@ -2863,7 +2868,11 @@ def _render_participant_auth_options(
             type="password",
             max_chars=EMAIL_OTP_MAX_INPUT_LENGTH,
         )
-        verified = st.form_submit_button("Code verifiëren", width="stretch")
+        verified = st.form_submit_button(
+            "Code verifiëren",
+            width="stretch",
+            type="primary",
+        )
 
     if verified:
         try:
@@ -2892,16 +2901,16 @@ def _render_signup_event_summary(event: Mapping[str, object]) -> bool:
         st.error("De tijden van deze TOS-avond konden niet worden geladen.")
         return False
 
-    sport = escape(event_sport_label(event))
-    title = escape(str(event.get("title") or "TOS-avond"))
-    event_date = escape(format_event_date(event))
     st.markdown(
-        (
-            '<div class="tos-signup-event">'
-            f'<div class="tos-signup-event-title">{sport} · {title} · {event_date}</div>'
-            f'<div class="tos-signup-event-time">{window.local_start:%H:%M} – '
-            f'{window.local_end:%H:%M}</div>'
-            "</div>"
+        participant_event_header_html(
+            sport=event_sport_label(event),
+            title=str(event.get("title") or "TOS-avond"),
+            metadata=(
+                f"{format_event_date(event)} · "
+                f"{window.local_start:%H:%M}–{window.local_end:%H:%M}"
+            ),
+            status=event.get("status"),
+            accent=_participant_event_accent(event),
         ),
         unsafe_allow_html=True,
     )
@@ -2994,6 +3003,7 @@ def _render_participant_signup_page(
             onboarded = st.form_submit_button(
                 "Clubprofiel aanmaken",
                 width="stretch",
+                type="primary",
             )
         if onboarded:
             try:
@@ -3042,6 +3052,14 @@ def _render_participant_signup_page(
     st.caption(
         f"Ingelogd als {member.get('display_name') or session.user.display_name}"
     )
+    if registration:
+        st.markdown(
+            participant_registration_status_html(
+                registration.get("response"),
+                _registration_availability_text(registration),
+            ),
+            unsafe_allow_html=True,
+        )
     if not event_allows_self_service(event):
         status = str(event.get("status") or "")
         if status == "cancelled":
@@ -3050,17 +3068,7 @@ def _render_participant_signup_page(
             closed_reason = "De inschrijving voor deze TOS-avond is gesloten."
         else:
             closed_reason = "De aanmelddeadline is verstreken."
-        if registration:
-            current_choice = (
-                "Ik doe mee"
-                if registration.get("response") == REGISTRATION_ATTENDING
-                else "Ik doe niet mee"
-            )
-            st.info(
-                f"Je huidige keuze is: {current_choice}. {closed_reason}"
-            )
-        else:
-            st.info(closed_reason)
+        st.info(closed_reason)
         return
 
     try:
@@ -3104,6 +3112,7 @@ def _render_participant_signup_page(
         save_registration = st.form_submit_button(
             "Aanmelding opslaan",
             width="stretch",
+            type="primary",
         )
 
     if save_registration:
@@ -3175,12 +3184,76 @@ def _navigate_to_signup(event_slug: object) -> None:
 
 def _event_title_and_time(event: Mapping[str, object]) -> tuple[str, str]:
     window = event_window(event)
-    title = f"{event_sport_label(event)} · {event.get('title') or 'TOS-avond'}"
+    title = str(event.get("title") or "TOS-avond")
     timing = (
         f"{format_event_date(event)} · "
-        f"{window.local_start:%H:%M} – {window.local_end:%H:%M}"
+        f"{window.local_start:%H:%M}–{window.local_end:%H:%M}"
     )
     return title, timing
+
+
+_DUTCH_SHORT_MONTHS = (
+    "jan",
+    "feb",
+    "mrt",
+    "apr",
+    "mei",
+    "jun",
+    "jul",
+    "aug",
+    "sep",
+    "okt",
+    "nov",
+    "dec",
+)
+
+
+def _participant_deadline_text(value: object) -> str:
+    try:
+        deadline = parse_supabase_timestamp(
+            value,
+            field_name="inschrijfdeadline",
+        ).astimezone(LOCAL_TIMEZONE)
+    except ParticipantRegistrationError:
+        return "Inschrijfdeadline niet beschikbaar"
+    month = _DUTCH_SHORT_MONTHS[deadline.month - 1]
+    return f"Inschrijven t/m {deadline.day} {month} · {deadline:%H:%M}"
+
+
+def _registration_availability_text(
+    registration: Mapping[str, object],
+) -> str | None:
+    if registration.get("response") != REGISTRATION_ATTENDING:
+        return None
+    try:
+        available_from = parse_supabase_timestamp(
+            registration.get("available_from"),
+            field_name="beschikbaarheid vanaf",
+        ).astimezone(LOCAL_TIMEZONE)
+        available_until = parse_supabase_timestamp(
+            registration.get("available_until"),
+            field_name="beschikbaarheid tot",
+        ).astimezone(LOCAL_TIMEZONE)
+    except ParticipantRegistrationError:
+        return None
+    return f"{available_from:%H:%M}–{available_until:%H:%M}"
+
+
+def _participant_event_accent(
+    event: Mapping[str, object],
+    registration: Mapping[str, object] | None = None,
+) -> str:
+    status = str(event.get("status") or "").strip().lower()
+    if status == "cancelled":
+        return "cancelled"
+    if status in {"closed", "draft"}:
+        return "closed"
+    if (
+        registration
+        and registration.get("response") == REGISTRATION_ATTENDING
+    ):
+        return "registered"
+    return "open" if status == "open" else "neutral"
 
 
 def _render_own_registration_card(
@@ -3199,40 +3272,41 @@ def _render_own_registration_card(
         return
 
     with st.container(border=True):
-        st.markdown(f"**{title}**")
-        st.caption(timing)
         response = str(registration.get("response") or "")
-        if response == REGISTRATION_ATTENDING:
-            try:
-                available_from = parse_supabase_timestamp(
-                    registration.get("available_from"),
-                    field_name="beschikbaarheid vanaf",
-                ).astimezone(LOCAL_TIMEZONE)
-                available_until = parse_supabase_timestamp(
-                    registration.get("available_until"),
-                    field_name="beschikbaarheid tot",
-                ).astimezone(LOCAL_TIMEZONE)
-                st.write(
-                    f"Je doet mee van {available_from:%H:%M} tot "
-                    f"{available_until:%H:%M}."
-                )
-            except ParticipantRegistrationError:
-                st.write("Je doet mee.")
-        else:
-            st.write(registration_response_label(response))
-
-        st.caption(event_status_label(event.get("status")))
+        st.markdown(
+            participant_event_header_html(
+                sport=event_sport_label(event),
+                title=title,
+                metadata=timing,
+                status=event.get("status"),
+                accent=_participant_event_accent(event, registration),
+            ),
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            participant_registration_status_html(
+                response,
+                _registration_availability_text(registration),
+            ),
+            unsafe_allow_html=True,
+        )
         if event.get("signup_deadline"):
-            st.caption(
-                "Aanmelden kan tot "
-                + _format_local_datetime(event.get("signup_deadline"))
+            st.markdown(
+                participant_deadline_html(
+                    _participant_deadline_text(event.get("signup_deadline"))
+                ),
+                unsafe_allow_html=True,
             )
-        if st.button(
-            "Aanmelding bekijken/wijzigen",
-            key=f"{key_prefix}_{registration.get('id')}",
-            width="stretch",
-        ):
-            _navigate_to_signup(event.get("slug"))
+        if event_allows_self_service(event):
+            if st.button(
+                "Aanmelding wijzigen",
+                key=f"{key_prefix}_{registration.get('id')}",
+                width="stretch",
+                type="primary",
+            ):
+                _navigate_to_signup(event.get("slug"))
+        else:
+            st.caption("Deze aanmelding kan niet meer worden gewijzigd.")
 
 
 def _render_open_event_card(
@@ -3249,6 +3323,7 @@ def _render_open_event_card(
         return
 
     event_id = str(event.get("id") or "")
+    own_registration = own_registrations.get(event_id)
     try:
         attendee_names = repository.list_event_attendee_names(event_id)
     except Exception:
@@ -3258,19 +3333,39 @@ def _render_open_event_card(
         names_available = True
 
     with st.container(border=True):
-        st.markdown(f"**{title}**")
-        st.caption(timing)
+        st.markdown(
+            participant_event_header_html(
+                sport=event_sport_label(event),
+                title=title,
+                metadata=timing,
+                status=event.get("status"),
+                accent=_participant_event_accent(event, own_registration),
+            ),
+            unsafe_allow_html=True,
+        )
+        if own_registration:
+            st.markdown(
+                participant_registration_status_html(
+                    own_registration.get("response")
+                ),
+                unsafe_allow_html=True,
+            )
         if event.get("signup_deadline"):
-            st.caption(
-                "Aanmelden tot "
-                + _format_local_datetime(event.get("signup_deadline"))
+            st.markdown(
+                participant_deadline_html(
+                    _participant_deadline_text(event.get("signup_deadline"))
+                ),
+                unsafe_allow_html=True,
             )
         if names_available:
             count = len(attendee_names)
-            st.write(f"{count} deelnemer{'s' if count != 1 else ''}")
+            st.markdown(participant_count_html(count), unsafe_allow_html=True)
             preview = attendee_names_preview(attendee_names)
             if preview:
-                st.caption(preview)
+                st.markdown(
+                    participant_attendee_names_html(preview),
+                    unsafe_allow_html=True,
+                )
         else:
             st.caption("De deelnemerslijst is tijdelijk niet beschikbaar.")
 
@@ -3278,6 +3373,7 @@ def _render_open_event_card(
             registration_cta_label(event_id, own_registrations),
             key=f"{key_prefix}_{event_id}",
             width="stretch",
+            type="primary",
         ):
             _navigate_to_signup(event.get("slug"))
 

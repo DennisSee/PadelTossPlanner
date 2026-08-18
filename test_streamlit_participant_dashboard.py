@@ -39,6 +39,8 @@ def test_open_tos_uses_user_scoped_reads_and_safe_names_rpc() -> None:
     assert "list_event_attendee_names" in card_source
     assert "attendee_names_preview" in card_source
     assert "registration_cta_label" in card_source
+    assert "participant_count_html" in card_source
+    assert "participant_attendee_names_html" in card_source
     assert "_get_admin_store" not in page_source
     assert "service_role" not in page_source
 
@@ -48,10 +50,15 @@ def test_participant_cards_show_no_technical_or_private_identity_fields() -> Non
     open_source = _function_source("_render_open_event_card")
     visible_source = own_source + open_source
 
-    assert "Aanmelding bekijken/wijzigen" in own_source
-    assert "Je doet mee van" in own_source
-    assert "event_status_label" in own_source
+    assert '"Aanmelding wijzigen"' in own_source
+    assert "participant_event_header_html" in own_source
+    assert "participant_registration_status_html" in own_source
+    assert "_registration_availability_text" in own_source
+    assert "event_allows_self_service" in own_source
+    assert "Deze aanmelding kan niet meer worden gewijzigd." in own_source
     assert "signup_deadline" in own_source
+    assert 'type="primary"' in own_source
+    assert 'type="primary"' in open_source
     assert "event.get(\"slug\")" in visible_source  # Alleen voor interne routing.
     for private_label in (
         "e-mail",
@@ -61,6 +68,19 @@ def test_participant_cards_show_no_technical_or_private_identity_fields() -> Non
         "approval_status",
     ):
         assert private_label not in visible_source
+
+
+def test_participant_cards_use_central_badges_and_clear_status_accents() -> None:
+    accent_source = _function_source("_participant_event_accent")
+    open_source = _function_source("_render_open_event_card")
+
+    assert 'return "cancelled"' in accent_source
+    assert 'return "closed"' in accent_source
+    assert 'return "registered"' in accent_source
+    assert 'return "open"' in accent_source
+    assert "participant_event_header_html" in open_source
+    assert "participant_registration_status_html" in open_source
+    assert "participant_deadline_html" in open_source
 
 
 def test_signup_navigation_uses_only_validated_internal_context() -> None:

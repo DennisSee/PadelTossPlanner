@@ -31,7 +31,7 @@ def test_cta_reflects_whether_current_user_already_registered() -> None:
     registrations = registrations_by_event_id(
         [{"event_id": "event-a", "response": "attending"}]
     )
-    assert registration_cta_label("event-a", registrations) == "Mijn aanmelding"
+    assert registration_cta_label("event-a", registrations) == "Aanmelding wijzigen"
     assert registration_cta_label("event-b", registrations) == "Aanmelden"
 
 

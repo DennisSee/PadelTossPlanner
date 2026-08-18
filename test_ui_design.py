@@ -8,6 +8,11 @@ from ui_design import (
     DESIGN_TOKENS,
     app_header_html,
     design_system_stylesheet,
+    participant_attendee_names_html,
+    participant_count_html,
+    participant_deadline_html,
+    participant_event_header_html,
+    participant_registration_status_html,
     sidebar_account_html,
     status_badge_html,
 )
@@ -44,7 +49,8 @@ def test_layout_has_bounded_desktop_width_and_mobile_first_breakpoints() -> None
     assert "@media (max-width: 1100px)" in stylesheet
     assert "@media (max-width: 700px)" in stylesheet
     assert "@media (max-width: 430px)" in stylesheet
-    assert "padding: 2.85rem 0.72rem 2rem" in stylesheet
+    assert "padding: 2.62rem 0.72rem 1.85rem" in stylesheet
+    assert "padding: 2.55rem 0.62rem 1.75rem" in stylesheet
     assert "min-height: 2.85rem" in stylesheet
 
 
@@ -60,6 +66,10 @@ def test_global_styles_cover_navigation_focus_cards_buttons_and_badges() -> None
     assert ".tos-badge--success" in stylesheet
     assert ".tos-badge--warning" in stylesheet
     assert ".tos-badge--danger" in stylesheet
+    assert ".tos-participant-event--registered" in stylesheet
+    assert ".tos-participant-event--open" in stylesheet
+    assert ".tos-participant-event--closed" in stylesheet
+    assert ".tos-participant-event--cancelled" in stylesheet
 
 
 def test_header_badges_and_sidebar_account_escape_visible_text() -> None:
@@ -82,6 +92,44 @@ def test_header_badges_and_sidebar_account_escape_visible_text() -> None:
     assert "&lt;Dennis&gt;" in account
     assert "tos-sidebar-account" in account
     assert "Deelnemer" in account
+
+
+def test_participant_components_create_compact_semantic_hierarchy() -> None:
+    header = participant_event_header_html(
+        sport="padel",
+        title="Vrijdagavond <TOS>",
+        metadata="vrijdag 21 augustus · 20:00–22:00",
+        status="open",
+        accent="registered",
+    )
+    assert "tos-participant-event--registered" in header
+    assert ">PADEL<" in header
+    assert ">Open<" in header
+    assert "Vrijdagavond &lt;TOS&gt;" in header
+    assert "20:00–22:00" in header
+
+    personal = participant_registration_status_html("attending", "20:00–21:50")
+    assert "✓ Aangemeld" in personal
+    assert "20:00–21:50" in personal
+    assert personal.count("tos-badge ") == 2
+    assert "Ik doe niet mee" in participant_registration_status_html("declined")
+
+    assert "12 deelnemers" in participant_count_html(12)
+    assert "1 deelnemer" in participant_count_html(1)
+    with pytest.raises(ValueError):
+        participant_count_html(-1)
+    assert "Inschrijven t/m" in participant_deadline_html("Inschrijven t/m 18 aug")
+    assert "Dennis &amp; Marieke" in participant_attendee_names_html(
+        "Dennis & Marieke"
+    )
+    with pytest.raises(ValueError):
+        participant_event_header_html(
+            sport="padel",
+            title="TOS",
+            metadata="nu",
+            status="open",
+            accent="luid",  # type: ignore[arg-type]
+        )
 
 
 def test_official_streamlit_theme_uses_the_same_core_palette() -> None:

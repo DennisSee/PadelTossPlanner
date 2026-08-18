@@ -46,7 +46,7 @@ def registration_cta_label(
     registrations: Mapping[str, Mapping[str, Any]],
 ) -> str:
     return (
-        "Mijn aanmelding"
+        "Aanmelding wijzigen"
         if str(event_id or "") in registrations
         else "Aanmelden"
     )

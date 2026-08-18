@@ -63,6 +63,18 @@ _CSS_TOKEN_NAMES = {
 
 BadgeTone = Literal["success", "warning", "danger", "info", "neutral"]
 _BADGE_TONES = frozenset({"success", "warning", "danger", "info", "neutral"})
+ParticipantEventAccent = Literal[
+    "registered", "open", "closed", "cancelled", "neutral"
+]
+_PARTICIPANT_EVENT_ACCENTS = frozenset(
+    {"registered", "open", "closed", "cancelled", "neutral"}
+)
+_PARTICIPANT_EVENT_STATUSES: dict[str, tuple[str, BadgeTone]] = {
+    "draft": ("Concept", "warning"),
+    "open": ("Open", "success"),
+    "closed": ("Gesloten", "neutral"),
+    "cancelled": ("Geannuleerd", "danger"),
+}
 
 
 def design_system_stylesheet() -> str:
@@ -349,6 +361,80 @@ def design_system_stylesheet() -> str:
             border-color: #D1DBD7;
         }
 
+        .tos-participant-event {
+            margin: -0.08rem 0 0.35rem;
+            padding: 0.72rem 0.78rem;
+            border-left: 4px solid var(--tc-border);
+            border-radius: var(--tc-radius-sm);
+            background: var(--tc-surface-subtle);
+        }
+
+        .tos-participant-event--registered {
+            border-left-color: var(--tc-success);
+            background: var(--tc-soft-green);
+        }
+
+        .tos-participant-event--open {
+            border-left-color: var(--tc-yellow);
+            background: var(--tc-soft-yellow);
+        }
+
+        .tos-participant-event--closed {
+            border-left-color: #91A19B;
+            background: #F0F3F2;
+        }
+
+        .tos-participant-event--cancelled {
+            border-left-color: var(--tc-danger);
+            background: #FDF0EE;
+        }
+
+        .tos-participant-badge-row,
+        .tos-participant-personal-status {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
+        .tos-participant-event-title {
+            margin: 0.46rem 0 0.15rem;
+            color: var(--tc-green-dark);
+            font-size: 1.12rem;
+            line-height: 1.22;
+            font-weight: 800;
+            overflow-wrap: anywhere;
+        }
+
+        .tos-participant-event-meta,
+        .tos-participant-deadline,
+        .tos-participant-attendees {
+            color: var(--tc-muted);
+            font-size: 0.84rem;
+            line-height: 1.4;
+        }
+
+        .tos-participant-personal-status {
+            margin: 0.45rem 0 0.5rem;
+        }
+
+        .tos-participant-deadline {
+            margin: 0.08rem 0 0.5rem;
+        }
+
+        .tos-participant-social-meta {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.42rem;
+            margin: 0.35rem 0 0.15rem;
+        }
+
+        .tos-participant-attendees {
+            margin: 0.12rem 0 0.52rem;
+            overflow-wrap: anywhere;
+        }
+
         [data-testid="stSidebar"] {
             background: #E9F2ED;
             border-right: 1px solid var(--tc-border);
@@ -452,12 +538,22 @@ def design_system_stylesheet() -> str:
         @media (max-width: 700px) {
             [data-testid="stAppViewBlockContainer"],
             .block-container {
-                padding: 2.85rem 0.72rem 2rem !important;
+                padding: 2.62rem 0.72rem 1.85rem !important;
             }
 
             [data-testid="stHeader"] {
-                height: 2.6rem !important;
-                min-height: 2.6rem !important;
+                height: 2.45rem !important;
+                min-height: 2.45rem !important;
+            }
+
+            [data-testid="stSidebarCollapsedControl"] {
+                top: 0.1rem !important;
+            }
+
+            [data-testid="stSidebarCollapsedControl"] button {
+                width: 2.2rem !important;
+                height: 2.2rem !important;
+                min-height: 2.2rem !important;
             }
 
             h1 {
@@ -475,9 +571,9 @@ def design_system_stylesheet() -> str:
             }
 
             .tos-app-header {
-                min-height: 2.95rem;
-                margin-bottom: 0.55rem;
-                padding: 0.2rem 0 0.45rem;
+                min-height: 2.7rem;
+                margin-bottom: 0.35rem;
+                padding: 0.08rem 0 0.28rem;
             }
 
             .tos-app-logo {
@@ -501,12 +597,27 @@ def design_system_stylesheet() -> str:
             [data-testid^="stBaseButton-"] {
                 min-height: 2.85rem;
             }
+
+            .tos-participant-event {
+                padding: 0.64rem 0.68rem;
+            }
+
+            .tos-participant-event-title {
+                margin-top: 0.38rem;
+                font-size: 1.05rem;
+            }
+
+            .tos-badge {
+                min-height: 1.52rem;
+                padding: 0.16rem 0.5rem;
+                font-size: 0.74rem;
+            }
         }
 
         @media (max-width: 430px) {
             [data-testid="stAppViewBlockContainer"],
             .block-container {
-                padding-inline: 0.62rem !important;
+                padding: 2.55rem 0.62rem 1.75rem !important;
             }
 
             .tos-app-brand {
@@ -565,6 +676,76 @@ def status_badge_html(label: str, tone: BadgeTone = "neutral") -> str:
     return (
         f'<span class="tos-badge tos-badge--{tone}">'
         f"{escape(str(label))}</span>"
+    )
+
+
+def participant_event_header_html(
+    *,
+    sport: str,
+    title: str,
+    metadata: str,
+    status: object,
+    accent: ParticipantEventAccent = "neutral",
+) -> str:
+    """Compacte eventhiërarchie met semantische badges en statusaccent."""
+    if accent not in _PARTICIPANT_EVENT_ACCENTS:
+        raise ValueError("Ongeldig eventaccent.")
+    status_label, status_tone = _PARTICIPANT_EVENT_STATUSES.get(
+        str(status or "").strip().lower(),
+        ("Status onbekend", "neutral"),
+    )
+    return (
+        f'<section class="tos-participant-event tos-participant-event--{accent}">'
+        '<div class="tos-participant-badge-row">'
+        f'{status_badge_html(str(sport).upper(), "info")}'
+        f'{status_badge_html(status_label, status_tone)}'
+        "</div>"
+        f'<div class="tos-participant-event-title">{escape(str(title))}</div>'
+        f'<div class="tos-participant-event-meta">{escape(str(metadata))}</div>'
+        "</section>"
+    )
+
+
+def participant_registration_status_html(
+    response: object,
+    availability: str | None = None,
+) -> str:
+    """Eigen deelname en optionele beschikbaarheid als compacte statusregel."""
+    attending = str(response or "") == "attending"
+    label = "✓ Aangemeld" if attending else "Ik doe niet mee"
+    tone: BadgeTone = "success" if attending else "neutral"
+    availability_badge = (
+        status_badge_html(availability, "neutral")
+        if attending and availability
+        else ""
+    )
+    return (
+        '<div class="tos-participant-personal-status">'
+        f"{status_badge_html(label, tone)}{availability_badge}"
+        "</div>"
+    )
+
+
+def participant_count_html(count: int) -> str:
+    """Sociaal deelnemersaantal zonder private deelnemerinformatie."""
+    if count < 0:
+        raise ValueError("Het deelnemersaantal kan niet negatief zijn.")
+    label = f"{count} deelnemer{'s' if count != 1 else ''}"
+    return (
+        '<div class="tos-participant-social-meta">'
+        f'{status_badge_html(label, "neutral")}'
+        "</div>"
+    )
+
+
+def participant_deadline_html(label: str) -> str:
+    return f'<div class="tos-participant-deadline">{escape(str(label))}</div>'
+
+
+def participant_attendee_names_html(names_preview: str) -> str:
+    return (
+        '<div class="tos-participant-attendees">'
+        f"{escape(str(names_preview))}</div>"
     )
 
 
