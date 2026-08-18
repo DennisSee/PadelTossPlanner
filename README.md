@@ -43,6 +43,8 @@ Een beheerder kan daarnaast:
 ├── planner.py                       # Plannings- en optimalisatielogica
 ├── excel_export.py                  # Exportmodule; nog niet gekoppeld aan de webinterface
 ├── database.py                      # Supabase Auth en databasefuncties
+├── participant_auth.py              # OAuth/PKCE-, OTP- en callbackvalidatie
+├── registration_repository.py       # User-scoped participantreads via RLS
 ├── supabase/
 │   ├── config.toml                  # Lokale Supabase-configuratie
 │   └── migrations/                  # Enige bron van waarheid voor het databaseschema
@@ -87,9 +89,10 @@ uit op de huidige productieomgeving**. Voor een nieuwe, lege omgeving kan de vol
 migrationreeks via een vooraf beoordeelde Supabase CLI- of CI-workflow worden toegepast,
 nadat het exacte doelproject expliciet is bevestigd.
 
-Row Level Security is op alle vier applicatietabellen ingeschakeld. `anon` en
-`authenticated` hebben geen directe tabelrechten; de Streamlit-server handelt de
-toegang af via de server-side secret/service key.
+Row Level Security begrenst publieke en user-scoped toegang. De openbare schemapagina
+kan uitsluitend gepubliceerde, expliciet toegestane kolommen lezen. Participants lezen
+hun eigen profiel en registratie via hun eigen Supabase access-token. Alleen expliciete
+planner-/adminfuncties gebruiken de server-side secret/service key.
 
 ### Nieuwe schemawijzigingen
 
@@ -150,6 +153,7 @@ secret_key = "sb_secret_..."
 
 [auth]
 cookie_password = "minimaal-32-willekeurige-tekens-los-van-supabase"
+oauth_redirect_url = "https://JOUW-STREAMLIT-APP.example/"
 ```
 
 Voor oudere Supabase-projecten zijn ook deze namen ondersteund:
@@ -164,6 +168,21 @@ service_role_key = "eyJ..."
 De `[auth]`-sectie met `cookie_password` is ook bij oudere Supabase-sleutels verplicht.
 Gebruik minimaal 32 willekeurige tekens en hergebruik hiervoor nooit de Supabase
 secret/service key. De waarde versleutelt de lokale refresh-token-cookie.
+
+`oauth_redirect_url` is de publieke basis-URL van de Streamlit-app, zonder querystring
+of fragment. Voor lokale ontwikkeling mag dit een loopback-URL met HTTP zijn. De app
+maakt hiervan twee vaste callbacks:
+
+```text
+https://JOUW-STREAMLIT-APP.example/?auth_callback=1&provider=google
+https://JOUW-STREAMLIT-APP.example/?auth_callback=1&provider=apple
+```
+
+Voeg deze exacte callback-URL's pas in de Supabase Auth allowlist toe voor de bedoelde
+test- of productieomgeving. Google- en Apple-providercredentials worden afzonderlijk in
+Supabase geconfigureerd en horen nooit in deze repository. Voor passwordless e-mail moet
+de Supabase e-mailtemplate de eenmalige code (`{{ .Token }}`) tonen; de applicatie gebruikt
+in V1 geen Magic Link.
 
 Sla de Secrets op en reboot de Streamlit-app.
 
@@ -249,9 +268,13 @@ streamlit run streamlit_app.py
 
 - Wachtwoorden worden door Supabase Auth verwerkt en niet in de eigen tabellen opgeslagen.
 - De admin-API gebruikt alleen server-side de secret/service key.
+- Participants gebruiken Google of Apple via één generieke Supabase OAuth/PKCE-flow,
+  of een eenmalige zescijferige e-mailcode.
+- PKCE-verifiers en refresh-tokens staan uitsluitend in afzonderlijk versleutelde
+  browsercookies; callbackcodes worden direct uit de URL verwijderd.
 - Openbare schema's bevatten geen rankings of berekende niveauvelden.
 - Een account kan vanuit gebruikersbeheer worden gedeactiveerd.
-- De eerste versie gebruikt e-mailadres plus wachtwoord; dit is betrouwbaarder dan zelf een wachtwoordsysteem bouwen.
+- E-mail+wachtwoord blijft uitsluitend beschikbaar voor bestaande planner-/adminaccounts.
 
 ## Nog niet opgenomen
 

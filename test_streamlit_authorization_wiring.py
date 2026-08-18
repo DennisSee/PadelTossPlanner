@@ -62,3 +62,45 @@ def test_public_route_does_not_construct_or_use_admin_store() -> None:
 
     main_calls = _function_calls("main")
     assert "_get_public_schedule_repository" in main_calls
+
+
+def test_participant_signup_route_uses_only_user_scoped_repository() -> None:
+    calls = _function_calls("_render_participant_signup_page")
+    assert "_get_user_registration_repository" in calls
+    assert "_get_admin_store" not in calls
+
+    tree = ast.parse(APP_PATH.read_text(encoding="utf-8"))
+    function = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef)
+        and node.name == "_render_participant_signup_page"
+    )
+    attributes = {
+        node.func.attr
+        for node in ast.walk(function)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+    }
+    assert "get_own_profile" in attributes
+    assert "get_open_event_by_slug" in attributes
+    assert not {"insert", "update", "upsert", "delete"} & attributes
+
+
+def test_oauth_callback_runs_before_restore_and_uses_current_query_api() -> None:
+    source = APP_PATH.read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    main = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "main"
+    )
+    ordered_calls = [
+        node.func.id
+        for node in ast.walk(main)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+    ]
+    assert ordered_calls.index("_handle_oauth_callback") < ordered_calls.index(
+        "_restore_persistent_auth"
+    )
+    assert "experimental_get_query_params" not in source
+    assert "experimental_set_query_params" not in source

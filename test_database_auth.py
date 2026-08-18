@@ -12,6 +12,8 @@ from database import (
     SupabaseAuthService,
     SupabaseConfig,
     auth_cookie_config_from_secrets,
+    config_from_secrets,
+    public_config_from_secrets,
 )
 
 
@@ -54,6 +56,7 @@ class _FakeAuth:
     def __init__(self) -> None:
         self.password_credentials: dict[str, str] | None = None
         self.refresh_token: str | None = None
+        self.sign_out_options: dict[str, str] | None = None
 
     @staticmethod
     def _response(access_token: str, refresh_token: str) -> SimpleNamespace:
@@ -76,6 +79,9 @@ class _FakeAuth:
     def refresh_session(self, refresh_token: str) -> SimpleNamespace:
         self.refresh_token = refresh_token
         return self._response("access-rotated", "refresh-rotated")
+
+    def sign_out(self, options: dict[str, str]) -> None:
+        self.sign_out_options = options
 
 
 class _FakeClient:
@@ -171,6 +177,34 @@ def test_cookie_password_is_separate_and_mandatory() -> None:
     )
     assert config.password == "x" * 32
     assert "x" * 32 not in repr(config)
+
+
+def test_participant_public_config_does_not_require_or_load_secret_key() -> None:
+    secrets = {
+        "supabase": {
+            "url": "https://project.example.test",
+            "publishable_key": "publishable-test-key",
+        }
+    }
+    public_config = public_config_from_secrets(secrets)
+    assert public_config.public_key == "publishable-test-key"
+    assert not hasattr(public_config, "secret_key")
+
+    with pytest.raises(ConfigurationError, match="secret_key"):
+        config_from_secrets(secrets)
+
+
+def test_logout_refreshes_then_revokes_only_the_local_session() -> None:
+    client = _FakeClient(role="participant")
+    service = SupabaseAuthService(
+        _config().public,
+        client_factory=lambda _url, _key: client,  # type: ignore[arg-type]
+    )
+
+    service.sign_out_session("refresh-to-revoke")
+
+    assert client.auth.refresh_token == "refresh-to-revoke"
+    assert client.auth.sign_out_options == {"scope": "local"}
 
 
 def test_admin_store_is_the_only_class_constructed_with_secret_key() -> None:

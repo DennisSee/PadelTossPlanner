@@ -7,6 +7,7 @@ def test_application_modules_import() -> None:
     for module_name in (
         "authorization",
         "database",
+        "participant_auth",
         "public_schedule_repository",
         "registration_repository",
         "streamlit_app",

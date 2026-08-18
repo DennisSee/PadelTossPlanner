@@ -11,8 +11,19 @@ from time import time
 from typing import Any, Callable, Mapping
 
 from supabase import Client, create_client
+from supabase.lib.client_options import SyncClientOptions
 
 from authorization import can_access_admin, can_access_planner
+from participant_auth import (
+    OAuthAuthorization,
+    ParticipantAuthFlowError,
+    normalize_email,
+    normalize_oauth_provider,
+    normalize_otp_code,
+    validate_oauth_authorization_code,
+    validate_oauth_callback_url,
+    validate_pkce_verifier,
+)
 
 
 class ConfigurationError(RuntimeError):
@@ -82,12 +93,10 @@ class PersistentAuthSession:
         return self.expires_at <= current_time + leeway_seconds
 
 
-def config_from_secrets(secrets: Mapping[str, Any]) -> SupabaseConfig:
-    """Lees Supabase-instellingen uit ``st.secrets``.
-
-    Zowel de oudere namen (anon/service_role) als de nieuwe namen
-    (publishable/secret) worden ondersteund.
-    """
+def public_config_from_secrets(
+    secrets: Mapping[str, Any],
+) -> PublicSupabaseConfig:
+    """Lees uitsluitend de publieke Supabase-instellingen uit ``st.secrets``."""
     try:
         section = secrets["supabase"]
     except (KeyError, TypeError) as exc:
@@ -101,25 +110,37 @@ def config_from_secrets(secrets: Mapping[str, Any]) -> SupabaseConfig:
         or section.get("anon_key")
         or ""
     ).strip()
-    secret_key = str(
-        section.get("secret_key")
-        or section.get("service_role_key")
-        or ""
-    ).strip()
-
     missing = []
     if not url:
         missing.append("url")
     if not public_key:
         missing.append("publishable_key/anon_key")
-    if not secret_key:
-        missing.append("secret_key/service_role_key")
     if missing:
         raise ConfigurationError(
             "Ontbrekende Supabase Secrets: " + ", ".join(missing)
         )
 
-    return SupabaseConfig(url=url, public_key=public_key, secret_key=secret_key)
+    return PublicSupabaseConfig(url=url, public_key=public_key)
+
+
+def config_from_secrets(secrets: Mapping[str, Any]) -> SupabaseConfig:
+    """Lees publieke én bevoorrechte instellingen voor planner/adminfuncties."""
+    public_config = public_config_from_secrets(secrets)
+    section = secrets["supabase"]
+    secret_key = str(
+        section.get("secret_key")
+        or section.get("service_role_key")
+        or ""
+    ).strip()
+    if not secret_key:
+        raise ConfigurationError(
+            "Ontbrekende Supabase Secrets: secret_key/service_role_key"
+        )
+    return SupabaseConfig(
+        url=public_config.url,
+        public_key=public_config.public_key,
+        secret_key=secret_key,
+    )
 
 
 def auth_cookie_config_from_secrets(
@@ -397,6 +418,19 @@ class SupabaseAuthService:
     def _public_client(self) -> Client:
         return self._client_factory(self.config.url, self.config.public_key)
 
+    def _pkce_client(self, storage: Any) -> Client:
+        options = SyncClientOptions(
+            auto_refresh_token=False,
+            persist_session=False,
+            flow_type="pkce",
+            storage=storage,
+        )
+        return self._client_factory(
+            self.config.url,
+            self.config.public_key,
+            options,
+        )
+
     def _persistent_session_from_response(
         self,
         response: Any,
@@ -461,8 +495,8 @@ class SupabaseAuthService:
             response = auth_client.auth.sign_in_with_password(
                 {"email": normalized_email, "password": password}
             )
-        except Exception as exc:
-            raise AuthenticationError("E-mailadres of wachtwoord is onjuist.") from exc
+        except Exception:
+            raise AuthenticationError("E-mailadres of wachtwoord is onjuist.") from None
 
         return self._persistent_session_from_response(
             response,
@@ -473,6 +507,138 @@ class SupabaseAuthService:
     def sign_in(self, email: str, password: str) -> AuthenticatedUser:
         return self.sign_in_with_session(email, password).user
 
+    def start_oauth(
+        self,
+        provider: str,
+        redirect_to: str,
+    ) -> OAuthAuthorization:
+        """Maak een Google/Apple authorize-URL en geef de geheime verifier apart terug."""
+        try:
+            normalized_provider = normalize_oauth_provider(provider)
+            callback_url = validate_oauth_callback_url(
+                redirect_to,
+                normalized_provider,
+            )
+        except ParticipantAuthFlowError as exc:
+            raise AuthenticationError(str(exc)) from None
+
+        storage = _PkceCaptureStorage()
+        auth_client = self._pkce_client(storage)
+        try:
+            response = auth_client.auth.sign_in_with_oauth(
+                {
+                    "provider": normalized_provider,
+                    "options": {"redirect_to": callback_url},
+                }
+            )
+            authorization_url = str(getattr(response, "url", "") or "")
+            verifier = validate_pkce_verifier(storage.code_verifier())
+        except Exception:
+            raise AuthenticationError(
+                f"Inloggen met {normalized_provider.title()} kon niet worden gestart."
+            ) from None
+
+        expected_prefix = f"{self.config.url.rstrip('/')}/auth/v1/authorize?"
+        if not authorization_url.startswith(expected_prefix):
+            raise AuthenticationError("De OAuth-authorisatie-URL is ongeldig.")
+
+        return OAuthAuthorization(
+            provider=normalized_provider,
+            authorization_url=authorization_url,
+            redirect_to=callback_url,
+            code_verifier=verifier,
+        )
+
+    def complete_oauth(
+        self,
+        authorization_code: str,
+        code_verifier: str,
+        redirect_to: str,
+        provider: str,
+    ) -> PersistentAuthSession:
+        """Wissel een eenmalige PKCE-code om voor de bestaande B1-sessie."""
+        try:
+            normalized_provider = normalize_oauth_provider(provider)
+            callback_url = validate_oauth_callback_url(
+                redirect_to,
+                normalized_provider,
+            )
+            verifier = validate_pkce_verifier(code_verifier)
+            code = validate_oauth_authorization_code(authorization_code)
+        except ParticipantAuthFlowError as exc:
+            raise AuthenticationError(str(exc)) from None
+
+        auth_client = self._pkce_client(_PkceCaptureStorage())
+        try:
+            response = auth_client.auth.exchange_code_for_session(
+                {
+                    "auth_code": code,
+                    "code_verifier": verifier,
+                    "redirect_to": callback_url,
+                }
+            )
+            return self._persistent_session_from_response(response, auth_client)
+        except AuthenticationError:
+            raise
+        except Exception:
+            raise AuthenticationError(
+                "De externe login kon niet veilig worden afgerond."
+            ) from None
+
+    def request_email_otp(self, email: str) -> str:
+        """Vraag uitsluitend een e-mailcode aan; de UI verwerkt geen Magic Link."""
+        try:
+            normalized_email = normalize_email(email)
+        except ParticipantAuthFlowError as exc:
+            raise AuthenticationError(str(exc)) from None
+
+        auth_client = self._public_client()
+        try:
+            auth_client.auth.sign_in_with_otp(
+                {
+                    "email": normalized_email,
+                    "options": {"should_create_user": True},
+                }
+            )
+        except Exception:
+            raise AuthenticationError(
+                "De eenmalige e-mailcode kon niet worden verstuurd."
+            ) from None
+        return normalized_email
+
+    def verify_email_otp(
+        self,
+        email: str,
+        code: str,
+    ) -> PersistentAuthSession:
+        """Verifieer de OTP-code en lever dezelfde B1-sessie als OAuth/password."""
+        try:
+            normalized_email = normalize_email(email)
+            normalized_code = normalize_otp_code(code)
+        except ParticipantAuthFlowError as exc:
+            raise AuthenticationError(str(exc)) from None
+
+        auth_client = self._public_client()
+        try:
+            response = auth_client.auth.verify_otp(
+                {
+                    "email": normalized_email,
+                    "token": normalized_code,
+                    "type": "email",
+                }
+            )
+            return self._persistent_session_from_response(
+                response,
+                auth_client,
+                fallback_email=normalized_email,
+            )
+        except AuthenticationError:
+            raise
+        except Exception:
+            raise AuthenticationError(
+                "De eenmalige e-mailcode is onjuist of verlopen."
+            ) from None
+
     def restore_session(self, refresh_token: str) -> PersistentAuthSession:
         """Roteer het refresh-token en retourneer de actuele access-token."""
         token = str(refresh_token or "").strip()
@@ -482,10 +648,10 @@ class SupabaseAuthService:
         auth_client = self._public_client()
         try:
             response = auth_client.auth.refresh_session(token)
-        except Exception as exc:
+        except Exception:
             raise AuthenticationError(
                 "De opgeslagen sessie is verlopen of ongeldig."
-            ) from exc
+            ) from None
         return self._persistent_session_from_response(response, auth_client)
 
     def sign_out_session(self, refresh_token: str) -> None:
@@ -497,3 +663,29 @@ class SupabaseAuthService:
         auth_client = self._public_client()
         auth_client.auth.refresh_session(token)
         auth_client.auth.sign_out({"scope": "local"})
+
+
+class _PkceCaptureStorage:
+    """Per-aanroepgeheugen dat alleen dient om de gegenereerde verifier af te vangen."""
+
+    def __init__(self) -> None:
+        self._values: dict[str, str] = {}
+
+    def get_item(self, key: str) -> str | None:
+        return self._values.get(key)
+
+    def set_item(self, key: str, value: str) -> None:
+        self._values[key] = value
+
+    def remove_item(self, key: str) -> None:
+        self._values.pop(key, None)
+
+    def code_verifier(self) -> str:
+        verifiers = [
+            value
+            for key, value in self._values.items()
+            if key.endswith("-code-verifier")
+        ]
+        if len(verifiers) != 1:
+            raise AuthenticationError("De PKCE-verifier kon niet worden aangemaakt.")
+        return verifiers[0]
