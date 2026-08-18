@@ -18,6 +18,7 @@ from streamlit_cookies_manager import EncryptedCookieManager
 
 from authorization import (
     AuthorizationError,
+    EVENT_MANAGEMENT_PAGE,
     PUBLIC_PAGE,
     SignupReturnContext,
     default_page_for_role,
@@ -47,6 +48,16 @@ from planner import (
     player_statistics,
     schedule_rows,
 )
+from event_management import (
+    EVENT_SPORTS,
+    EVENT_STATUSES,
+    EventManagementError,
+    build_event_payload,
+    build_event_update_payload,
+    build_signup_url,
+    generate_event_slug,
+    public_base_url_from_secrets,
+)
 from public_schedule_repository import PublicScheduleRepository
 from participant_auth import (
     OAuthPendingState,
@@ -73,6 +84,7 @@ from participant_registration import (
     event_sport_label,
     event_window,
     format_event_date,
+    parse_supabase_timestamp,
     registration_availability,
     registration_initial_values,
 )
@@ -3710,6 +3722,245 @@ def _saved_schedule_label(item: Mapping[str, Any]) -> str:
     )
 
 
+def _render_event_management_page(
+    store: AdminSupabaseStore,
+    user: AuthenticatedUser,
+    public_base_url: str,
+) -> None:
+    """Beheer TOS-events via de expliciet bevoorrechte adminstore."""
+    try:
+        require_planner_role(user.role)
+    except AuthorizationError as exc:
+        st.error(str(exc))
+        return
+    status_labels = {
+        "draft": "Concept",
+        "open": "Open",
+        "closed": "Gesloten",
+        "cancelled": "Geannuleerd",
+    }
+    sport_labels = {"padel": "Padel", "tennis": "Tennis"}
+
+    st.title("TOS-avonden")
+    st.caption(
+        "Maak een event, zet het open en deel daarna de aanmeldlink. "
+        "Tennis-events ondersteunen aanmelding, maar nog geen schemagenerator."
+    )
+
+    default_event_date = date.today() + timedelta(days=7)
+    with st.expander("Nieuwe TOS-avond", expanded=False):
+        with st.form("create_tos_event"):
+            sport = st.selectbox(
+                "Sport",
+                EVENT_SPORTS,
+                format_func=lambda value: sport_labels[value],
+            )
+            title = st.text_input("Titel", value="TOS-avond", max_chars=160)
+            event_date = st.date_input("Datum", value=default_event_date)
+            start_column, end_column = st.columns(2)
+            with start_column:
+                starts_at = st.time_input("Starttijd", value=time(20, 0), step=300)
+            with end_column:
+                ends_at = st.time_input("Eindtijd", value=time(22, 0), step=300)
+            deadline_enabled = st.checkbox(
+                "Inschrijfdeadline instellen",
+                value=True,
+            )
+            deadline_date_column, deadline_time_column = st.columns(2)
+            with deadline_date_column:
+                deadline_date = st.date_input(
+                    "Deadlinedatum",
+                    value=default_event_date,
+                )
+            with deadline_time_column:
+                deadline_time = st.time_input(
+                    "Deadlinetijd",
+                    value=time(19, 0),
+                    step=300,
+                )
+            initial_status = st.selectbox(
+                "Initiële status",
+                EVENT_STATUSES,
+                format_func=lambda value: status_labels[value],
+            )
+            create_event = st.form_submit_button(
+                "TOS-avond aanmaken",
+                width="stretch",
+            )
+
+        if create_event:
+            try:
+                event_payload = build_event_payload(
+                    sport=sport,
+                    title=title,
+                    event_date=event_date,
+                    starts_at=starts_at,
+                    ends_at=ends_at,
+                    signup_deadline_enabled=deadline_enabled,
+                    signup_deadline_date=deadline_date,
+                    signup_deadline_time=deadline_time,
+                    status=initial_status,
+                )
+                event_payload.update(
+                    {
+                        "slug": generate_event_slug(sport, event_date),
+                        "created_by": user.id,
+                    }
+                )
+                store.create_tos_event(event_payload)
+                st.success("De TOS-avond is aangemaakt.")
+                st.rerun()
+            except (EventManagementError, ValueError, RuntimeError) as exc:
+                st.error(str(exc))
+            except Exception:
+                st.error("De TOS-avond kon niet veilig worden aangemaakt.")
+
+    try:
+        events = store.list_tos_events()
+    except Exception:
+        st.error("De TOS-avonden konden niet worden geladen.")
+        return
+
+    if not events:
+        st.info("Er zijn nog geen TOS-avonden aangemaakt.")
+        return
+
+    summary_rows: list[dict[str, object]] = []
+    for event in events:
+        try:
+            window = event_window(event)
+            deadline_text = (
+                _format_local_datetime(event.get("signup_deadline"), fallback="Geen")
+                if event.get("signup_deadline")
+                else "Geen"
+            )
+            summary_rows.append(
+                {
+                    "Datum": window.local_start.strftime("%d-%m-%Y"),
+                    "Sport": sport_labels.get(str(event.get("sport")), "Onbekend"),
+                    "Titel": str(event.get("title") or ""),
+                    "Tijd": (
+                        f"{window.local_start:%H:%M}–{window.local_end:%H:%M}"
+                    ),
+                    "Deadline": deadline_text,
+                    "Status": status_labels.get(
+                        str(event.get("status")),
+                        str(event.get("status") or ""),
+                    ),
+                    "Aanmeldingen": int(event.get("registration_count") or 0),
+                }
+            )
+        except (ParticipantRegistrationError, TypeError, ValueError):
+            continue
+    if summary_rows:
+        st.dataframe(pd.DataFrame(summary_rows), hide_index=True, width="stretch")
+
+    st.subheader("Beheren en delen")
+    for event in events:
+        event_id = str(event.get("id") or "")
+        event_slug = str(event.get("slug") or "")
+        try:
+            window = event_window(event)
+            signup_link = build_signup_url(public_base_url, event_slug)
+        except (EventManagementError, ParticipantRegistrationError):
+            st.error(f"Event {event_slug or event_id} bevat ongeldige gegevens.")
+            continue
+
+        registration_count = int(event.get("registration_count") or 0)
+        expander_title = (
+            f"{window.local_start:%d-%m-%Y} · "
+            f"{sport_labels.get(str(event.get('sport')), 'TOS')} · "
+            f"{event.get('title')}"
+        )
+        with st.expander(expander_title, expanded=False):
+            st.caption(
+                f"Status: {status_labels.get(str(event.get('status')), 'Onbekend')} · "
+                f"{registration_count} aanmelding(en)"
+            )
+            st.markdown("**Deelbare aanmeldlink**")
+            st.code(signup_link, language=None)
+            st.caption(
+                "De slug, sport, datum en tijden blijven na creatie vast. "
+                "Annuleer een fout event en maak een vervangend event."
+            )
+
+            existing_deadline = event.get("signup_deadline")
+            deadline_local = (
+                parse_supabase_timestamp(
+                    existing_deadline,
+                    field_name="aanmelddeadline",
+                ).astimezone(LOCAL_TIMEZONE)
+                if existing_deadline
+                else window.local_start - timedelta(hours=1)
+            )
+            with st.form(f"edit_tos_event_{event_id}"):
+                edited_title = st.text_input(
+                    "Titel",
+                    value=str(event.get("title") or "TOS-avond"),
+                    max_chars=160,
+                    key=f"event_title_{event_id}",
+                )
+                edited_deadline_enabled = st.checkbox(
+                    "Inschrijfdeadline instellen",
+                    value=bool(existing_deadline),
+                    key=f"event_deadline_enabled_{event_id}",
+                )
+                edit_deadline_date_column, edit_deadline_time_column = st.columns(2)
+                with edit_deadline_date_column:
+                    edited_deadline_date = st.date_input(
+                        "Deadlinedatum",
+                        value=deadline_local.date(),
+                        key=f"event_deadline_date_{event_id}",
+                    )
+                with edit_deadline_time_column:
+                    edited_deadline_time = st.time_input(
+                        "Deadlinetijd",
+                        value=deadline_local.time().replace(tzinfo=None),
+                        step=300,
+                        key=f"event_deadline_time_{event_id}",
+                    )
+                save_event = st.form_submit_button("Wijzigingen opslaan")
+
+            if save_event:
+                try:
+                    store.update_tos_event(
+                        event_id,
+                        build_event_update_payload(
+                            event,
+                            title=edited_title,
+                            signup_deadline_enabled=edited_deadline_enabled,
+                            signup_deadline_date=edited_deadline_date,
+                            signup_deadline_time=edited_deadline_time,
+                        ),
+                    )
+                    st.success("Eventgegevens aangepast.")
+                    st.rerun()
+                except (EventManagementError, ValueError, RuntimeError) as exc:
+                    st.error(str(exc))
+                except Exception:
+                    st.error("Het event kon niet veilig worden gewijzigd.")
+
+            with st.form(f"status_tos_event_{event_id}"):
+                current_status = str(event.get("status") or "draft")
+                new_status = st.selectbox(
+                    "Status",
+                    EVENT_STATUSES,
+                    index=EVENT_STATUSES.index(current_status),
+                    format_func=lambda value: status_labels[value],
+                    key=f"event_status_{event_id}",
+                )
+                save_status = st.form_submit_button("Status aanpassen")
+            if save_status:
+                try:
+                    store.set_tos_event_status(event_id, new_status)
+                    st.success("Eventstatus aangepast; registraties zijn behouden.")
+                    st.rerun()
+                except (ValueError, RuntimeError) as exc:
+                    st.error(str(exc))
+                except Exception:
+                    st.error("De eventstatus kon niet veilig worden aangepast.")
+
+
 def _render_saved_page(
     store: AdminSupabaseStore,
     user: AuthenticatedUser,
@@ -3984,6 +4235,13 @@ def main() -> None:
         store = _get_admin_store(admin_config)
         if page == "Planner":
             _render_planner_page(store, user)
+        elif page == EVENT_MANAGEMENT_PAGE:
+            try:
+                public_base_url = public_base_url_from_secrets(st.secrets)
+            except EventManagementError as exc:
+                st.error(str(exc))
+                return
+            _render_event_management_page(store, user, public_base_url)
         elif page == "Opgeslagen schema's":
             _render_saved_page(store, user)
         elif page == "Gebruikersbeheer":

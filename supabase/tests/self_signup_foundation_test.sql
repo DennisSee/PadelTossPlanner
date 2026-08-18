@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(52);
+select plan(56);
 
 select has_table('public', 'club_members', 'club_members bestaat');
 select has_table('public', 'tos_events', 'tos_events bestaat');
@@ -163,7 +163,55 @@ values
         'open',
         'padel',
         'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
+    ),
+    (
+        '10000000-0000-4000-8000-000000000005',
+        'draft-event',
+        'Concept TOS',
+        '2099-05-01 20:00:00+00',
+        '2099-05-01 22:00:00+00',
+        '2099-04-30 20:00:00+00',
+        'draft',
+        'padel',
+        'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
+    ),
+    (
+        '10000000-0000-4000-8000-000000000006',
+        'cancelled-event',
+        'Geannuleerde TOS',
+        '2099-06-01 20:00:00+00',
+        '2099-06-01 22:00:00+00',
+        '2099-05-31 20:00:00+00',
+        'cancelled',
+        'tennis',
+        'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
     );
+
+select throws_ok(
+    $sql$
+        insert into public.tos_events (
+            slug,
+            title,
+            starts_at,
+            ends_at,
+            status,
+            sport,
+            created_by
+        )
+        values (
+            'open-event',
+            'Dubbele slug',
+            '2099-09-01 20:00:00+00',
+            '2099-09-01 22:00:00+00',
+            'draft',
+            'padel',
+            'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
+        )
+    $sql$,
+    '23505',
+    null,
+    'eventslug blijft database-side uniek'
+);
 
 select ok(
     not has_table_privilege('authenticated', 'public.profiles', 'UPDATE'),
@@ -536,6 +584,24 @@ select throws_ok(
 select throws_ok(
     $sql$
         insert into public.registrations (event_id, response)
+        values ('10000000-0000-4000-8000-000000000005', 'attending')
+    $sql$,
+    '42501',
+    'Zelf-service voor dit TOS-event is gesloten.',
+    'draft-event weigert self-service registratie'
+);
+select throws_ok(
+    $sql$
+        insert into public.registrations (event_id, response)
+        values ('10000000-0000-4000-8000-000000000006', 'attending')
+    $sql$,
+    '42501',
+    'Zelf-service voor dit TOS-event is gesloten.',
+    'cancelled event weigert self-service registratie'
+);
+select throws_ok(
+    $sql$
+        insert into public.registrations (event_id, response)
         values ('10000000-0000-4000-8000-000000000003', 'attending')
     $sql$,
     '42501',
@@ -581,6 +647,19 @@ select is(
     ),
     'attending',
     'registratie bleef na de deadline ongewijzigd'
+);
+
+update public.tos_events
+set status = 'cancelled'
+where id = '10000000-0000-4000-8000-000000000001';
+select is(
+    (
+        select count(*)
+        from public.registrations
+        where event_id = '10000000-0000-4000-8000-000000000001'
+    ),
+    2::bigint,
+    'annuleren van een event behoudt bestaande registraties'
 );
 
 select ok(

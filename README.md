@@ -31,6 +31,7 @@ opslaan of wijzigen totdat het event sluit of de aanmelddeadline verstrijkt.
 Een planner kan:
 
 - inloggen met e-mailadres en wachtwoord;
+- padel- en tennis-TOS-events aanmaken, beheren en via een stabiele link delen;
 - de gedeelde spelerslijst en instellingen opslaan;
 - dezelfde clubinvoer op desktop en telefoon terugvinden;
 - schema's genereren;
@@ -53,6 +54,7 @@ Een beheerder kan daarnaast:
 ├── planner.py                       # Plannings- en optimalisatielogica
 ├── excel_export.py                  # Exportmodule; nog niet gekoppeld aan de webinterface
 ├── database.py                      # Supabase Auth en databasefuncties
+├── event_management.py              # Eventvalidatie, stabiele slugs en aanmeldlinks
 ├── participant_auth.py              # OAuth/PKCE-, OTP- en callbackvalidatie
 ├── participant_registration.py      # Tijdzone- en formulierlogica voor self-service
 ├── registration_repository.py       # User-scoped participanttoegang via RLS/RPC
@@ -179,6 +181,9 @@ secret_key = "sb_secret_..."
 [auth]
 cookie_password = "minimaal-32-willekeurige-tekens-los-van-supabase"
 oauth_redirect_url = "https://JOUW-STREAMLIT-APP.example/"
+
+[app]
+public_base_url = "https://JOUW-STREAMLIT-APP.example/"
 ```
 
 Voor oudere Supabase-projecten zijn ook deze namen ondersteund:
@@ -208,6 +213,24 @@ test- of productieomgeving. Google- en Apple-providercredentials worden afzonder
 Supabase geconfigureerd en horen nooit in deze repository. Voor passwordless e-mail moet
 de Supabase e-mailtemplate de eenmalige code (`{{ .Token }}`) tonen; de applicatie gebruikt
 in V1 geen Magic Link.
+
+`app.public_base_url` is de expliciete basis voor deelbare TOS-aanmeldlinks. Voor
+lokale ontwikkeling mag dit `http://localhost:8501/` zijn; voor een gedeelde omgeving
+is HTTPS verplicht. De app voegt uitsluitend `?page=signup&event=<slug>` toe. De slug
+is stabiel maar vormt geen beveiligingsgrens: deelnemers moeten altijd authenticeren.
+
+## TOS-events beheren
+
+Planners en beheerders zien de pagina **TOS-avonden**. Daar kunnen zij een padel- of
+tennisevent aanmaken, de status wijzigen en de aanmeldlink kopiëren. `draft` is nog niet
+zichtbaar voor deelnemers; `open` staat self-signup toe; `closed` en `cancelled`
+blokkeren self-service zonder registraties te verwijderen.
+
+Voor een conservatieve eerste versie zijn slug, sport, datum en start-/eindtijd na
+creatie onveranderlijk. Titel, deadline en status blijven wijzigbaar. Een fout event
+wordt geannuleerd en vervangen, zodat bestaande registraties nooit stilzwijgend buiten
+nieuwe eventgrenzen vallen of van sport veranderen. Tennis-events ondersteunen wel
+dezelfde signupflow, maar nog geen tennisplanner.
 
 Sla de Secrets op en reboot de Streamlit-app.
 

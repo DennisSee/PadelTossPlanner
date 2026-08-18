@@ -25,6 +25,7 @@ def test_every_planner_route_has_a_direct_role_guard() -> None:
     for function_name in (
         "_render_private_result",
         "_render_planner_page",
+        "_render_event_management_page",
         "_render_saved_page",
     ):
         assert "require_planner_role" in _function_calls(function_name)
@@ -32,6 +33,31 @@ def test_every_planner_route_has_a_direct_role_guard() -> None:
 
 def test_admin_route_has_a_direct_admin_guard() -> None:
     assert "require_admin_role" in _function_calls("_render_user_management")
+
+
+def test_event_management_route_uses_only_the_guarded_admin_store() -> None:
+    calls = _function_calls("_render_event_management_page")
+    assert "require_planner_role" in calls
+    assert "_get_user_registration_repository" not in calls
+
+    tree = ast.parse(APP_PATH.read_text(encoding="utf-8"))
+    function = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef)
+        and node.name == "_render_event_management_page"
+    )
+    attributes = {
+        node.func.attr
+        for node in ast.walk(function)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+    }
+    assert {
+        "list_tos_events",
+        "create_tos_event",
+        "update_tos_event",
+        "set_tos_event_status",
+    }.issubset(attributes)
 
 
 def test_user_repository_factory_is_not_streamlit_cached() -> None:

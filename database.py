@@ -286,6 +286,108 @@ class AdminSupabaseStore:
         )
 
     # ------------------------------------------------------------------
+    # TOS-eventbeheer voor planners en beheerders
+    # ------------------------------------------------------------------
+    def list_tos_events(self) -> list[dict[str, Any]]:
+        response = (
+            self.admin.table("tos_events")
+            .select(
+                "id,slug,title,sport,starts_at,ends_at,signup_deadline,status,"
+                "created_by,created_at,updated_at"
+            )
+            .order("starts_at", desc=True)
+            .execute()
+        )
+        events = _response_data(response)
+        registration_response = (
+            self.admin.table("registrations").select("event_id").execute()
+        )
+        registration_counts: dict[str, int] = {}
+        for registration in _response_data(registration_response):
+            event_id = str(registration.get("event_id") or "")
+            if event_id:
+                registration_counts[event_id] = registration_counts.get(event_id, 0) + 1
+        return [
+            {
+                **event,
+                "registration_count": registration_counts.get(
+                    str(event.get("id") or ""),
+                    0,
+                ),
+            }
+            for event in events
+        ]
+
+    def get_tos_event(self, event_id: str) -> dict[str, Any] | None:
+        response = (
+            self.admin.table("tos_events")
+            .select(
+                "id,slug,title,sport,starts_at,ends_at,signup_deadline,status,"
+                "created_by,created_at,updated_at"
+            )
+            .eq("id", event_id)
+            .limit(1)
+            .execute()
+        )
+        rows = _response_data(response)
+        return rows[0] if rows else None
+
+    def create_tos_event(self, payload: Mapping[str, Any]) -> dict[str, Any]:
+        allowed_fields = {
+            "slug",
+            "title",
+            "sport",
+            "starts_at",
+            "ends_at",
+            "signup_deadline",
+            "status",
+            "created_by",
+        }
+        record = dict(payload)
+        if set(record) != allowed_fields:
+            raise ValueError("Het nieuwe event bevat ongeldige of ontbrekende velden.")
+        response = self.admin.table("tos_events").insert(record).execute()
+        rows = _response_data(response)
+        if not rows:
+            raise RuntimeError("Het TOS-event kon niet worden aangemaakt.")
+        return rows[0]
+
+    def update_tos_event(
+        self,
+        event_id: str,
+        payload: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        record = dict(payload)
+        if not record or not set(record).issubset({"title", "signup_deadline"}):
+            raise ValueError(
+                "Na creatie zijn alleen titel en inschrijfdeadline wijzigbaar."
+            )
+        response = (
+            self.admin.table("tos_events")
+            .update(record)
+            .eq("id", event_id)
+            .execute()
+        )
+        rows = _response_data(response)
+        if not rows:
+            raise RuntimeError("Het TOS-event kon niet worden gewijzigd.")
+        return rows[0]
+
+    def set_tos_event_status(self, event_id: str, status: str) -> dict[str, Any]:
+        if status not in {"draft", "open", "closed", "cancelled"}:
+            raise ValueError("De eventstatus is ongeldig.")
+        response = (
+            self.admin.table("tos_events")
+            .update({"status": status})
+            .eq("id", event_id)
+            .execute()
+        )
+        rows = _response_data(response)
+        if not rows:
+            raise RuntimeError("De eventstatus kon niet worden gewijzigd.")
+        return rows[0]
+
+    # ------------------------------------------------------------------
     # Gedeelde clubinvoer
     # ------------------------------------------------------------------
     def load_club_draft(self) -> dict[str, Any] | None:
