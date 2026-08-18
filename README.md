@@ -16,6 +16,14 @@ Een bezoeker ziet alleen:
 
 Rankings, gemiddelde teamniveaus en spelersstatistieken worden niet openbaar getoond.
 
+### Deelnemer
+
+Een nieuwe Supabase Auth-gebruiker krijgt de rol `participant`. Via de openbare
+aanmeldroute kan die gebruiker eenmalig een eigen, sportneutraal clublidprofiel
+aanmaken. Standaard is dit profiel direct goedgekeurd; de clubinstelling
+`require_member_approval` kan toekomstige onboardings op `pending` laten starten.
+Deze instelling verandert nooit automatisch de status van bestaande leden.
+
 ### Planner
 
 Een planner kan:
@@ -44,7 +52,7 @@ Een beheerder kan daarnaast:
 ├── excel_export.py                  # Exportmodule; nog niet gekoppeld aan de webinterface
 ├── database.py                      # Supabase Auth en databasefuncties
 ├── participant_auth.py              # OAuth/PKCE-, OTP- en callbackvalidatie
-├── registration_repository.py       # User-scoped participantreads via RLS
+├── registration_repository.py       # User-scoped participanttoegang via RLS/RPC
 ├── supabase/
 │   ├── config.toml                  # Lokale Supabase-configuratie
 │   └── migrations/                  # Enige bron van waarheid voor het databaseschema
@@ -93,6 +101,20 @@ Row Level Security begrenst publieke en user-scoped toegang. De openbare schemap
 kan uitsluitend gepubliceerde, expliciet toegestane kolommen lezen. Participants lezen
 hun eigen profiel en registratie via hun eigen Supabase access-token. Alleen expliciete
 planner-/adminfuncties gebruiken de server-side secret/service key.
+
+### Leden, goedkeuring en sporten
+
+`auth.users` koppelt via `profiles.member_id` aan precies één `club_members`-identiteit.
+Accountactiviteit (`profiles.active`) en clubbrede onboardinggoedkeuring
+(`club_members.approval_status`) zijn afzonderlijke beveiligingsbeslissingen. Een
+participant kan deze koppeling en status niet rechtstreeks wijzigen; de beperkte
+`self_onboard_member`-RPC werkt alleen voor `auth.uid()` en gebruikt de clubinstelling.
+
+Sportafhankelijke gegevens staan in `member_sport_profiles`, met één record per lid en
+sport (`padel` of `tennis`). Ranking is daardoor per sport onafhankelijk en wordt niet
+door de participant tijdens onboarding ingevuld. `tos_events.sport` maakt ieder nieuw
+event expliciet padel of tennis. De huidige planner en interface blijven uitsluitend de
+bestaande padelflow uitvoeren; tennisplannerlogica is nog niet geïmplementeerd.
 
 ### Nieuwe schemawijzigingen
 

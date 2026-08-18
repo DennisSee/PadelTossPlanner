@@ -51,8 +51,12 @@ from public_schedule_repository import PublicScheduleRepository
 from participant_auth import (
     OAuthPendingState,
     OAUTH_CALLBACK_MARKER,
+    PARTICIPANT_STATUS_INACTIVE,
+    PARTICIPANT_STATUS_NEEDS_ONBOARDING,
     PARTICIPANT_STATUS_NOT_PARTICIPANT,
-    PARTICIPANT_STATUS_PENDING,
+    PARTICIPANT_STATUS_PENDING_APPROVAL,
+    PARTICIPANT_STATUS_REJECTED,
+    PARTICIPANT_STATUS_UNAVAILABLE,
     ParticipantAuthFlowError,
     SUPPORTED_OAUTH_PROVIDERS,
     oauth_callback_url,
@@ -2575,7 +2579,7 @@ def _render_participant_signup_page(
     cookies: EncryptedCookieManager,
     context: SignupReturnContext,
 ) -> None:
-    """Mobiele B2-route; het echte registratieformulier volgt pas in Fase C."""
+    """Mobiele C1-route; het echte registratieformulier volgt pas in Fase C2."""
     st.markdown(_public_brand_header_html(), unsafe_allow_html=True)
     st.caption(f"Aanmeldpagina · {context.event_slug}")
 
@@ -2623,20 +2627,33 @@ def _render_participant_signup_page(
     if link_status == PARTICIPANT_STATUS_NOT_PARTICIPANT:
         st.info(
             "Je bent ingelogd met een planner- of beheerdersaccount. "
-            "De participant-aanmelding wordt in B2 niet voor dit account geopend."
+            "De participant-aanmelding wordt niet voor dit account geopend."
         )
         return
 
-    member_id = str(profile.get("member_id") or "")
-    if link_status == PARTICIPANT_STATUS_PENDING and not member_id:
-        st.warning(
-            "Je deelnemersaccount is aangemaakt, maar moet nog veilig aan je "
-            "clublidprofiel worden gekoppeld. Je kunt daarom nog geen aanmelding wijzigen."
+    if link_status == PARTICIPANT_STATUS_NEEDS_ONBOARDING:
+        st.info(
+            "Maak eenmalig je clubprofiel aan. Je krijgt hierdoor geen planner- "
+            "of beheerrechten."
         )
-        st.caption(
-            "Je account heeft uitsluitend de rol Deelnemer en geeft geen toegang "
-            "tot planner- of beheerfuncties."
-        )
+        with st.form(f"self_onboarding_{context.event_slug}"):
+            display_name = st.text_input(
+                "Naam",
+                value=str(profile.get("display_name") or session.user.display_name),
+                max_chars=120,
+            )
+            onboarded = st.form_submit_button(
+                "Clubprofiel aanmaken",
+                width="stretch",
+            )
+        if onboarded:
+            try:
+                repository.self_onboard_member(display_name)
+                st.rerun()
+            except (ValueError, RuntimeError) as exc:
+                st.error(str(exc))
+            except Exception:
+                st.error("Je clubprofiel kon niet veilig worden aangemaakt.")
         return
 
     try:
@@ -2645,13 +2662,28 @@ def _render_participant_signup_page(
         st.error("De gekoppelde clublidstatus kon niet veilig worden geladen.")
         return
 
-    if participant_link_status(profile, member) == PARTICIPANT_STATUS_PENDING:
+    link_status = participant_link_status(profile, member)
+    if link_status == PARTICIPANT_STATUS_PENDING_APPROVAL:
+        st.warning(
+            "Je clubprofiel wacht op goedkeuring. Je kunt al inloggen, maar nog "
+            "geen TOS-aanmelding opslaan."
+        )
+        return
+    if link_status == PARTICIPANT_STATUS_REJECTED:
+        st.error(
+            "Je clubprofiel is niet goedgekeurd. Neem contact op met de beheerder."
+        )
+        return
+    if link_status == PARTICIPANT_STATUS_INACTIVE:
+        st.warning("Je clubprofiel is niet actief. Neem contact op met de beheerder.")
+        return
+    if link_status == PARTICIPANT_STATUS_UNAVAILABLE:
         st.warning("De ledenkoppeling is nog niet beschikbaar. Neem contact op met de beheerder.")
         return
 
     st.success(
         f"Ingelogd als {member.get('display_name') or session.user.display_name}. "
-        "Je account is klaar voor het aanmeldformulier in Fase C."
+        "Je account is klaar voor het aanmeldformulier in Fase C2."
     )
 
 

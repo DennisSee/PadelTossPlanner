@@ -96,10 +96,10 @@ select ok(
     'bestaande planner hoeft geen member-koppeling te hebben'
 );
 
-insert into public.club_members (id, display_name, ranking)
+insert into public.club_members (id, display_name)
 values
-    ('11111111-1111-4111-8111-111111111111', 'Lid A', 3),
-    ('22222222-2222-4222-8222-222222222222', 'Lid B', 4);
+    ('11111111-1111-4111-8111-111111111111', 'Lid A'),
+    ('22222222-2222-4222-8222-222222222222', 'Lid B');
 
 update public.profiles
 set member_id = '11111111-1111-4111-8111-111111111111'
@@ -116,6 +116,7 @@ insert into public.tos_events (
     ends_at,
     signup_deadline,
     status,
+    sport,
     created_by
 )
 values
@@ -127,6 +128,7 @@ values
         '2099-01-01 22:00:00+00',
         '2098-12-31 20:00:00+00',
         'open',
+        'padel',
         'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
     ),
     (
@@ -137,6 +139,7 @@ values
         '2099-02-01 22:00:00+00',
         '2099-01-31 20:00:00+00',
         'closed',
+        'padel',
         'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
     ),
     (
@@ -147,6 +150,7 @@ values
         '2099-03-01 22:00:00+00',
         '2000-01-01 00:00:00+00',
         'open',
+        'padel',
         'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
     ),
     (
@@ -157,6 +161,7 @@ values
         '2099-04-01 22:00:00+00',
         '2099-03-31 20:00:00+00',
         'open',
+        'padel',
         'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
     );
 
@@ -409,8 +414,8 @@ select set_config(
 );
 select throws_ok(
     $sql$
-        insert into public.club_members (display_name, ranking)
-        values ('Onbevoegd lid', 3)
+        insert into public.club_members (display_name)
+        values ('Onbevoegd lid')
     $sql$,
     '42501',
     'permission denied for table club_members',
@@ -419,7 +424,7 @@ select throws_ok(
 select throws_ok(
     $sql$
         update public.club_members
-        set ranking = 5
+        set approval_status = 'approved'
         where id = '11111111-1111-4111-8111-111111111111'
     $sql$,
     '42501',
@@ -429,7 +434,7 @@ select throws_ok(
 select throws_ok(
     $sql$
         insert into public.tos_events (
-            slug, title, starts_at, ends_at, status, created_by
+            slug, title, starts_at, ends_at, status, sport, created_by
         )
         values (
             'onbevoegd-event',
@@ -437,6 +442,7 @@ select throws_ok(
             '2099-05-01 20:00:00+00',
             '2099-05-01 22:00:00+00',
             'open',
+            'padel',
             'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
         )
     $sql$,

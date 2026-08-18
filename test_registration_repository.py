@@ -41,11 +41,16 @@ class _UserClient:
         self.postgrest = _Postgrest()
         self.responses = responses or {}
         self.queries: dict[str, _Query] = {}
+        self.rpc_calls: list[tuple[str, dict[str, object]]] = []
 
     def table(self, table_name: str) -> _Query:
         query = _Query(self.responses.get(table_name, []))
         self.queries[table_name] = query
         return query
+
+    def rpc(self, function_name: str, params: dict[str, object]) -> _Query:
+        self.rpc_calls.append((function_name, params))
+        return _Query(self.responses.get(f"rpc:{function_name}", []))
 
 
 def _session(user_id: str, access_token: str) -> PersistentAuthSession:
@@ -118,8 +123,17 @@ def test_read_methods_filter_to_current_user_and_safe_public_fields() -> None:
     client = _UserClient(
         {
             "profiles": [{"id": user_id, "member_id": member_id}],
-            "club_members": [{"id": member_id, "display_name": "Lid A"}],
-            "tos_events": [{"id": event_id, "slug": "vrijdag-tos"}],
+            "club_members": [
+                {
+                    "id": member_id,
+                    "display_name": "Lid A",
+                    "approval_status": "approved",
+                    "active": True,
+                }
+            ],
+            "tos_events": [
+                {"id": event_id, "slug": "vrijdag-tos", "sport": "padel"}
+            ],
             "registrations": [{"event_id": event_id, "user_id": user_id}],
         }
     )
@@ -134,10 +148,13 @@ def test_read_methods_filter_to_current_user_and_safe_public_fields() -> None:
     assert repository.get_linked_club_member() == {
         "id": member_id,
         "display_name": "Lid A",
+        "approval_status": "approved",
+        "active": True,
     }
     assert repository.get_open_event_by_slug("vrijdag-tos") == {
         "id": event_id,
         "slug": "vrijdag-tos",
+        "sport": "padel",
     }
     assert repository.get_own_registration(event_id) == {
         "event_id": event_id,
@@ -145,3 +162,34 @@ def test_read_methods_filter_to_current_user_and_safe_public_fields() -> None:
     }
     assert ("eq:user_id", user_id) in client.queries["registrations"].calls
     assert ("eq:status", "open") in client.queries["tos_events"].calls
+
+
+def test_self_onboarding_uses_only_the_user_scoped_rpc() -> None:
+    user_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    member_id = "11111111-1111-4111-8111-111111111111"
+    client = _UserClient(
+        {
+            "rpc:self_onboard_member": [
+                {
+                    "member_id": member_id,
+                    "display_name": "Lid A",
+                    "approval_status": "approved",
+                    "active": True,
+                }
+            ]
+        }
+    )
+    repository = UserScopedRegistrationRepository(
+        "https://project.example.test",
+        "publishable-test-key",
+        _session(user_id, "access-a"),
+        client_factory=lambda _url, _key: client,  # type: ignore[arg-type]
+    )
+
+    result = repository.self_onboard_member("  Lid A  ")
+
+    assert result["approval_status"] == "approved"
+    assert client.rpc_calls == [
+        ("self_onboard_member", {"p_display_name": "Lid A"})
+    ]
+    assert client.queries == {}

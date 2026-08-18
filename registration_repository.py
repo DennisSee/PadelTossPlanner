@@ -64,12 +64,27 @@ class UserScopedRegistrationRepository:
 
         response = (
             self._client.table("club_members")
-            .select("id,display_name,ranking,active")
+            .select("id,display_name,approval_status,active")
             .eq("id", member_id)
             .limit(1)
             .execute()
         )
         return _first_row(response)
+
+    def self_onboard_member(self, display_name: str) -> dict[str, Any]:
+        """Roep de narrowly scoped auth.uid()-gebonden onboarding-RPC aan."""
+        normalized_name = str(display_name or "").strip()
+        if not 1 <= len(normalized_name) <= 120:
+            raise ValueError("De weergavenaam moet tussen 1 en 120 tekens bevatten.")
+
+        response = self._client.rpc(
+            "self_onboard_member",
+            {"p_display_name": normalized_name},
+        ).execute()
+        member = _first_row(response)
+        if member is None:
+            raise RuntimeError("Self-onboarding leverde geen clublidstatus op.")
+        return member
 
     def get_open_event_by_slug(self, event_slug: str) -> dict[str, Any] | None:
         slug = str(event_slug or "").strip()
@@ -78,7 +93,7 @@ class UserScopedRegistrationRepository:
 
         response = (
             self._client.table("tos_events")
-            .select("id,slug,title,starts_at,ends_at,signup_deadline,status")
+            .select("id,slug,title,sport,starts_at,ends_at,signup_deadline,status")
             .eq("slug", slug)
             .eq("status", "open")
             .limit(1)

@@ -13,7 +13,11 @@ from authorization import SignupReturnContext, is_valid_event_slug
 
 
 SUPPORTED_OAUTH_PROVIDERS = ("google", "apple")
-PARTICIPANT_STATUS_PENDING = "pending_member_link"
+PARTICIPANT_STATUS_NEEDS_ONBOARDING = "needs_onboarding"
+PARTICIPANT_STATUS_PENDING_APPROVAL = "pending_approval"
+PARTICIPANT_STATUS_REJECTED = "rejected"
+PARTICIPANT_STATUS_INACTIVE = "inactive"
+PARTICIPANT_STATUS_UNAVAILABLE = "member_unavailable"
 PARTICIPANT_STATUS_READY = "ready"
 PARTICIPANT_STATUS_NOT_PARTICIPANT = "not_participant"
 OAUTH_PENDING_MAX_AGE_SECONDS = 10 * 60
@@ -246,11 +250,20 @@ def participant_link_status(
 
     member_id = str(profile.get("member_id") or "")
     if not member_id:
-        return PARTICIPANT_STATUS_PENDING
+        return PARTICIPANT_STATUS_NEEDS_ONBOARDING
     if (
         member is None
         or str(member.get("id") or "") != member_id
-        or not bool(member.get("active", False))
     ):
-        return PARTICIPANT_STATUS_PENDING
+        return PARTICIPANT_STATUS_UNAVAILABLE
+
+    approval_status = str(member.get("approval_status") or "")
+    if approval_status == "pending":
+        return PARTICIPANT_STATUS_PENDING_APPROVAL
+    if approval_status == "rejected":
+        return PARTICIPANT_STATUS_REJECTED
+    if approval_status != "approved":
+        return PARTICIPANT_STATUS_UNAVAILABLE
+    if not bool(member.get("active", False)):
+        return PARTICIPANT_STATUS_INACTIVE
     return PARTICIPANT_STATUS_READY

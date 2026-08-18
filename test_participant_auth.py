@@ -3,9 +3,13 @@
 import pytest
 
 from participant_auth import (
+    PARTICIPANT_STATUS_INACTIVE,
+    PARTICIPANT_STATUS_NEEDS_ONBOARDING,
     PARTICIPANT_STATUS_NOT_PARTICIPANT,
-    PARTICIPANT_STATUS_PENDING,
+    PARTICIPANT_STATUS_PENDING_APPROVAL,
     PARTICIPANT_STATUS_READY,
+    PARTICIPANT_STATUS_REJECTED,
+    PARTICIPANT_STATUS_UNAVAILABLE,
     OAuthPendingState,
     ParticipantAuthFlowError,
     normalize_email,
@@ -133,13 +137,13 @@ def test_email_and_otp_are_normalized_without_magic_link_input() -> None:
         normalize_otp_code("12345")
 
 
-def test_participant_without_member_is_pending_and_never_planner() -> None:
-    pending_profile = {
+def test_participant_link_status_distinguishes_onboarding_and_approval() -> None:
+    new_profile = {
         "id": "user-a",
         "role": "participant",
         "member_id": None,
     }
-    assert participant_link_status(pending_profile) == PARTICIPANT_STATUS_PENDING
+    assert participant_link_status(new_profile) == PARTICIPANT_STATUS_NEEDS_ONBOARDING
     assert participant_link_status({"role": "planner"}) == (
         PARTICIPANT_STATUS_NOT_PARTICIPANT
     )
@@ -153,9 +157,22 @@ def test_participant_without_member_is_pending_and_never_planner() -> None:
     }
     assert participant_link_status(
         linked_profile,
-        {"id": "member-a", "active": True},
+        {"id": "member-a", "approval_status": "approved", "active": True},
     ) == PARTICIPANT_STATUS_READY
     assert participant_link_status(
         linked_profile,
-        {"id": "member-a", "active": False},
-    ) == PARTICIPANT_STATUS_PENDING
+        {"id": "member-a", "approval_status": "approved", "active": False},
+    ) == PARTICIPANT_STATUS_INACTIVE
+    assert participant_link_status(
+        linked_profile,
+        {"id": "member-a", "approval_status": "pending", "active": True},
+    ) == PARTICIPANT_STATUS_PENDING_APPROVAL
+    assert participant_link_status(
+        linked_profile,
+        {"id": "member-a", "approval_status": "rejected", "active": True},
+    ) == PARTICIPANT_STATUS_REJECTED
+    assert participant_link_status(linked_profile, None) == PARTICIPANT_STATUS_UNAVAILABLE
+    assert participant_link_status(
+        linked_profile,
+        {"id": "member-b", "approval_status": "approved", "active": True},
+    ) == PARTICIPANT_STATUS_UNAVAILABLE
