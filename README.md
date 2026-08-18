@@ -58,7 +58,10 @@ Een beheerder kan daarnaast:
 
 Streamlit Community Cloud garandeert niet dat lokaal opgeslagen bestanden behouden blijven. Daarom staan accounts, spelerslijsten en schema's in een externe PostgreSQL-database van Supabase.
 
-De Supabase secret/service key staat uitsluitend in Streamlit Secrets en nooit in GitHub. Alle tabeltoegang loopt server-side via de Streamlit-app.
+De Supabase secret/service key staat uitsluitend in Streamlit Secrets en nooit in
+GitHub. Bevoorrechte planner-/adminbewerkingen lopen via een afzonderlijke server-side
+beheerclient. User-scoped functionaliteit gebruikt de publishable key en het actuele
+Supabase access-token, zodat Row Level Security wordt toegepast.
 
 ## 1. Supabase-database voorbereiden
 
@@ -144,6 +147,9 @@ Plaats daar:
 url = "https://JOUW-PROJECT.supabase.co"
 publishable_key = "sb_publishable_..."
 secret_key = "sb_secret_..."
+
+[auth]
+cookie_password = "minimaal-32-willekeurige-tekens-los-van-supabase"
 ```
 
 Voor oudere Supabase-projecten zijn ook deze namen ondersteund:
@@ -154,6 +160,10 @@ url = "https://JOUW-PROJECT.supabase.co"
 anon_key = "eyJ..."
 service_role_key = "eyJ..."
 ```
+
+De `[auth]`-sectie met `cookie_password` is ook bij oudere Supabase-sleutels verplicht.
+Gebruik minimaal 32 willekeurige tekens en hergebruik hiervoor nooit de Supabase
+secret/service key. De waarde versleutelt de lokale refresh-token-cookie.
 
 Sla de Secrets op en reboot de Streamlit-app.
 

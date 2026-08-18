@@ -16,13 +16,26 @@ import pandas as pd
 import streamlit as st
 from streamlit_cookies_manager import EncryptedCookieManager
 
+from authorization import (
+    AuthorizationError,
+    PUBLIC_PAGE,
+    default_page_for_role,
+    navigation_pages_for_role,
+    require_admin_role,
+    require_planner_role,
+    signup_context_from_query_params,
+)
 from database import (
+    AdminSupabaseStore,
+    AuthCookieConfig,
     AuthenticatedUser,
     AuthenticationError,
     ConfigurationError,
     PersistentAuthSession,
+    PublicSupabaseConfig,
+    SupabaseAuthService,
     SupabaseConfig,
-    SupabaseStore,
+    auth_cookie_config_from_secrets,
     config_from_secrets,
 )
 from planner import (
@@ -32,6 +45,8 @@ from planner import (
     player_statistics,
     schedule_rows,
 )
+from public_schedule_repository import PublicScheduleRepository
+from registration_repository import UserScopedRegistrationRepository
 
 
 LOGGER = logging.getLogger(__name__)
@@ -1478,8 +1493,29 @@ def _render_public_schedule_fragment(
 
 
 @st.cache_resource(show_spinner=False)
-def _get_store(config: SupabaseConfig) -> SupabaseStore:
-    return SupabaseStore(config)
+def _get_admin_store(config: SupabaseConfig) -> AdminSupabaseStore:
+    """Alleen deze stateless beheerclient mag globaal worden gecachet."""
+    return AdminSupabaseStore(config)
+
+
+@st.cache_resource(show_spinner=False)
+def _get_public_schedule_repository(
+    config: PublicSupabaseConfig,
+) -> PublicScheduleRepository:
+    """Deze stateless, anonieme client bevat uitsluitend de publishable key."""
+    return PublicScheduleRepository(config.url, config.public_key)
+
+
+def _get_user_registration_repository(
+    config: SupabaseConfig,
+    session: PersistentAuthSession,
+) -> UserScopedRegistrationRepository:
+    """Maak bewust per aanroep een user-scoped client; nooit globaal cachen."""
+    return UserScopedRegistrationRepository(
+        config.url,
+        config.public_key,
+        session,
+    )
 
 
 def _generate_schedule_once(
@@ -2037,21 +2073,13 @@ def _diagnostics_for_storage(diagnostics: Mapping[str, object]) -> dict[str, obj
     return result
 
 
-def _cookie_password(config: SupabaseConfig) -> str:
-    """Gebruik een aparte cookie-secret indien ingesteld, anders de server-secret."""
-    try:
-        auth_section = st.secrets.get("auth", {})
-        configured = str(auth_section.get("cookie_password", "")).strip()
-    except Exception:
-        configured = ""
-    return configured or config.secret_key
-
-
-def _get_cookie_manager(config: SupabaseConfig) -> EncryptedCookieManager:
+def _get_cookie_manager(
+    cookie_config: AuthCookieConfig,
+) -> EncryptedCookieManager:
     """Initialiseer de versleutelde browsercookie voor dit specifieke apparaat."""
     return EncryptedCookieManager(
         prefix=AUTH_COOKIE_PREFIX,
-        password=_cookie_password(config),
+        password=cookie_config.password,
     )
 
 
@@ -2123,36 +2151,42 @@ def _save_preferred_player(
 
 
 def _restore_persistent_auth(
-    store: SupabaseStore,
+    auth_service: SupabaseAuthService,
     cookies: EncryptedCookieManager,
 ) -> None:
-    """Herstel bij een nieuwe Streamlit/WebSocket-sessie de ingelogde gebruiker."""
-    if _current_user() is not None:
-        return
-    if st.session_state.get("persistent_auth_checked"):
-        return
+    """Herstel of roteer de sessie voordat een user-scoped client wordt gemaakt."""
+    current_session = _current_auth_session()
+    persisted = bool(st.session_state.get("auth_persisted", False))
 
-    st.session_state["persistent_auth_checked"] = True
+    if current_session is not None:
+        if not current_session.needs_refresh():
+            return
+        refresh_token = current_session.refresh_token
+    else:
+        if st.session_state.get("persistent_auth_checked"):
+            return
+        st.session_state["persistent_auth_checked"] = True
+        try:
+            refresh_token = str(cookies.get(AUTH_COOKIE_NAME) or "").strip()
+        except Exception:
+            LOGGER.exception("De persistente login-cookie kon niet worden gelezen.")
+            return
+        if not refresh_token:
+            return
+        persisted = True
+
     try:
-        refresh_token = str(cookies.get(AUTH_COOKIE_NAME) or "").strip()
-    except Exception:
-        LOGGER.exception("De persistente login-cookie kon niet worden gelezen.")
-        return
-
-    if not refresh_token:
-        return
-
-    try:
-        session = store.restore_session(refresh_token)
-        st.session_state["auth_user"] = session.user
-        st.session_state["navigation_page"] = "Planner"
+        session = auth_service.restore_session(refresh_token)
+        _set_auth_session(session, persisted=persisted)
+        st.session_state["navigation_page"] = _post_login_page(session.user)
         st.session_state["auth_restored"] = True
 
         # Supabase roteert refresh-tokens. Bewaar daarom direct de nieuwste token.
-        if session.refresh_token != refresh_token:
+        if persisted and session.refresh_token != refresh_token:
             _save_persistent_cookie(cookies, session)
     except AuthenticationError:
         _remove_persistent_cookie(cookies)
+        _clear_auth_session_state()
     except Exception:
         LOGGER.exception("Automatisch sessieherstel is mislukt.")
 
@@ -2161,6 +2195,8 @@ def _clear_auth_session_state() -> None:
     """Verwijder alleen login-gerelateerde state en behoud CookieManager-internals."""
     for key in (
         "auth_user",
+        "auth_session",
+        "auth_persisted",
         "auth_restored",
         "login_success",
         "login_error",
@@ -2168,28 +2204,69 @@ def _clear_auth_session_state() -> None:
         "last_saved_schedule_id",
     ):
         st.session_state.pop(key, None)
-    st.session_state["navigation_page"] = "Openbaar schema"
+    st.session_state["navigation_page"] = PUBLIC_PAGE
+
+
+def _capture_signup_return_context() -> None:
+    """Bewaar een geldige signup-route zonder queryparameters te herschrijven."""
+    context = signup_context_from_query_params(st.query_params)
+    if context is not None:
+        st.session_state["signup_return_context"] = context
+
+
+def _post_login_page(user: AuthenticatedUser) -> str:
+    if st.session_state.get("signup_return_context") is not None:
+        # B2 kan hier de echte signup-pagina kiezen; B1 bewaart de context veilig.
+        return PUBLIC_PAGE
+    return default_page_for_role(user.role)
+
+
+def _set_auth_session(
+    session: PersistentAuthSession,
+    *,
+    persisted: bool,
+) -> None:
+    st.session_state["auth_session"] = session
+    st.session_state["auth_user"] = session.user
+    st.session_state["auth_persisted"] = bool(persisted)
+
+
+def _current_auth_session() -> PersistentAuthSession | None:
+    session = st.session_state.get("auth_session")
+    return session if isinstance(session, PersistentAuthSession) else None
 
 
 def _current_user() -> AuthenticatedUser | None:
+    session = _current_auth_session()
+    if session is not None:
+        return session.user
     user = st.session_state.get("auth_user")
     return user if isinstance(user, AuthenticatedUser) else None
 
 
-def _render_login(store: SupabaseStore, cookies: EncryptedCookieManager) -> None:
+def _render_login(
+    auth_service: SupabaseAuthService,
+    cookies: EncryptedCookieManager,
+) -> None:
     user = _current_user()
     with st.sidebar:
         if user:
             st.header("Account")
             st.write(f"Ingelogd als **{user.display_name}**")
-            st.caption("Beheerder" if user.is_admin else "Planner")
+            role_label = {
+                "admin": "Beheerder",
+                "planner": "Planner",
+                "participant": "Deelnemer",
+            }.get(user.role, "Onbekende rol")
+            st.caption(role_label)
             if st.button("Uitloggen", width="stretch"):
                 try:
-                    refresh_token = str(
-                        cookies.get(AUTH_COOKIE_NAME) or ""
-                    ).strip()
+                    current_session = _current_auth_session()
+                    refresh_token = (
+                        current_session.refresh_token if current_session else ""
+                    )
                     if refresh_token:
-                        store.sign_out_session(refresh_token)
+                        auth_service.sign_out_session(refresh_token)
                 except Exception:
                     # Lokaal uitloggen moet altijd lukken, ook bij een verlopen
                     # of tijdelijk onbereikbare Supabase-sessie.
@@ -2204,7 +2281,7 @@ def _render_login(store: SupabaseStore, cookies: EncryptedCookieManager) -> None
         # inlogvelden staan daarbinnen nog achter een compacte uitklapper.
         login_error = st.session_state.pop("login_error", None)
         with st.expander(
-            "Inloggen als planner",
+            "Inloggen",
             expanded=bool(login_error),
             icon="🔐",
         ):
@@ -2222,8 +2299,8 @@ def _render_login(store: SupabaseStore, cookies: EncryptedCookieManager) -> None
 
             if submitted:
                 try:
-                    auth_session = store.sign_in_with_session(email, password)
-                    st.session_state["auth_user"] = auth_session.user
+                    auth_session = auth_service.sign_in_with_session(email, password)
+                    _set_auth_session(auth_session, persisted=remember_login)
                     st.session_state.pop("planner_result", None)
 
                     if remember_login:
@@ -2231,8 +2308,9 @@ def _render_login(store: SupabaseStore, cookies: EncryptedCookieManager) -> None
                     else:
                         _remove_persistent_cookie(cookies)
 
-                    # Na een succesvolle login direct naar de planner navigeren.
-                    st.session_state["navigation_page"] = "Planner"
+                    st.session_state["navigation_page"] = _post_login_page(
+                        auth_session.user
+                    )
                     st.session_state["login_success"] = True
                     st.rerun()
                 except AuthenticationError as exc:
@@ -2273,12 +2351,12 @@ def _format_local_datetime(
 
 
 def _render_public_page(
-    store: SupabaseStore,
+    repository: PublicScheduleRepository,
     cookies: EncryptedCookieManager,
 ) -> None:
     st.markdown(_public_brand_header_html(), unsafe_allow_html=True)
     try:
-        schedule = store.latest_public_schedule()
+        schedule = repository.latest_published_schedule()
     except Exception:
         st.error("Het openbare schema kon niet worden geladen.")
         return
@@ -2347,7 +2425,7 @@ def _render_public_page(
         st.caption(f"Gepubliceerd door {creator or 'beheerder'} · {created_at}")
 
 
-def _load_club_draft(store: SupabaseStore) -> dict[str, Any]:
+def _load_club_draft(store: AdminSupabaseStore) -> dict[str, Any]:
     cache_key = "club_draft"
     if cache_key not in st.session_state:
         try:
@@ -2398,7 +2476,16 @@ def _draft_payload(
     }
 
 
-def _render_private_result(store: SupabaseStore, user: AuthenticatedUser) -> None:
+def _render_private_result(
+    store: AdminSupabaseStore,
+    user: AuthenticatedUser,
+) -> None:
+    try:
+        require_planner_role(user.role)
+    except AuthorizationError as exc:
+        st.error(str(exc))
+        return
+
     result = st.session_state.get("planner_result")
     if not isinstance(result, dict) or result.get("owner_id") != user.id:
         return
@@ -2516,7 +2603,16 @@ def _schedule_fingerprint(rows: object) -> tuple[tuple[str, ...], ...]:
         if isinstance(row, dict)
     )
 
-def _render_planner_page(store: SupabaseStore, user: AuthenticatedUser) -> None:
+def _render_planner_page(
+    store: AdminSupabaseStore,
+    user: AuthenticatedUser,
+) -> None:
+    try:
+        require_planner_role(user.role)
+    except AuthorizationError as exc:
+        st.error(str(exc))
+        return
+
     st.header("Nieuw schema maken")
     st.write(
         "De invoer is gedeeld met alle planners. De laatst opgeslagen spelerslijst en "
@@ -3139,7 +3235,16 @@ def _saved_schedule_label(item: Mapping[str, Any]) -> str:
     )
 
 
-def _render_saved_page(store: SupabaseStore, user: AuthenticatedUser) -> None:
+def _render_saved_page(
+    store: AdminSupabaseStore,
+    user: AuthenticatedUser,
+) -> None:
+    try:
+        require_planner_role(user.role)
+    except AuthorizationError as exc:
+        st.error(str(exc))
+        return
+
     st.header("Opgeslagen schema's")
     st.caption(
         "Alle ingelogde planners kunnen alle clubschema's bekijken. Alleen de maker "
@@ -3243,9 +3348,14 @@ def _render_saved_page(store: SupabaseStore, user: AuthenticatedUser) -> None:
             "openbare publicatie aanpassen."
         )
 
-def _render_user_management(store: SupabaseStore, user: AuthenticatedUser) -> None:
-    if not user.is_admin:
-        st.error("Alleen beheerders hebben toegang tot gebruikersbeheer.")
+def _render_user_management(
+    store: AdminSupabaseStore,
+    user: AuthenticatedUser,
+) -> None:
+    try:
+        require_admin_role(user.role)
+    except AuthorizationError as exc:
+        st.error(str(exc))
         return
 
     st.header("Gebruikersbeheer")
@@ -3336,22 +3446,25 @@ def main() -> None:
 
     try:
         config = config_from_secrets(st.secrets)
-        store = _get_store(config)
+        cookie_config = auth_cookie_config_from_secrets(st.secrets)
+        public_schedule_repository = _get_public_schedule_repository(config.public)
+        auth_service = SupabaseAuthService(config.public)
     except ConfigurationError as exc:
         st.error(str(exc))
         st.code(
-            """[supabase]\nurl = \"https://JOUW-PROJECT.supabase.co\"\npublishable_key = \"sb_publishable_...\"\nsecret_key = \"sb_secret_...\"""",
+            """[supabase]\nurl = \"https://JOUW-PROJECT.supabase.co\"\npublishable_key = \"sb_publishable_...\"\nsecret_key = \"sb_secret_...\"\n\n[auth]\ncookie_password = \"MINIMAAL-32-WILLEKEURIGE-TEKENS\"""",
             language="toml",
         )
         st.stop()
 
-    cookies = _get_cookie_manager(config)
+    _capture_signup_return_context()
+    cookies = _get_cookie_manager(cookie_config)
     if not cookies.ready():
         # De cookiecomponent levert zijn waarde in een korte vervolgrun.
         st.stop()
 
-    _restore_persistent_auth(store, cookies)
-    _render_login(store, cookies)
+    _restore_persistent_auth(auth_service, cookies)
+    _render_login(auth_service, cookies)
     user = _current_user()
 
     if user and st.session_state.pop("login_success", False):
@@ -3361,25 +3474,25 @@ def main() -> None:
 
     with st.sidebar:
         if user:
-            options = ["Openbaar schema", "Planner", "Opgeslagen schema's"]
-            if user.is_admin:
-                options.append("Gebruikersbeheer")
+            options = list(navigation_pages_for_role(user.role))
             current_page = st.session_state.get("navigation_page")
             if current_page not in options:
-                st.session_state["navigation_page"] = "Openbaar schema"
+                st.session_state["navigation_page"] = PUBLIC_PAGE
             page = st.radio("Navigatie", options, key="navigation_page")
         else:
-            page = "Openbaar schema"
+            page = PUBLIC_PAGE
             st.info("Bezoekers zien alleen deelnemers en het gepubliceerde schema.")
 
-    if page == "Openbaar schema":
-        _render_public_page(store, cookies)
-    elif page == "Planner" and user:
-        _render_planner_page(store, user)
-    elif page == "Opgeslagen schema's" and user:
-        _render_saved_page(store, user)
-    elif page == "Gebruikersbeheer" and user:
-        _render_user_management(store, user)
+    if page == PUBLIC_PAGE:
+        _render_public_page(public_schedule_repository, cookies)
+    elif user and user.can_plan:
+        store = _get_admin_store(config)
+        if page == "Planner":
+            _render_planner_page(store, user)
+        elif page == "Opgeslagen schema's":
+            _render_saved_page(store, user)
+        elif page == "Gebruikersbeheer":
+            _render_user_management(store, user)
 
 
 

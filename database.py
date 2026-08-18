@@ -1,15 +1,18 @@
-"""Supabase-authenticatie en persistente opslag voor de TOS Padelplanner.
+"""Gescheiden Supabase-authenticatie en server-side beheeropslag.
 
-Alle databasebewerkingen lopen op de Streamlit-server via een Supabase secret/service
-key. De browser krijgt deze sleutel nooit te zien.
+De secret/service key blijft beperkt tot :class:`AdminSupabaseStore`. Auth-sessies
+gebruiken een publishable key; user-scoped RLS-verzoeken staan in een aparte repository.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any, Mapping
+from dataclasses import dataclass, field
+from time import time
+from typing import Any, Callable, Mapping
 
 from supabase import Client, create_client
+
+from authorization import can_access_admin, can_access_planner
 
 
 class ConfigurationError(RuntimeError):
@@ -26,6 +29,21 @@ class SupabaseConfig:
     public_key: str
     secret_key: str
 
+    @property
+    def public(self) -> "PublicSupabaseConfig":
+        return PublicSupabaseConfig(url=self.url, public_key=self.public_key)
+
+
+@dataclass(frozen=True)
+class PublicSupabaseConfig:
+    url: str
+    public_key: str
+
+
+@dataclass(frozen=True)
+class AuthCookieConfig:
+    password: str = field(repr=False)
+
 
 @dataclass(frozen=True)
 class AuthenticatedUser:
@@ -36,15 +54,32 @@ class AuthenticatedUser:
 
     @property
     def is_admin(self) -> bool:
-        return self.role == "admin"
+        return can_access_admin(self.role)
+
+    @property
+    def can_plan(self) -> bool:
+        return can_access_planner(self.role)
 
 
 @dataclass(frozen=True)
 class PersistentAuthSession:
-    """Applicatiegebruiker plus de geroteerde Supabase refresh-token."""
+    """Applicatiegebruiker plus de actuele, geroteerde Supabase-tokens."""
 
     user: AuthenticatedUser
-    refresh_token: str
+    access_token: str = field(repr=False)
+    refresh_token: str = field(repr=False)
+    expires_at: int | None = None
+
+    def needs_refresh(
+        self,
+        *,
+        now: float | None = None,
+        leeway_seconds: int = 60,
+    ) -> bool:
+        if self.expires_at is None:
+            return True
+        current_time = time() if now is None else now
+        return self.expires_at <= current_time + leeway_seconds
 
 
 def config_from_secrets(secrets: Mapping[str, Any]) -> SupabaseConfig:
@@ -87,6 +122,25 @@ def config_from_secrets(secrets: Mapping[str, Any]) -> SupabaseConfig:
     return SupabaseConfig(url=url, public_key=public_key, secret_key=secret_key)
 
 
+def auth_cookie_config_from_secrets(
+    secrets: Mapping[str, Any],
+) -> AuthCookieConfig:
+    """Lees de afzonderlijke verplichte encryptiesleutel voor login-cookies."""
+    try:
+        section = secrets["auth"]
+    except (KeyError, TypeError) as exc:
+        raise ConfigurationError(
+            "Voeg een [auth]-sectie met cookie_password toe aan Streamlit Secrets."
+        ) from exc
+
+    password = str(section.get("cookie_password") or "").strip()
+    if len(password) < 32:
+        raise ConfigurationError(
+            "auth.cookie_password ontbreekt of is korter dan 32 tekens."
+        )
+    return AuthCookieConfig(password=password)
+
+
 def _response_data(response: Any) -> list[dict[str, Any]]:
     data = getattr(response, "data", None)
     if not data:
@@ -98,101 +152,26 @@ def _response_data(response: Any) -> list[dict[str, Any]]:
     return []
 
 
-class SupabaseStore:
-    """Server-side repository voor accounts, conceptinvoer en schema's."""
+def _session_expiry(auth_session: Any) -> int | None:
+    raw_expiry = getattr(auth_session, "expires_at", None)
+    if raw_expiry is None:
+        return None
+    try:
+        return int(raw_expiry)
+    except (TypeError, ValueError):
+        return None
+
+
+class AdminSupabaseStore:
+    """Expliciet bevoorrechte repository voor planner- en adminfuncties."""
 
     def __init__(self, config: SupabaseConfig) -> None:
         self.config = config
         self.admin: Client = create_client(config.url, config.secret_key)
 
     # ------------------------------------------------------------------
-    # Authenticatie en profielen
+    # Bevoorrechte profielen en accounts
     # ------------------------------------------------------------------
-    def _persistent_session_from_response(
-        self,
-        response: Any,
-        *,
-        fallback_email: str = "",
-    ) -> PersistentAuthSession:
-        """Valideer een Supabase Auth-response en laad het applicatieprofiel."""
-        auth_user = getattr(response, "user", None)
-        auth_session = getattr(response, "session", None)
-
-        user_id = str(getattr(auth_user, "id", ""))
-        user_email = str(
-            getattr(auth_user, "email", fallback_email) or fallback_email
-        ).strip().lower()
-        refresh_token = str(getattr(auth_session, "refresh_token", "") or "")
-
-        if not user_id or not refresh_token:
-            raise AuthenticationError("De gebruikerssessie kon niet worden geladen.")
-
-        profile = self.get_profile(user_id)
-        if not profile or not bool(profile.get("active", False)):
-            raise AuthenticationError("Dit account is niet actief.")
-
-        return PersistentAuthSession(
-            user=AuthenticatedUser(
-                id=user_id,
-                email=str(profile.get("email") or user_email),
-                display_name=str(profile.get("display_name") or user_email),
-                role=str(profile.get("role") or "planner"),
-            ),
-            refresh_token=refresh_token,
-        )
-
-    def sign_in_with_session(
-        self,
-        email: str,
-        password: str,
-    ) -> PersistentAuthSession:
-        """Log in en geef ook de refresh-token voor sessieherstel terug."""
-        normalized_email = email.strip().lower()
-        auth_client = create_client(self.config.url, self.config.public_key)
-        try:
-            response = auth_client.auth.sign_in_with_password(
-                {"email": normalized_email, "password": password}
-            )
-        except Exception as exc:
-            raise AuthenticationError("E-mailadres of wachtwoord is onjuist.") from exc
-
-        return self._persistent_session_from_response(
-            response,
-            fallback_email=normalized_email,
-        )
-
-    def sign_in(self, email: str, password: str) -> AuthenticatedUser:
-        """Achterwaarts compatibele login zonder sessietoken in het resultaat."""
-        return self.sign_in_with_session(email, password).user
-
-    def restore_session(self, refresh_token: str) -> PersistentAuthSession:
-        """Herstel en roteer een bestaande Supabase-sessie."""
-        token = str(refresh_token or "").strip()
-        if not token:
-            raise AuthenticationError("De opgeslagen sessie ontbreekt.")
-
-        auth_client = create_client(self.config.url, self.config.public_key)
-        try:
-            response = auth_client.auth.refresh_session(token)
-        except Exception as exc:
-            raise AuthenticationError(
-                "De opgeslagen sessie is verlopen of ongeldig."
-            ) from exc
-
-        return self._persistent_session_from_response(response)
-
-    def sign_out_session(self, refresh_token: str) -> None:
-        """Beëindig alleen de huidige Supabase-sessie, niet andere apparaten."""
-        token = str(refresh_token or "").strip()
-        if not token:
-            return
-
-        auth_client = create_client(self.config.url, self.config.public_key)
-        response = auth_client.auth.refresh_session(token)
-        # Supabase gebruikt standaard 'global'; expliciet local voorkomt dat
-        # uitloggen op de telefoon ook de desktopsessie beëindigt.
-        auth_client.auth.sign_out({"scope": "local"})
-
     def get_profile(self, user_id: str) -> dict[str, Any] | None:
         response = (
             self.admin.table("profiles")
@@ -351,22 +330,6 @@ class SupabaseStore:
             raise RuntimeError("Het schema kon niet worden opgeslagen.")
         return rows[0]
 
-    def latest_public_schedule(self) -> dict[str, Any] | None:
-        response = (
-            self.admin.table("schedules")
-            .select(
-                "id,title,event_date,created_by_name,start_time,end_time,match_minutes,"
-                "courts,participants_public,schedule_public,diagnostics,is_published,created_at"
-            )
-            .eq("is_published", True)
-            .order("event_date", desc=True)
-            .order("created_at", desc=True)
-            .limit(1)
-            .execute()
-        )
-        rows = _response_data(response)
-        return rows[0] if rows else None
-
     def list_schedule_summaries(
         self,
         user_id: str,
@@ -417,3 +380,120 @@ class SupabaseStore:
         response = query.execute()
         if not _response_data(response):
             raise PermissionError("Je mag dit schema niet aanpassen.")
+
+
+class SupabaseAuthService:
+    """Stateless Auth-service die uitsluitend de publishable key gebruikt."""
+
+    def __init__(
+        self,
+        config: PublicSupabaseConfig,
+        *,
+        client_factory: Callable[[str, str], Client] = create_client,
+    ) -> None:
+        self.config = config
+        self._client_factory = client_factory
+
+    def _public_client(self) -> Client:
+        return self._client_factory(self.config.url, self.config.public_key)
+
+    def _persistent_session_from_response(
+        self,
+        response: Any,
+        auth_client: Client,
+        *,
+        fallback_email: str = "",
+    ) -> PersistentAuthSession:
+        """Valideer een Auth-response en laad het applicatieprofiel."""
+        auth_user = getattr(response, "user", None)
+        auth_session = getattr(response, "session", None)
+
+        user_id = str(getattr(auth_user, "id", "") or "")
+        user_email = str(
+            getattr(auth_user, "email", fallback_email) or fallback_email
+        ).strip().lower()
+        access_token = str(getattr(auth_session, "access_token", "") or "")
+        refresh_token = str(getattr(auth_session, "refresh_token", "") or "")
+
+        if not user_id or not access_token or not refresh_token:
+            raise AuthenticationError("De gebruikerssessie kon niet worden geladen.")
+
+        # Bind ook profielresolutie aan het JWT. De profiles_select_own-policy
+        # bepaalt hierdoor dat uitsluitend het eigen profiel zichtbaar is.
+        auth_client.postgrest.auth(access_token)
+        profile_response = (
+            auth_client.table("profiles")
+            .select("id,display_name,role,active,member_id")
+            .eq("id", user_id)
+            .limit(1)
+            .execute()
+        )
+        profile_rows = _response_data(profile_response)
+        profile = profile_rows[0] if profile_rows else None
+        if not profile or not bool(profile.get("active", False)):
+            raise AuthenticationError("Dit account is niet actief.")
+
+        role = str(profile.get("role") or "participant")
+        if role not in {"participant", "planner", "admin"}:
+            raise AuthenticationError("Dit account heeft een ongeldige applicatierol.")
+
+        return PersistentAuthSession(
+            user=AuthenticatedUser(
+                id=user_id,
+                email=user_email,
+                display_name=str(profile.get("display_name") or user_email),
+                role=role,
+            ),
+            access_token=access_token,
+            refresh_token=refresh_token,
+            expires_at=_session_expiry(auth_session),
+        )
+
+    def sign_in_with_session(
+        self,
+        email: str,
+        password: str,
+    ) -> PersistentAuthSession:
+        """Behoud de bestaande e-mail/wachtwoordlogin en retourneer beide tokens."""
+        normalized_email = email.strip().lower()
+        auth_client = self._public_client()
+        try:
+            response = auth_client.auth.sign_in_with_password(
+                {"email": normalized_email, "password": password}
+            )
+        except Exception as exc:
+            raise AuthenticationError("E-mailadres of wachtwoord is onjuist.") from exc
+
+        return self._persistent_session_from_response(
+            response,
+            auth_client,
+            fallback_email=normalized_email,
+        )
+
+    def sign_in(self, email: str, password: str) -> AuthenticatedUser:
+        return self.sign_in_with_session(email, password).user
+
+    def restore_session(self, refresh_token: str) -> PersistentAuthSession:
+        """Roteer het refresh-token en retourneer de actuele access-token."""
+        token = str(refresh_token or "").strip()
+        if not token:
+            raise AuthenticationError("De opgeslagen sessie ontbreekt.")
+
+        auth_client = self._public_client()
+        try:
+            response = auth_client.auth.refresh_session(token)
+        except Exception as exc:
+            raise AuthenticationError(
+                "De opgeslagen sessie is verlopen of ongeldig."
+            ) from exc
+        return self._persistent_session_from_response(response, auth_client)
+
+    def sign_out_session(self, refresh_token: str) -> None:
+        """Beëindig alleen de actuele Supabase-sessie op dit apparaat."""
+        token = str(refresh_token or "").strip()
+        if not token:
+            return
+
+        auth_client = self._public_client()
+        auth_client.auth.refresh_session(token)
+        auth_client.auth.sign_out({"scope": "local"})

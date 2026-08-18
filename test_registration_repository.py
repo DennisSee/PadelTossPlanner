@@ -1,0 +1,147 @@
+"""Tests voor geïsoleerde user-scoped Supabase/PostgREST-clients."""
+
+from types import SimpleNamespace
+from typing import Any
+
+from database import AuthenticatedUser, PersistentAuthSession
+from registration_repository import UserScopedRegistrationRepository
+
+
+class _Query:
+    def __init__(self, response_data: object) -> None:
+        self.response_data = response_data
+        self.calls: list[tuple[str, object]] = []
+
+    def select(self, columns: str) -> "_Query":
+        self.calls.append(("select", columns))
+        return self
+
+    def eq(self, column: str, value: object) -> "_Query":
+        self.calls.append((f"eq:{column}", value))
+        return self
+
+    def limit(self, value: int) -> "_Query":
+        self.calls.append(("limit", value))
+        return self
+
+    def execute(self) -> SimpleNamespace:
+        return SimpleNamespace(data=self.response_data)
+
+
+class _Postgrest:
+    def __init__(self) -> None:
+        self.access_token: str | None = None
+
+    def auth(self, token: str) -> None:
+        self.access_token = token
+
+
+class _UserClient:
+    def __init__(self, responses: dict[str, object] | None = None) -> None:
+        self.postgrest = _Postgrest()
+        self.responses = responses or {}
+        self.queries: dict[str, _Query] = {}
+
+    def table(self, table_name: str) -> _Query:
+        query = _Query(self.responses.get(table_name, []))
+        self.queries[table_name] = query
+        return query
+
+
+def _session(user_id: str, access_token: str) -> PersistentAuthSession:
+    return PersistentAuthSession(
+        user=AuthenticatedUser(
+            user_id,
+            f"{user_id}@example.test",
+            user_id,
+            "participant",
+        ),
+        access_token=access_token,
+        refresh_token=f"refresh-{user_id}",
+        expires_at=2_000_000_000,
+    )
+
+
+def test_repository_uses_publishable_key_and_user_access_token_only() -> None:
+    created: list[tuple[str, str, _UserClient]] = []
+
+    def factory(url: str, key: str) -> _UserClient:
+        client = _UserClient()
+        created.append((url, key, client))
+        return client
+
+    UserScopedRegistrationRepository(
+        "https://project.example.test",
+        "publishable-test-key",
+        _session("user-a", "access-a"),
+        client_factory=factory,  # type: ignore[arg-type]
+    )
+
+    assert created[0][:2] == (
+        "https://project.example.test",
+        "publishable-test-key",
+    )
+    assert created[0][2].postgrest.access_token == "access-a"
+
+
+def test_two_users_never_share_one_global_client_or_session() -> None:
+    clients: list[_UserClient] = []
+
+    def factory(_url: str, _key: str) -> _UserClient:
+        client = _UserClient()
+        clients.append(client)
+        return client
+
+    repo_a = UserScopedRegistrationRepository(
+        "https://project.example.test",
+        "publishable-test-key",
+        _session("user-a", "access-a"),
+        client_factory=factory,  # type: ignore[arg-type]
+    )
+    repo_b = UserScopedRegistrationRepository(
+        "https://project.example.test",
+        "publishable-test-key",
+        _session("user-b", "access-b"),
+        client_factory=factory,  # type: ignore[arg-type]
+    )
+
+    assert repo_a is not repo_b
+    assert clients[0] is not clients[1]
+    assert clients[0].postgrest.access_token == "access-a"
+    assert clients[1].postgrest.access_token == "access-b"
+
+
+def test_read_methods_filter_to_current_user_and_safe_public_fields() -> None:
+    user_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    member_id = "11111111-1111-4111-8111-111111111111"
+    event_id = "10000000-0000-4000-8000-000000000001"
+    client = _UserClient(
+        {
+            "profiles": [{"id": user_id, "member_id": member_id}],
+            "club_members": [{"id": member_id, "display_name": "Lid A"}],
+            "tos_events": [{"id": event_id, "slug": "vrijdag-tos"}],
+            "registrations": [{"event_id": event_id, "user_id": user_id}],
+        }
+    )
+    repository = UserScopedRegistrationRepository(
+        "https://project.example.test",
+        "publishable-test-key",
+        _session(user_id, "access-a"),
+        client_factory=lambda _url, _key: client,  # type: ignore[arg-type]
+    )
+
+    assert repository.get_own_profile() == {"id": user_id, "member_id": member_id}
+    assert repository.get_linked_club_member() == {
+        "id": member_id,
+        "display_name": "Lid A",
+    }
+    assert repository.get_open_event_by_slug("vrijdag-tos") == {
+        "id": event_id,
+        "slug": "vrijdag-tos",
+    }
+    assert repository.get_own_registration(event_id) == {
+        "event_id": event_id,
+        "user_id": user_id,
+    }
+    assert ("eq:user_id", user_id) in client.queries["registrations"].calls
+    assert ("eq:status", "open") in client.queries["tos_events"].calls
