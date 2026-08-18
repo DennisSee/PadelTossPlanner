@@ -77,6 +77,7 @@ from public_schedule_repository import PublicScheduleRepository
 from participant_auth import (
     OAuthPendingState,
     OAuthCookiePersistenceError,
+    EMAIL_OTP_MAX_INPUT_LENGTH,
     OAUTH_CALLBACK_MARKER,
     OAUTH_COOKIE_SYNC_MAX_RUNS,
     OTP_CODE_USER_ERROR,
@@ -2828,7 +2829,7 @@ def _render_participant_auth_options(
                 normalized_email = auth_service.request_email_otp(email)
                 st.session_state[PARTICIPANT_OTP_EMAIL_STATE] = normalized_email
                 st.session_state[PARTICIPANT_AUTH_NOTICE_STATE] = (
-                    "Als het adres geldig is, ontvang je een zescijferige code."
+                    "Als het adres geldig is, ontvang je een inlogcode."
                 )
             except AuthenticationError:
                 st.session_state[PARTICIPANT_AUTH_ERROR_STATE] = (
@@ -2837,12 +2838,12 @@ def _render_participant_auth_options(
             st.rerun()
         return
 
-    st.caption("Vul de zescijferige code uit de e-mail in.")
+    st.caption("Vul de cijfercode uit de e-mail in.")
     with st.form(f"participant_otp_verify_{context.event_slug}"):
         otp_code = st.text_input(
-            "Eenmalige code",
+            "Inlogcode",
             type="password",
-            max_chars=7,
+            max_chars=EMAIL_OTP_MAX_INPUT_LENGTH,
         )
         verified = st.form_submit_button("Code verifiëren", width="stretch")
 

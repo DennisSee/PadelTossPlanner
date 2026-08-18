@@ -43,6 +43,8 @@ def test_participant_login_shows_event_and_required_auth_choices() -> None:
     assert "Doorgaan met " in auth_source
     assert '"E-mailadres"' in auth_source
     assert "Stuur mij een inlogcode" in auth_source
+    assert "zescijfer" not in auth_source
+    assert "EMAIL_OTP_MAX_INPUT_LENGTH" in auth_source
     assert "tos-login-separator" in auth_source
     assert "T.C. Zuid TOS" in _function_source("_public_brand_header_html")
     assert "st-key-participant_oauth_google" in SOURCE

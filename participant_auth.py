@@ -23,6 +23,7 @@ PARTICIPANT_STATUS_NOT_PARTICIPANT = "not_participant"
 OAUTH_PENDING_MAX_AGE_SECONDS = 10 * 60
 OAUTH_CALLBACK_MARKER = "auth_callback"
 OAUTH_COOKIE_SYNC_MAX_RUNS = 2
+EMAIL_OTP_MAX_INPUT_LENGTH = 32
 OTP_CODE_USER_ERROR = (
     "De code klopt niet of is verlopen. Vraag eventueel een nieuwe code aan."
 )
@@ -162,9 +163,14 @@ def normalize_email(value: object) -> str:
 
 
 def normalize_otp_code(value: object) -> str:
-    code = re.sub(r"[\s-]", "", str(value or ""))
-    if not re.fullmatch(r"\d{6}", code):
-        raise ParticipantAuthFlowError("Vul de volledige zescijferige code in.")
+    """Beperk alleen het invoerformaat; Supabase bepaalt OTP-lengte/geldigheid."""
+    code = str(value or "").strip()
+    if (
+        not code
+        or len(code) > EMAIL_OTP_MAX_INPUT_LENGTH
+        or not re.fullmatch(r"[0-9]+", code)
+    ):
+        raise ParticipantAuthFlowError("Vul alleen de cijfercode uit de e-mail in.")
     return code
 
 

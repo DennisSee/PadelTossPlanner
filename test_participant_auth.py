@@ -250,13 +250,17 @@ def test_redirect_configuration_allows_https_and_local_loopback_only() -> None:
             )
 
 
-def test_email_and_otp_are_normalized_without_magic_link_input() -> None:
+def test_email_otp_accepts_numeric_codes_without_owning_supabase_length() -> None:
     assert normalize_email(" User@Example.Test ") == "user@example.test"
-    assert normalize_otp_code("123-456") == "123456"
+    assert normalize_otp_code("12345678") == "12345678"
+    assert normalize_otp_code("123456") == "123456"
+    assert normalize_otp_code("1234") == "1234"
     with pytest.raises(ParticipantAuthFlowError):
         normalize_email("ongeldig")
     with pytest.raises(ParticipantAuthFlowError):
-        normalize_otp_code("12345")
+        normalize_otp_code("1234-5678")
+    with pytest.raises(ParticipantAuthFlowError):
+        normalize_otp_code("code1234")
 
 
 def test_participant_link_status_distinguishes_onboarding_and_approval() -> None:

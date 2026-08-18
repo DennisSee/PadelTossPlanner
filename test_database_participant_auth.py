@@ -216,7 +216,7 @@ def test_email_otp_request_and_verification_use_publishable_clients() -> None:
     service = _service(factory)
 
     normalized_email = service.request_email_otp(" Participant@Example.Test ")
-    session = service.verify_email_otp(normalized_email, "123-456")
+    session = service.verify_email_otp(normalized_email, "12345678")
 
     assert normalized_email == "participant@example.test"
     assert factory.clients[0].auth.otp_credentials == {
@@ -225,7 +225,7 @@ def test_email_otp_request_and_verification_use_publishable_clients() -> None:
     }
     assert factory.clients[1].auth.verify_params == {
         "email": "participant@example.test",
-        "token": "123456",
+        "token": "12345678",
         "type": "email",
     }
     assert all(call[1] == "publishable-test-key" for call in factory.calls)
@@ -237,7 +237,7 @@ def test_wrong_otp_is_generic_and_never_leaks_the_code() -> None:
     factory = _ClientFactory()
     factory.fail_verify = True
     service = _service(factory)
-    sensitive_code = "654321"
+    sensitive_code = "87654321"
 
     with pytest.raises(AuthenticationError) as error:
         service.verify_email_otp("participant@example.test", sensitive_code)
