@@ -12,6 +12,11 @@ from authorization import is_valid_event_slug
 from database import PersistentAuthSession
 
 
+PUBLIC_SIGNUP_EVENT_COLUMNS = (
+    "id,slug,title,sport,starts_at,ends_at,signup_deadline,status"
+)
+
+
 def _first_row(response: Any) -> dict[str, Any] | None:
     data = getattr(response, "data", None)
     if isinstance(data, list) and data and isinstance(data[0], dict):
@@ -19,6 +24,36 @@ def _first_row(response: Any) -> dict[str, Any] | None:
     if isinstance(data, dict):
         return data
     return None
+
+
+class PublicSignupEventRepository:
+    """Lees uitsluitend open eventinformatie met de publishable key en RLS."""
+
+    def __init__(
+        self,
+        supabase_url: str,
+        publishable_key: str,
+        *,
+        client_factory: Callable[[str, str], Client] = create_client,
+    ) -> None:
+        if not supabase_url.strip() or not publishable_key.strip():
+            raise ValueError("Supabase URL en publishable key zijn verplicht.")
+        self._client = client_factory(supabase_url, publishable_key)
+
+    def get_open_event_by_slug(self, event_slug: str) -> dict[str, Any] | None:
+        slug = str(event_slug or "").strip()
+        if not is_valid_event_slug(slug):
+            raise ValueError("Ongeldige TOS-eventslug.")
+
+        response = (
+            self._client.table("tos_events")
+            .select(PUBLIC_SIGNUP_EVENT_COLUMNS)
+            .eq("slug", slug)
+            .eq("status", "open")
+            .limit(1)
+            .execute()
+        )
+        return _first_row(response)
 
 
 class UserScopedRegistrationRepository:
@@ -94,7 +129,7 @@ class UserScopedRegistrationRepository:
 
         response = (
             self._client.table("tos_events")
-            .select("id,slug,title,sport,starts_at,ends_at,signup_deadline,status")
+            .select(PUBLIC_SIGNUP_EVENT_COLUMNS)
             .eq("slug", slug)
             .eq("status", "open")
             .limit(1)

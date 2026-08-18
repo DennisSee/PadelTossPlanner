@@ -4,7 +4,11 @@ from types import SimpleNamespace
 from typing import Any
 
 from database import AuthenticatedUser, PersistentAuthSession
-from registration_repository import UserScopedRegistrationRepository
+from registration_repository import (
+    PUBLIC_SIGNUP_EVENT_COLUMNS,
+    PublicSignupEventRepository,
+    UserScopedRegistrationRepository,
+)
 
 
 class _Query:
@@ -95,6 +99,46 @@ def test_repository_uses_publishable_key_and_user_access_token_only() -> None:
         "publishable-test-key",
     )
     assert created[0][2].postgrest.access_token == "access-a"
+
+
+def test_public_signup_event_uses_publishable_key_rls_and_explicit_columns() -> None:
+    client = _UserClient(
+        {
+            "tos_events": [
+                {
+                    "id": "10000000-0000-4000-8000-000000000001",
+                    "slug": "vrijdag-tos",
+                    "title": "Padel TOS",
+                    "sport": "padel",
+                }
+            ]
+        }
+    )
+    created: list[tuple[str, str]] = []
+
+    def factory(url: str, key: str) -> _UserClient:
+        created.append((url, key))
+        return client
+
+    repository = PublicSignupEventRepository(
+        "https://project.example.test",
+        "publishable-test-key",
+        client_factory=factory,  # type: ignore[arg-type]
+    )
+
+    event = repository.get_open_event_by_slug("vrijdag-tos")
+
+    assert event is not None
+    assert event["slug"] == "vrijdag-tos"
+    assert created == [
+        ("https://project.example.test", "publishable-test-key")
+    ]
+    assert client.postgrest.access_token is None
+    calls = client.queries["tos_events"].calls
+    assert ("select", PUBLIC_SIGNUP_EVENT_COLUMNS) in calls
+    assert "*" not in PUBLIC_SIGNUP_EVENT_COLUMNS
+    assert ("eq:slug", "vrijdag-tos") in calls
+    assert ("eq:status", "open") in calls
 
 
 def test_two_users_never_share_one_global_client_or_session() -> None:

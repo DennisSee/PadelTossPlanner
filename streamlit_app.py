@@ -76,7 +76,10 @@ from planner_registration_import import (
 from public_schedule_repository import PublicScheduleRepository
 from participant_auth import (
     OAuthPendingState,
+    OAuthCookiePersistenceError,
     OAUTH_CALLBACK_MARKER,
+    OAUTH_COOKIE_SYNC_MAX_RUNS,
+    OTP_CODE_USER_ERROR,
     PARTICIPANT_STATUS_INACTIVE,
     PARTICIPANT_STATUS_NEEDS_ONBOARDING,
     PARTICIPANT_STATUS_NOT_PARTICIPANT,
@@ -85,9 +88,13 @@ from participant_auth import (
     PARTICIPANT_STATUS_UNAVAILABLE,
     ParticipantAuthFlowError,
     SUPPORTED_OAUTH_PROVIDERS,
+    confirmed_oauth_pending_cookie,
     oauth_callback_url,
     oauth_pending_cookie_name,
+    oauth_provider_label,
+    oauth_provider_unavailable_message,
     oauth_redirect_base_from_secrets,
+    oauth_storage_user_error,
     parse_oauth_callback,
     participant_link_status,
 )
@@ -103,7 +110,10 @@ from participant_registration import (
     registration_availability,
     registration_initial_values,
 )
-from registration_repository import UserScopedRegistrationRepository
+from registration_repository import (
+    PublicSignupEventRepository,
+    UserScopedRegistrationRepository,
+)
 
 
 LOGGER = logging.getLogger(__name__)
@@ -159,6 +169,8 @@ AUTH_COOKIE_NAME = "supabase_refresh_token"
 PARTICIPANT_OTP_EMAIL_STATE = "participant_otp_email"
 PARTICIPANT_AUTH_ERROR_STATE = "participant_auth_error"
 PARTICIPANT_AUTH_NOTICE_STATE = "participant_auth_notice"
+PARTICIPANT_OAUTH_PROVIDER_STATE = "participant_oauth_provider"
+PARTICIPANT_OAUTH_SYNC_RUNS_STATE = "participant_oauth_sync_runs"
 PREFERRED_PLAYER_COOKIE_NAME = "preferred_player_name"
 AUTH_COOKIE_PREFIX = "tc-zuid-tos/"
 
@@ -718,6 +730,83 @@ def _inject_responsive_styles() -> None:
         [data-testid="stPills"] button p {
             text-align: center !important;
             white-space: nowrap !important;
+        }
+
+        .tos-signup-event {
+            margin: 0.4rem 0 1.45rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--tos-border);
+        }
+
+        .tos-signup-event-title {
+            color: #17211f;
+            font-size: 1rem;
+            font-weight: 750;
+            line-height: 1.35;
+        }
+
+        .tos-signup-event-time {
+            margin-top: 0.22rem;
+            color: var(--tos-muted);
+            font-size: 0.94rem;
+            font-weight: 600;
+        }
+
+        .tos-login-separator {
+            display: flex;
+            align-items: center;
+            gap: 0.7rem;
+            margin: 1rem 0 0.75rem;
+            color: var(--tos-muted);
+            font-size: 0.82rem;
+        }
+
+        .tos-login-separator::before,
+        .tos-login-separator::after {
+            content: "";
+            height: 1px;
+            flex: 1;
+            background: var(--tos-border);
+        }
+
+        .st-key-participant_oauth_google button,
+        .st-key-participant_oauth_google a,
+        .st-key-participant_oauth_redirect_google a,
+        .st-key-participant_oauth_apple button,
+        .st-key-participant_oauth_apple a,
+        .st-key-participant_oauth_redirect_apple a {
+            position: relative;
+            min-height: 3rem;
+            justify-content: center;
+            font-weight: 700;
+        }
+
+        .st-key-participant_oauth_google button::before,
+        .st-key-participant_oauth_google a::before,
+        .st-key-participant_oauth_redirect_google a::before,
+        .st-key-participant_oauth_apple button::before,
+        .st-key-participant_oauth_apple a::before,
+        .st-key-participant_oauth_redirect_apple a::before {
+            content: "";
+            position: absolute;
+            left: 0.9rem;
+            width: 1.25rem;
+            height: 1.25rem;
+            background-repeat: no-repeat;
+            background-position: center;
+            background-size: contain;
+        }
+
+        .st-key-participant_oauth_google button::before,
+        .st-key-participant_oauth_google a::before,
+        .st-key-participant_oauth_redirect_google a::before {
+            background-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0iIzQyODVGNCIgZD0iTTIxLjYgMTIuMjNjMC0uNzEtLjA2LTEuNC0uMTgtMi4wN0gxMnYzLjkyaDUuMzhhNC42IDQuNiAwIDAgMS0yIDMuMDJ2Mi41NGgzLjI0YzEuOS0xLjc1IDIuOTgtNC4zMyAyLjk4LTcuNDFaIi8+PHBhdGggZmlsbD0iIzM0QTg1MyIgZD0iTTEyIDIyYzIuNyAwIDQuOTctLjkgNi42Mi0yLjM2bC0zLjI0LTIuNTRjLS45LjYtMi4wNS45Ni0zLjM4Ljk2LTIuNjEgMC00LjgyLTEuNzYtNS42MS00LjEzSDMuMDR2Mi42MkExMCAxMCAwIDAgMCAxMiAyMloiLz48cGF0aCBmaWxsPSIjRkJCQzA1IiBkPSJNNi4zOSAxMy45M0E2IDYgMCAwIDEgNi4wNyAxMmMwLS42Ny4xMS0xLjMyLjMyLTEuOTNWNy40NUgzLjA0QTEwIDEwIDAgMCAwIDIgMTJjMCAxLjYxLjM4IDMuMTQgMS4wNCA0LjU1bDMuMzUtMi42MloiLz48cGF0aCBmaWxsPSIjRUE0MzM1IiBkPSJNMTIgNS45NGMxLjQ3IDAgMi43OS41MSAzLjgzIDEuNWwyLjg3LTIuODhBOS42MiA5LjYyIDAgMCAwIDEyIDJhMTAgMTAgMCAwIDAtOC45NiA1LjQ1bDMuMzUgMi42MkM3LjE4IDcuNyA5LjM5IDUuOTQgMTIgNS45NFoiLz48L3N2Zz4=");
+        }
+
+        .st-key-participant_oauth_apple button::before,
+        .st-key-participant_oauth_apple a::before,
+        .st-key-participant_oauth_redirect_apple a::before {
+            background-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0iIzExMTgyNyIgZD0iTTE4LjcxIDEyLjA1Yy0uMDMtMy4wNSAyLjQ5LTQuNTMgMi42LTQuNmE1LjU5IDUuNTkgMCAwIDAtNC40LTIuMzhjLTEuODUtLjItMy42NSAxLjExLTQuNTkgMS4xMS0uOTYgMC0yLjQtMS4wOS0zLjk2LTEuMDZhNS44MyA1LjgzIDAgMCAwLTQuOTEgMi45OWMtMi4xMyAzLjY5LS41NCA5LjEyIDEuNSAxMi4xMSAxLjAyIDEuNDYgMi4yIDMuMDggMy43NiAzLjAyIDEuNTMtLjA2IDIuMS0uOTcgMy45NS0uOTcgMS44MiAwIDIuMzYuOTcgMy45Ni45MyAxLjY0LS4wMyAyLjY3LTEuNDcgMy42NS0yLjk0YTEyLjEgMTIuMSAwIDAgMCAxLjY3LTMuMzkgNS4yNyA1LjI3IDAgMCAxLTMuMjMtNC44MlpNMTUuNyAzLjExQTUuMzUgNS4zNSAwIDAgMCAxNi45MyAwYTUuNDUgNS40NSAwIDAgMC0zLjU0IDEuNTkgNS4wNyA1LjA3IDAgMCAwLTEuMjcgMi45NyA0LjUgNC41IDAgMCAwIDMuNTgtMS40NVoiLz48L3N2Zz4=");
         }
 
         @media (max-width: 700px) {
@@ -1566,6 +1655,14 @@ def _get_public_schedule_repository(
     return PublicScheduleRepository(config.url, config.public_key)
 
 
+@st.cache_resource(show_spinner=False)
+def _get_public_signup_event_repository(
+    config: PublicSupabaseConfig,
+) -> PublicSignupEventRepository:
+    """Open eventinformatie gebruikt alleen publishable key en database-RLS."""
+    return PublicSignupEventRepository(config.url, config.public_key)
+
+
 def _get_user_registration_repository(
     config: PublicSupabaseConfig,
     session: PersistentAuthSession,
@@ -2196,14 +2293,20 @@ def _get_cookie_manager(
     return EncryptedCookieManager(
         prefix=AUTH_COOKIE_PREFIX,
         password=cookie_config.password,
+        path="/",
     )
 
 
-def _remove_persistent_cookie(cookies: EncryptedCookieManager) -> None:
+def _remove_persistent_cookie(
+    cookies: EncryptedCookieManager,
+    *,
+    save: bool = True,
+) -> None:
     try:
         if AUTH_COOKIE_NAME in cookies:
             del cookies[AUTH_COOKIE_NAME]
-            cookies.save()
+            if save:
+                cookies.save()
     except Exception:
         LOGGER.warning("De persistente login-cookie kon niet worden verwijderd.")
 
@@ -2211,10 +2314,13 @@ def _remove_persistent_cookie(cookies: EncryptedCookieManager) -> None:
 def _save_persistent_cookie(
     cookies: EncryptedCookieManager,
     session: PersistentAuthSession,
+    *,
+    save: bool = True,
 ) -> None:
     try:
         cookies[AUTH_COOKIE_NAME] = session.refresh_token
-        cookies.save()
+        if save:
+            cookies.save()
     except Exception:
         raise AuthenticationError(
             "De login kon niet veilig op dit apparaat worden bewaard."
@@ -2237,24 +2343,33 @@ def _clear_oauth_pending_cookies(
         changed = False
         for current_provider in providers:
             cookie_name = oauth_pending_cookie_name(current_provider)
+            cookie_manager = getattr(cookies, "_cookie_manager", None)
+            queue = getattr(cookie_manager, "_queue", None)
+            if isinstance(queue, dict) and cookie_name in queue:
+                queue.pop(cookie_name, None)
+                changed = True
             if cookie_name in cookies:
                 del cookies[cookie_name]
                 changed = True
-        if changed:
+        cookie_manager = getattr(cookies, "_cookie_manager", None)
+        queue = getattr(cookie_manager, "_queue", None)
+        if changed or bool(queue):
             cookies.save()
     except Exception:
         LOGGER.warning("De lokale OAuth-aanvraag kon niet worden verwijderd.")
+    finally:
+        st.session_state.pop(PARTICIPANT_OAUTH_PROVIDER_STATE, None)
+        st.session_state.pop(PARTICIPANT_OAUTH_SYNC_RUNS_STATE, None)
 
 
-def _save_oauth_pending_cookie(
+def _queue_oauth_pending_cookie(
     cookies: EncryptedCookieManager,
     pending: OAuthPendingState,
 ) -> None:
     try:
         cookies[oauth_pending_cookie_name(pending.provider)] = pending.to_cookie_value()
-        cookies.save()
     except Exception:
-        raise ParticipantAuthFlowError(
+        raise OAuthCookiePersistenceError(
             "De OAuth-aanvraag kon niet veilig in deze browser worden opgeslagen."
         ) from None
 
@@ -2262,9 +2377,11 @@ def _save_oauth_pending_cookie(
 def _finish_participant_login(
     session: PersistentAuthSession,
     cookies: EncryptedCookieManager,
+    *,
+    save_cookie: bool = True,
 ) -> None:
     """Bewaar OAuth/OTP als dezelfde geroteerde, persistente B1-sessie."""
-    _save_persistent_cookie(cookies, session)
+    _save_persistent_cookie(cookies, session, save=save_cookie)
     _set_auth_session(session, persisted=True)
     st.session_state.pop(PARTICIPANT_OTP_EMAIL_STATE, None)
     st.session_state.pop("planner_result", None)
@@ -2279,10 +2396,12 @@ def _handle_oauth_callback(
     """Verwerk één gevalideerde callback en verwijder de code direct uit de URL."""
     try:
         callback = parse_oauth_callback(st.query_params)
-    except ParticipantAuthFlowError as exc:
+    except ParticipantAuthFlowError:
         _clear_oauth_pending_cookies(cookies)
         _replace_query_params({})
-        st.session_state[PARTICIPANT_AUTH_ERROR_STATE] = str(exc)
+        st.session_state[PARTICIPANT_AUTH_ERROR_STATE] = (
+            "Inloggen is niet gelukt. Probeer het opnieuw of gebruik e-mail."
+        )
         st.rerun()
         return
 
@@ -2291,10 +2410,11 @@ def _handle_oauth_callback(
 
     pending: OAuthPendingState | None = None
     try:
-        cookie_name = oauth_pending_cookie_name(callback.provider)
-        pending = OAuthPendingState.from_cookie_value(cookies.get(cookie_name))
-        if pending.provider != callback.provider:
-            raise ParticipantAuthFlowError("De OAuth-provider komt niet overeen.")
+        pending = confirmed_oauth_pending_cookie(
+            cookies,
+            callback.provider,
+            None,
+        )
 
         session = auth_service.complete_oauth(
             callback.authorization_code,
@@ -2303,15 +2423,20 @@ def _handle_oauth_callback(
             pending.provider,
         )
         st.session_state["signup_return_context"] = pending.return_context
-        _finish_participant_login(session, cookies)
+        # Queue refresh-token en verwijder PKCE-state met één gezamenlijke
+        # CookieManager-save; twee saves in één Streamlit-run delen anders
+        # dezelfde component-key.
+        _finish_participant_login(session, cookies, save_cookie=False)
         _clear_oauth_pending_cookies(cookies)
         _replace_query_params(pending.return_context.query_params)
         st.rerun()
-    except (AuthenticationError, ParticipantAuthFlowError) as exc:
+    except (AuthenticationError, ParticipantAuthFlowError):
         _clear_oauth_pending_cookies(cookies)
         safe_context = pending.return_context if pending is not None else None
         _replace_query_params(safe_context.query_params if safe_context else {})
-        st.session_state[PARTICIPANT_AUTH_ERROR_STATE] = str(exc)
+        st.session_state[PARTICIPANT_AUTH_ERROR_STATE] = oauth_storage_user_error(
+            callback.provider
+        )
         st.rerun()
     except Exception:
         _clear_oauth_pending_cookies(cookies)
@@ -2426,6 +2551,8 @@ def _clear_auth_session_state() -> None:
         PARTICIPANT_OTP_EMAIL_STATE,
         PARTICIPANT_AUTH_ERROR_STATE,
         PARTICIPANT_AUTH_NOTICE_STATE,
+        PARTICIPANT_OAUTH_PROVIDER_STATE,
+        PARTICIPANT_OAUTH_SYNC_RUNS_STATE,
         "planner_result",
         "last_saved_schedule_id",
     ):
@@ -2500,7 +2627,7 @@ def _render_login(
                     # of tijdelijk onbereikbare Supabase-sessie.
                     LOGGER.warning("De Supabase-sessie kon niet worden ingetrokken.")
 
-                _remove_persistent_cookie(cookies)
+                _remove_persistent_cookie(cookies, save=False)
                 _clear_oauth_pending_cookies(cookies)
                 _clear_auth_session_state()
                 st.rerun()
@@ -2557,7 +2684,7 @@ def _prepare_oauth_authorization(
     redirect_base: str,
     context: SignupReturnContext,
     provider: str,
-) -> str:
+) -> None:
     callback_url = oauth_callback_url(redirect_base, provider)
     authorization = auth_service.start_oauth(provider, callback_url)
     pending = OAuthPendingState(
@@ -2566,9 +2693,62 @@ def _prepare_oauth_authorization(
         redirect_to=authorization.redirect_to,
         created_at=int(datetime.now(tz=timezone.utc).timestamp()),
         code_verifier=authorization.code_verifier,
+        authorization_url=authorization.authorization_url,
     )
-    _save_oauth_pending_cookie(cookies, pending)
-    return authorization.authorization_url
+    # EncryptedCookieManager versleutelt vóórdat de waarde in zijn persistente
+    # session-state queue komt. De volgende normale sync-componentrun schrijft
+    # de queue naar document.cookie en bevestigt die via setComponentValue.
+    _queue_oauth_pending_cookie(cookies, pending)
+    st.session_state[PARTICIPANT_OAUTH_PROVIDER_STATE] = authorization.provider
+    st.session_state[PARTICIPANT_OAUTH_SYNC_RUNS_STATE] = 0
+
+
+def _render_confirmed_oauth_link(
+    cookies: EncryptedCookieManager,
+    context: SignupReturnContext,
+    provider: str,
+) -> None:
+    """Toon de externe link pas na een bewezen browsercookie-roundtrip."""
+    try:
+        pending = confirmed_oauth_pending_cookie(
+            cookies,
+            provider,
+            context.event_slug,
+        )
+    except ParticipantAuthFlowError:
+        sync_runs = int(
+            st.session_state.get(PARTICIPANT_OAUTH_SYNC_RUNS_STATE, 0)
+        )
+        if sync_runs < OAUTH_COOKIE_SYNC_MAX_RUNS:
+            st.session_state[PARTICIPANT_OAUTH_SYNC_RUNS_STATE] = sync_runs + 1
+            st.caption("Inloggen voorbereiden…")
+            if st.button(
+                "Opnieuw proberen",
+                key=f"participant_oauth_retry_{provider}",
+                type="tertiary",
+            ):
+                st.rerun()
+            return
+
+        _clear_oauth_pending_cookies(cookies, provider)
+        st.error(oauth_storage_user_error(provider))
+        return
+
+    st.session_state.pop(PARTICIPANT_OAUTH_SYNC_RUNS_STATE, None)
+    label = f"Doorgaan met {oauth_provider_label(provider)}"
+    st.link_button(
+        label,
+        pending.authorization_url,
+        key=f"participant_oauth_redirect_{provider}",
+        width="stretch",
+    )
+    if st.button(
+        "Andere manier kiezen",
+        key=f"participant_oauth_cancel_{provider}",
+        type="tertiary",
+    ):
+        _clear_oauth_pending_cookies(cookies, provider)
+        st.stop()
 
 
 def _render_participant_auth_options(
@@ -2583,39 +2763,55 @@ def _render_participant_auth_options(
     if auth_notice:
         st.success(str(auth_notice))
 
-    st.subheader("Log in om je aanmelding te beheren")
-    st.caption("Je account krijgt standaard uitsluitend de rol Deelnemer.")
+    st.subheader("Aanmelden")
+
+    staged_provider = str(
+        st.session_state.get(PARTICIPANT_OAUTH_PROVIDER_STATE) or ""
+    )
+    if staged_provider in SUPPORTED_OAUTH_PROVIDERS:
+        _render_confirmed_oauth_link(cookies, context, staged_provider)
+        return
 
     try:
         redirect_base = oauth_redirect_base_from_secrets(st.secrets)
-    except ParticipantAuthFlowError as exc:
-        st.info(str(exc))
-    else:
-        provider_labels = {
-            "google": "Doorgaan met Google",
-            "apple": "Doorgaan met Apple",
-        }
-        for provider in SUPPORTED_OAUTH_PROVIDERS:
-            try:
-                authorization_url = _prepare_oauth_authorization(
-                    auth_service,
-                    cookies,
-                    redirect_base,
-                    context,
-                    provider,
-                )
-                st.link_button(
-                    provider_labels[provider],
-                    authorization_url,
-                    width="stretch",
-                )
-            except (AuthenticationError, ParticipantAuthFlowError) as exc:
-                st.warning(str(exc))
-            except Exception:
-                st.warning("Deze externe login kon niet veilig worden voorbereid.")
+    except ParticipantAuthFlowError:
+        redirect_base = ""
 
-    st.divider()
-    st.markdown("**Of ontvang een eenmalige code per e-mail**")
+    selected_provider: str | None = None
+    for provider in SUPPORTED_OAUTH_PROVIDERS:
+        if st.button(
+            f"Doorgaan met {oauth_provider_label(provider)}",
+            key=f"participant_oauth_{provider}",
+            width="stretch",
+            disabled=not redirect_base,
+        ):
+            selected_provider = provider
+
+    if not redirect_base:
+        st.caption(oauth_provider_unavailable_message())
+    elif selected_provider is not None:
+        try:
+            _prepare_oauth_authorization(
+                auth_service,
+                cookies,
+                redirect_base,
+                context,
+                selected_provider,
+            )
+            # Geen directe redirect: eerst moet de browsercomponent de
+            # queued, versleutelde PKCE-cookie via de normale sync-run schrijven.
+            st.rerun()
+        except OAuthCookiePersistenceError:
+            st.error(oauth_storage_user_error(selected_provider))
+        except (AuthenticationError, ParticipantAuthFlowError):
+            st.error(oauth_provider_unavailable_message(selected_provider))
+        except Exception:
+            st.error(oauth_storage_user_error(selected_provider))
+
+    st.markdown(
+        '<div class="tos-login-separator"><span>of</span></div>',
+        unsafe_allow_html=True,
+    )
 
     pending_email = str(
         st.session_state.get(PARTICIPANT_OTP_EMAIL_STATE) or ""
@@ -2624,7 +2820,7 @@ def _render_participant_auth_options(
         with st.form(f"participant_otp_request_{context.event_slug}"):
             email = st.text_input("E-mailadres", key="participant_otp_request_email")
             requested = st.form_submit_button(
-                "Stuur eenmalige code",
+                "Stuur mij een inlogcode",
                 width="stretch",
             )
         if requested:
@@ -2634,8 +2830,10 @@ def _render_participant_auth_options(
                 st.session_state[PARTICIPANT_AUTH_NOTICE_STATE] = (
                     "Als het adres geldig is, ontvang je een zescijferige code."
                 )
-            except AuthenticationError as exc:
-                st.session_state[PARTICIPANT_AUTH_ERROR_STATE] = str(exc)
+            except AuthenticationError:
+                st.session_state[PARTICIPANT_AUTH_ERROR_STATE] = (
+                    "De inlogcode kon niet worden verstuurd. Probeer het later opnieuw."
+                )
             st.rerun()
         return
 
@@ -2654,8 +2852,8 @@ def _render_participant_auth_options(
             _finish_participant_login(session, cookies)
             _replace_query_params(context.query_params)
             st.rerun()
-        except AuthenticationError as exc:
-            st.session_state[PARTICIPANT_AUTH_ERROR_STATE] = str(exc)
+        except AuthenticationError:
+            st.session_state[PARTICIPANT_AUTH_ERROR_STATE] = OTP_CODE_USER_ERROR
             st.rerun()
 
     if st.button(
@@ -2667,6 +2865,30 @@ def _render_participant_auth_options(
         st.rerun()
 
 
+def _render_signup_event_summary(event: Mapping[str, object]) -> bool:
+    """Toon compacte lokale eventdata zonder technische route-informatie."""
+    try:
+        window = event_window(event)
+    except ParticipantRegistrationError:
+        st.error("De tijden van deze TOS-avond konden niet worden geladen.")
+        return False
+
+    sport = escape(event_sport_label(event))
+    title = escape(str(event.get("title") or "TOS-avond"))
+    event_date = escape(format_event_date(event))
+    st.markdown(
+        (
+            '<div class="tos-signup-event">'
+            f'<div class="tos-signup-event-title">{sport} · {title} · {event_date}</div>'
+            f'<div class="tos-signup-event-time">{window.local_start:%H:%M} – '
+            f'{window.local_end:%H:%M}</div>'
+            "</div>"
+        ),
+        unsafe_allow_html=True,
+    )
+    return True
+
+
 def _render_participant_signup_page(
     auth_service: SupabaseAuthService,
     public_config: PublicSupabaseConfig,
@@ -2675,9 +2897,22 @@ def _render_participant_signup_page(
 ) -> None:
     """Mobiele participantflow voor onboarding en de eigen TOS-aanmelding."""
     st.markdown(_public_brand_header_html(), unsafe_allow_html=True)
-    st.caption(f"Aanmeldpagina · {context.event_slug}")
 
-    if st.button("← Terug naar openbaar schema", key="leave_signup_route"):
+    try:
+        event = _get_public_signup_event_repository(
+            public_config
+        ).get_open_event_by_slug(context.event_slug)
+    except Exception:
+        st.error("De TOS-avond kon niet worden geladen.")
+        return
+
+    if not event:
+        st.info("Deze TOS-avond is niet beschikbaar of niet meer open voor aanmelding.")
+        return
+    if not _render_signup_event_summary(event):
+        return
+
+    if st.button("← Terug", key="leave_signup_route", type="tertiary"):
         st.session_state.pop("signup_return_context", None)
         st.session_state.pop(PARTICIPANT_OTP_EMAIL_STATE, None)
         _clear_oauth_pending_cookies(cookies)
@@ -2706,26 +2941,18 @@ def _render_participant_signup_page(
         return
 
     try:
-        event = repository.get_open_event_by_slug(context.event_slug)
+        authenticated_event = repository.get_open_event_by_slug(context.event_slug)
     except Exception:
         st.error("De TOS-avond kon niet veilig worden geladen.")
         return
 
-    if not event:
+    if (
+        not authenticated_event
+        or str(authenticated_event.get("id") or "") != str(event.get("id") or "")
+    ):
         st.info("Deze TOS-avond is niet beschikbaar of niet meer open voor aanmelding.")
         return
-
-    try:
-        window = event_window(event)
-    except ParticipantRegistrationError:
-        st.error("De tijden van deze TOS-avond konden niet veilig worden geladen.")
-        return
-
-    st.subheader(str(event.get("title") or "TOS-avond"))
-    st.caption(f"{event_sport_label(event)} · {format_event_date(event)}")
-    st.markdown(
-        f"**{window.local_start:%H:%M} – {window.local_end:%H:%M}**"
-    )
+    event = authenticated_event
 
     link_status = participant_link_status(profile)
     if link_status == PARTICIPANT_STATUS_NOT_PARTICIPANT:
