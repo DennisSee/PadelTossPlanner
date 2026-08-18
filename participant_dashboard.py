@@ -32,6 +32,19 @@ def registrations_by_event_id(
     }
 
 
+def unregistered_open_events(
+    open_events: Iterable[Mapping[str, Any]],
+    registrations: Iterable[Mapping[str, Any]],
+) -> list[Mapping[str, Any]]:
+    """Behoud alleen open events zonder eigen response, in bestaande volgorde."""
+    registered_event_ids = set(registrations_by_event_id(registrations))
+    return [
+        event
+        for event in open_events
+        if str(event.get("id") or "") not in registered_event_ids
+    ]
+
+
 def registration_response_label(response: object) -> str:
     return "Ik doe mee" if response == "attending" else "Ik doe niet mee"
 

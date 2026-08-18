@@ -56,10 +56,10 @@ class OAuthCallback:
 
 @dataclass(frozen=True)
 class OAuthPendingState:
-    """Versleuteld te bewaren PKCE-state voor precies één provider en event."""
+    """Versleutelde PKCE-state met een veilige signup- of homeroute."""
 
     provider: str
-    event_slug: str
+    event_slug: str | None
     redirect_to: str
     created_at: int
     code_verifier: str = field(repr=False)
@@ -68,9 +68,10 @@ class OAuthPendingState:
     def to_cookie_value(self) -> str:
         return json.dumps(
             {
-                "version": 2,
+                "version": 3,
                 "provider": self.provider,
                 "event_slug": self.event_slug,
+                "return_page": "signup" if self.event_slug is not None else "home",
                 "redirect_to": self.redirect_to,
                 "created_at": self.created_at,
                 "code_verifier": self.code_verifier,
@@ -94,12 +95,27 @@ class OAuthPendingState:
                 "De OAuth-aanvraag ontbreekt of is ongeldig."
             ) from None
 
-        if not isinstance(payload, dict) or payload.get("version") != 2:
+        if not isinstance(payload, dict) or payload.get("version") not in {2, 3}:
             raise ParticipantAuthFlowError("De OAuth-aanvraag ontbreekt of is ongeldig.")
 
         provider = normalize_oauth_provider(payload.get("provider"))
-        event_slug = str(payload.get("event_slug") or "")
-        if not is_valid_event_slug(event_slug):
+        raw_event_slug = payload.get("event_slug")
+        event_slug = str(raw_event_slug or "") or None
+        if payload.get("version") == 2:
+            # Bestaande, maximaal tien minuten oude cookies waren altijd deeplinks.
+            valid_return_route = event_slug is not None and is_valid_event_slug(
+                event_slug
+            )
+        else:
+            return_page = str(payload.get("return_page") or "")
+            valid_return_route = (
+                return_page == "home" and event_slug is None
+            ) or (
+                return_page == "signup"
+                and event_slug is not None
+                and is_valid_event_slug(event_slug)
+            )
+        if not valid_return_route:
             raise ParticipantAuthFlowError("De OAuth-returnroute is ongeldig.")
 
         redirect_to = validate_oauth_callback_url(
@@ -131,8 +147,12 @@ class OAuthPendingState:
         )
 
     @property
-    def return_context(self) -> SignupReturnContext:
-        return SignupReturnContext(event_slug=self.event_slug)
+    def return_context(self) -> SignupReturnContext | None:
+        return (
+            SignupReturnContext(event_slug=self.event_slug)
+            if self.event_slug is not None
+            else None
+        )
 
 
 def _query_value(value: object) -> str:

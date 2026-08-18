@@ -23,10 +23,19 @@ def _function_source(function_name: str) -> str:
 def test_participant_home_contains_requested_sections_and_friendly_empty_state() -> None:
     source = _function_source("_render_participant_home_page")
     assert '"Mijn komende TOS"' in source
-    assert '"Open voor inschrijving"' in source
+    assert '"Nog aanmelden"' in source
     assert '"Openbaar schema"' in source
     assert "Je bent nog niet aangemeld voor een komende TOS." in source
+    assert "Geen andere open TOS-avonden." in source
     assert "latest_published_schedule" in source
+
+
+def test_home_never_renders_registered_event_again_under_to_join() -> None:
+    source = _function_source("_render_participant_home_page")
+    assert "unregistered_open_events(open_events, registrations)" in source
+    assert "for event in events_to_join[:3]" in source
+    assert "if len(events_to_join) > 3" in source
+    assert "for event in open_events[:3]" not in source
 
 
 def test_open_tos_uses_user_scoped_reads_and_safe_names_rpc() -> None:
@@ -89,3 +98,20 @@ def test_signup_navigation_uses_only_validated_internal_context() -> None:
     assert '{"page": "signup", "event":' in source
     assert "SignupReturnContext(" not in source
     assert "_replace_query_params(context.query_params)" in source
+
+
+def test_root_login_reuses_participant_auth_and_keeps_deeplink_path_separate() -> None:
+    root_cta = _function_source("_render_participant_root_login_cta")
+    root_login = _function_source("_render_participant_root_login_page")
+    main_source = _function_source("main")
+    signup_source = _function_source("_render_participant_signup_page")
+    finish_source = _function_source("_finish_participant_login")
+
+    assert '"Inloggen / aanmelden"' in root_cta
+    assert 'type="primary"' in root_cta
+    assert "PARTICIPANT_ROOT_LOGIN_STATE" in root_cta
+    assert "_render_participant_auth_options(auth_service, cookies, None)" in root_login
+    assert "_render_participant_root_login_page" in main_source
+    assert "_render_participant_root_login_cta" in main_source
+    assert "PARTICIPANT_ROOT_LOGIN_STATE" in finish_source
+    assert "_render_participant_auth_options(auth_service, cookies, context)" in signup_source

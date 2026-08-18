@@ -119,6 +119,7 @@ from participant_dashboard import (
     registration_cta_label,
     registration_event,
     registrations_by_event_id,
+    unregistered_open_events,
 )
 from registration_repository import (
     PublicSignupEventRepository,
@@ -191,6 +192,7 @@ PARTICIPANT_AUTH_ERROR_STATE = "participant_auth_error"
 PARTICIPANT_AUTH_NOTICE_STATE = "participant_auth_notice"
 PARTICIPANT_OAUTH_PROVIDER_STATE = "participant_oauth_provider"
 PARTICIPANT_OAUTH_SYNC_RUNS_STATE = "participant_oauth_sync_runs"
+PARTICIPANT_ROOT_LOGIN_STATE = "participant_root_login"
 PREFERRED_PLAYER_COOKIE_NAME = "preferred_player_name"
 AUTH_COOKIE_PREFIX = "tc-zuid-tos/"
 
@@ -2399,6 +2401,7 @@ def _finish_participant_login(
     _save_persistent_cookie(cookies, session, save=save_cookie)
     _set_auth_session(session, persisted=True)
     st.session_state.pop(PARTICIPANT_OTP_EMAIL_STATE, None)
+    st.session_state.pop(PARTICIPANT_ROOT_LOGIN_STATE, None)
     st.session_state.pop("planner_result", None)
     st.session_state["navigation_page"] = _post_login_page(session.user)
     st.session_state["login_success"] = True
@@ -2437,17 +2440,25 @@ def _handle_oauth_callback(
             pending.redirect_to,
             pending.provider,
         )
-        st.session_state["signup_return_context"] = pending.return_context
+        return_context = pending.return_context
+        if return_context is None:
+            st.session_state.pop("signup_return_context", None)
+        else:
+            st.session_state["signup_return_context"] = return_context
         # Queue refresh-token en verwijder PKCE-state met één gezamenlijke
         # CookieManager-save; twee saves in één Streamlit-run delen anders
         # dezelfde component-key.
         _finish_participant_login(session, cookies, save_cookie=False)
         _clear_oauth_pending_cookies(cookies)
-        _replace_query_params(pending.return_context.query_params)
+        _replace_query_params(
+            return_context.query_params if return_context is not None else {}
+        )
         st.rerun()
     except (AuthenticationError, ParticipantAuthFlowError):
         _clear_oauth_pending_cookies(cookies)
         safe_context = pending.return_context if pending is not None else None
+        if pending is not None and safe_context is None:
+            st.session_state[PARTICIPANT_ROOT_LOGIN_STATE] = True
         _replace_query_params(safe_context.query_params if safe_context else {})
         st.session_state[PARTICIPANT_AUTH_ERROR_STATE] = oauth_storage_user_error(
             callback.provider
@@ -2568,6 +2579,7 @@ def _clear_auth_session_state() -> None:
         PARTICIPANT_AUTH_NOTICE_STATE,
         PARTICIPANT_OAUTH_PROVIDER_STATE,
         PARTICIPANT_OAUTH_SYNC_RUNS_STATE,
+        PARTICIPANT_ROOT_LOGIN_STATE,
         "planner_result",
         "last_saved_schedule_id",
     ):
@@ -2704,14 +2716,14 @@ def _prepare_oauth_authorization(
     auth_service: SupabaseAuthService,
     cookies: EncryptedCookieManager,
     redirect_base: str,
-    context: SignupReturnContext,
+    context: SignupReturnContext | None,
     provider: str,
 ) -> None:
     callback_url = oauth_callback_url(redirect_base, provider)
     authorization = auth_service.start_oauth(provider, callback_url)
     pending = OAuthPendingState(
         provider=authorization.provider,
-        event_slug=context.event_slug,
+        event_slug=context.event_slug if context is not None else None,
         redirect_to=authorization.redirect_to,
         created_at=int(datetime.now(tz=timezone.utc).timestamp()),
         code_verifier=authorization.code_verifier,
@@ -2727,7 +2739,7 @@ def _prepare_oauth_authorization(
 
 def _render_confirmed_oauth_link(
     cookies: EncryptedCookieManager,
-    context: SignupReturnContext,
+    context: SignupReturnContext | None,
     provider: str,
 ) -> None:
     """Toon de externe link pas na een bewezen browsercookie-roundtrip."""
@@ -2735,7 +2747,7 @@ def _render_confirmed_oauth_link(
         pending = confirmed_oauth_pending_cookie(
             cookies,
             provider,
-            context.event_slug,
+            context.event_slug if context is not None else None,
         )
     except ParticipantAuthFlowError:
         sync_runs = int(
@@ -2777,7 +2789,7 @@ def _render_confirmed_oauth_link(
 def _render_participant_auth_options(
     auth_service: SupabaseAuthService,
     cookies: EncryptedCookieManager,
-    context: SignupReturnContext,
+    context: SignupReturnContext | None,
 ) -> None:
     auth_error = st.session_state.pop(PARTICIPANT_AUTH_ERROR_STATE, None)
     auth_notice = st.session_state.pop(PARTICIPANT_AUTH_NOTICE_STATE, None)
@@ -2839,8 +2851,9 @@ def _render_participant_auth_options(
     pending_email = str(
         st.session_state.get(PARTICIPANT_OTP_EMAIL_STATE) or ""
     )
+    context_key = context.event_slug if context is not None else "home"
     if not pending_email:
-        with st.form(f"participant_otp_request_{context.event_slug}"):
+        with st.form(f"participant_otp_request_{context_key}"):
             email = st.text_input("E-mailadres", key="participant_otp_request_email")
             requested = st.form_submit_button(
                 "Stuur mij een inlogcode",
@@ -2862,7 +2875,7 @@ def _render_participant_auth_options(
         return
 
     st.caption("Vul de cijfercode uit de e-mail in.")
-    with st.form(f"participant_otp_verify_{context.event_slug}"):
+    with st.form(f"participant_otp_verify_{context_key}"):
         otp_code = st.text_input(
             "Inlogcode",
             type="password",
@@ -2886,11 +2899,45 @@ def _render_participant_auth_options(
 
     if st.button(
         "Gebruik een ander e-mailadres",
-        key=f"participant_otp_change_{context.event_slug}",
+        key=f"participant_otp_change_{context_key}",
         width="stretch",
     ):
         st.session_state.pop(PARTICIPANT_OTP_EMAIL_STATE, None)
         st.rerun()
+
+
+def _render_participant_root_login_page(
+    auth_service: SupabaseAuthService,
+    cookies: EncryptedCookieManager,
+) -> None:
+    """Hergebruik participant-auth zonder een verplichte eventdeeplink."""
+    st.markdown(
+        _public_brand_header_html("Inloggen / aanmelden"),
+        unsafe_allow_html=True,
+    )
+    if st.button("← Terug", key="leave_participant_root_login", type="tertiary"):
+        st.session_state.pop(PARTICIPANT_ROOT_LOGIN_STATE, None)
+        st.session_state.pop(PARTICIPANT_OTP_EMAIL_STATE, None)
+        _clear_oauth_pending_cookies(cookies)
+        st.rerun()
+    _render_participant_auth_options(auth_service, cookies, None)
+
+
+def _render_participant_root_login_cta() -> None:
+    """Rustige primaire ingang voor clubleden naast het openbare schema."""
+    with st.container(border=True):
+        st.markdown("### Meedoen aan TOS?")
+        st.caption(
+            "Bekijk je aanmeldingen en schrijf je in voor open TOS-avonden."
+        )
+        if st.button(
+            "Inloggen / aanmelden",
+            key="participant_root_login_cta",
+            type="primary",
+            width="stretch",
+        ):
+            st.session_state[PARTICIPANT_ROOT_LOGIN_STATE] = True
+            st.rerun()
 
 
 def _render_signup_event_summary(event: Mapping[str, object]) -> bool:
@@ -3418,17 +3465,17 @@ def _render_participant_home_page(
     else:
         st.info("Je bent nog niet aangemeld voor een komende TOS.")
 
-    st.subheader("Open voor inschrijving")
-    if open_events:
-        own_by_event = registrations_by_event_id(registrations)
-        for event in open_events[:3]:
+    events_to_join = unregistered_open_events(open_events, registrations)
+    st.subheader("Nog aanmelden")
+    if events_to_join:
+        for event in events_to_join[:3]:
             _render_open_event_card(
                 repository,
                 event,
-                own_by_event,
+                {},
                 key_prefix="home_open_event",
             )
-        if len(open_events) > 3 and st.button(
+        if len(events_to_join) > 3 and st.button(
             "Bekijk alle open TOS-avonden",
             key="home_all_open_events",
             width="stretch",
@@ -3436,7 +3483,7 @@ def _render_participant_home_page(
             st.session_state["navigation_page"] = OPEN_TOS_PAGE
             st.rerun()
     else:
-        st.info("Er staan nu geen TOS-avonden open voor inschrijving.")
+        st.caption("Geen andere open TOS-avonden.")
 
     st.subheader("Openbaar schema")
     try:
@@ -5209,6 +5256,12 @@ def main() -> None:
         )
         return
 
+    if user is None and bool(
+        st.session_state.get(PARTICIPANT_ROOT_LOGIN_STATE, False)
+    ):
+        _render_participant_root_login_page(auth_service, cookies)
+        return
+
     callback_error = st.session_state.pop(PARTICIPANT_AUTH_ERROR_STATE, None)
     if callback_error:
         st.error(str(callback_error))
@@ -5246,6 +5299,8 @@ def main() -> None:
         else:
             _render_open_tos_page(repository, user)
     elif page == PUBLIC_PAGE:
+        if user is None:
+            _render_participant_root_login_cta()
         _render_public_page(public_schedule_repository, cookies)
     elif user and user.can_plan:
         try:

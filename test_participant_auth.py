@@ -114,6 +114,7 @@ def test_pending_pkce_state_restores_only_validated_internal_signup_context() ->
         now=1_100,
     )
 
+    assert restored.return_context is not None
     assert restored.return_context.event_slug == "vrijdag-tos"
     assert restored.return_context.query_params == {
         "page": "signup",
@@ -128,6 +129,33 @@ def test_pending_pkce_state_restores_only_validated_internal_signup_context() ->
     unsafe = pending.to_cookie_value().replace("vrijdag-tos", "../../planner")
     with pytest.raises(ParticipantAuthFlowError):
         OAuthPendingState.from_cookie_value(unsafe, now=1_100)
+
+
+def test_pending_pkce_state_can_return_safely_to_participant_home() -> None:
+    pending = OAuthPendingState(
+        provider="google",
+        event_slug=None,
+        redirect_to="https://app.example/?auth_callback=1&provider=google",
+        created_at=1_000,
+        code_verifier=VERIFIER,
+        authorization_url=AUTHORIZE_URL,
+    )
+    restored = OAuthPendingState.from_cookie_value(
+        pending.to_cookie_value(),
+        now=1_100,
+    )
+
+    assert restored.event_slug is None
+    assert restored.return_context is None
+    assert VERIFIER not in repr(restored)
+    assert "sensitive-state" not in repr(restored)
+
+    unsafe_missing_route = pending.to_cookie_value().replace(
+        '"return_page":"home"',
+        '"return_page":"planner"',
+    )
+    with pytest.raises(ParticipantAuthFlowError):
+        OAuthPendingState.from_cookie_value(unsafe_missing_route, now=1_100)
 
 
 def test_pkce_cookie_must_be_confirmed_by_browser_before_oauth_redirect() -> None:

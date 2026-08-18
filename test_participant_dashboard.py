@@ -9,6 +9,7 @@ from participant_dashboard import (
     registration_event,
     registration_response_label,
     registrations_by_event_id,
+    unregistered_open_events,
 )
 
 
@@ -33,6 +34,26 @@ def test_cta_reflects_whether_current_user_already_registered() -> None:
     )
     assert registration_cta_label("event-a", registrations) == "Aanmelding wijzigen"
     assert registration_cta_label("event-b", registrations) == "Aanmelden"
+
+
+def test_home_open_events_exclude_every_event_with_an_own_registration() -> None:
+    open_events = [
+        {"id": "event-a", "title": "A"},
+        {"id": "event-b", "title": "B"},
+        {"id": "event-c", "title": "C"},
+    ]
+    registrations = [
+        {"event_id": "event-a", "response": "attending"},
+        {"event_id": "event-c", "response": "declined"},
+    ]
+
+    assert unregistered_open_events(open_events, registrations) == [
+        {"id": "event-b", "title": "B"}
+    ]
+    assert unregistered_open_events(open_events, []) == open_events
+    assert unregistered_open_events(open_events, registrations_by_event_id(
+        registrations
+    ).values()) == [{"id": "event-b", "title": "B"}]
 
 
 def test_social_names_preview_is_compact_and_contains_only_names() -> None:
