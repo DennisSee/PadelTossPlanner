@@ -2632,16 +2632,22 @@ def _set_navigation_page(page: str, *, section: str | None = None) -> None:
 
 def _normalize_navigation_state(user: AuthenticatedUser) -> str:
     """Migreer oude zichtbare paginanamen eenmalig en fail-closed."""
+    legacy_session = (
+        st.session_state.get(NAVIGATION_VERSION_STATE)
+        != NAVIGATION_STATE_VERSION
+    )
     target = normalize_navigation_target(
         st.session_state.get("navigation_page"),
         user.role,
         participant_area=True,
-        legacy_session=(
-            st.session_state.get(NAVIGATION_VERSION_STATE)
-            != NAVIGATION_STATE_VERSION
-        ),
+        legacy_session=legacy_session,
     )
-    _set_navigation_page(target.page, section=target.section)
+    _set_navigation_page(
+        target.page,
+        # Een legacy-route mag één keer de initiële subpagina kiezen. Daarna is
+        # de widgetkey de enige owner en blijft een geldige gebruikerskeuze staan.
+        section=target.section if legacy_session else None,
+    )
     return target.page
 
 
@@ -3117,6 +3123,19 @@ def _render_signup_event_summary(event: Mapping[str, object]) -> bool:
     return True
 
 
+def _participant_signup_display_name(
+    member: Mapping[str, object] | None,
+    user: AuthenticatedUser,
+) -> str:
+    """Gebruik de gekoppelde ledennaam met een veilige sessiefallback."""
+    member_name = (
+        str(member.get("display_name") or "").strip()
+        if isinstance(member, Mapping)
+        else ""
+    )
+    return member_name or str(user.display_name or "").strip() or "Deelnemer"
+
+
 def _finish_participant_registration_save(*, was_existing: bool) -> None:
     """Sluit een geslaagde signup-taak af en voorkom deeplink-heropening."""
     st.session_state[PARTICIPANT_REGISTRATION_NOTICE_STATE] = (
@@ -3177,7 +3196,7 @@ def _render_participant_signup_page(
         st.error("Je deelnemerssessie kon niet veilig worden geladen.")
         return
     try:
-        profile, _member, capability = _load_participant_capability(
+        profile, member, capability = _load_participant_capability(
             repository,
             session.user,
         )
@@ -3198,6 +3217,13 @@ def _render_participant_signup_page(
     ):
         return
 
+    if (
+        not isinstance(member, Mapping)
+        or str(member.get("id") or "") != capability.member_id
+    ):
+        st.error("Je gekoppelde clubprofiel kon niet veilig worden geladen.")
+        return
+
     try:
         registration = repository.get_own_registration(str(event.get("id") or ""))
     except (ValueError, RuntimeError):
@@ -3208,7 +3234,7 @@ def _render_participant_signup_page(
         return
 
     st.caption(
-        f"Ingelogd als {member.get('display_name') or session.user.display_name}"
+        f"Ingelogd als {_participant_signup_display_name(member, session.user)}"
     )
     if registration:
         st.markdown(

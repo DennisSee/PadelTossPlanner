@@ -2,6 +2,20 @@
 
 import ast
 from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
+
+import streamlit_app as app
+from authorization import (
+    MEMBER_MANAGEMENT_ACCOUNTS,
+    MEMBER_MANAGEMENT_PAGE,
+    TOS_MANAGEMENT_EVENTS,
+    TOS_MANAGEMENT_PAGE,
+    TOS_MANAGEMENT_PLANNER,
+    TOS_MANAGEMENT_SAVED,
+)
+from database import AuthenticatedUser
 
 
 APP_PATH = Path(__file__).with_name("streamlit_app.py")
@@ -80,6 +94,137 @@ def test_ranking_ui_uses_one_nullable_choice_and_keeps_sport_active() -> None:
     assert "clear_ranking" not in member_source
     assert '"Sportprofiel actief"' in member_source
     assert "selected_ranking," in member_source
+
+
+def _staff_user(role: str = "planner") -> AuthenticatedUser:
+    return AuthenticatedUser(
+        id=f"user-{role}",
+        email=f"{role}@example.test",
+        display_name=role.title(),
+        role=role,
+        member_id=f"member-{role}",
+    )
+
+
+@pytest.mark.parametrize(
+    ("section", "expected_renderer"),
+    [
+        (TOS_MANAGEMENT_EVENTS, "events"),
+        (TOS_MANAGEMENT_PLANNER, "planner"),
+        (TOS_MANAGEMENT_SAVED, "saved"),
+    ],
+)
+def test_tos_management_widget_state_selects_and_keeps_the_requested_renderer(
+    monkeypatch: pytest.MonkeyPatch,
+    section: str,
+    expected_renderer: str,
+) -> None:
+    state = {app.TOS_MANAGEMENT_SECTION_STATE: section}
+    rendered: list[str] = []
+    fake_st = SimpleNamespace(
+        session_state=state,
+        secrets={},
+        error=lambda _message: None,
+        radio=lambda _label, _options, *, key, **_kwargs: state[key],
+    )
+    monkeypatch.setattr(app, "st", fake_st)
+    monkeypatch.setattr(
+        app,
+        "public_base_url_from_secrets",
+        lambda _secrets: "https://test.example",
+    )
+    monkeypatch.setattr(
+        app,
+        "_render_event_management_page",
+        lambda *_args: rendered.append("events"),
+    )
+    monkeypatch.setattr(
+        app,
+        "_render_planner_page",
+        lambda *_args: rendered.append("planner"),
+    )
+    monkeypatch.setattr(
+        app,
+        "_render_saved_page",
+        lambda *_args: rendered.append("saved"),
+    )
+
+    app._render_tos_management_hub(object(), _staff_user())
+
+    assert state[app.TOS_MANAGEMENT_SECTION_STATE] == section
+    assert rendered == [expected_renderer]
+
+
+def test_tos_management_default_only_applies_when_state_is_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    state: dict[str, object] = {}
+    rendered: list[str] = []
+    monkeypatch.setattr(
+        app,
+        "st",
+        SimpleNamespace(
+            session_state=state,
+            error=lambda _message: None,
+            radio=lambda _label, _options, *, key, **_kwargs: state[key],
+        ),
+    )
+    monkeypatch.setattr(
+        app,
+        "_render_planner_page",
+        lambda *_args: rendered.append("planner"),
+    )
+
+    app._render_tos_management_hub(object(), _staff_user())
+
+    assert state[app.TOS_MANAGEMENT_SECTION_STATE] == TOS_MANAGEMENT_PLANNER
+    assert rendered == ["planner"]
+
+
+def test_current_and_legacy_navigation_do_not_overwrite_later_widget_choices(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    state: dict[str, object] = {
+        "navigation_page": "Planner",
+    }
+    monkeypatch.setattr(app, "st", SimpleNamespace(session_state=state))
+    planner = _staff_user()
+
+    assert app._normalize_navigation_state(planner) == TOS_MANAGEMENT_PAGE
+    assert state[app.TOS_MANAGEMENT_SECTION_STATE] == TOS_MANAGEMENT_PLANNER
+
+    state[app.TOS_MANAGEMENT_SECTION_STATE] = TOS_MANAGEMENT_SAVED
+    assert app._normalize_navigation_state(planner) == TOS_MANAGEMENT_PAGE
+    assert state[app.TOS_MANAGEMENT_SECTION_STATE] == TOS_MANAGEMENT_SAVED
+
+
+def test_member_management_uses_the_same_stable_state_owner(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    state: dict[str, object] = {
+        "navigation_page": MEMBER_MANAGEMENT_PAGE,
+        app.NAVIGATION_VERSION_STATE: app.NAVIGATION_STATE_VERSION,
+        app.MEMBER_MANAGEMENT_SECTION_STATE: MEMBER_MANAGEMENT_ACCOUNTS,
+    }
+    rendered: list[str] = []
+    fake_st = SimpleNamespace(
+        session_state=state,
+        error=lambda _message: None,
+        radio=lambda _label, _options, *, key, **_kwargs: state[key],
+    )
+    monkeypatch.setattr(app, "st", fake_st)
+    monkeypatch.setattr(
+        app,
+        "_render_user_management",
+        lambda *_args: rendered.append("accounts"),
+    )
+
+    admin = _staff_user("admin")
+    assert app._normalize_navigation_state(admin) == MEMBER_MANAGEMENT_PAGE
+    app._render_member_management_hub(object(), admin)
+
+    assert state[app.MEMBER_MANAGEMENT_SECTION_STATE] == MEMBER_MANAGEMENT_ACCOUNTS
+    assert rendered == ["accounts"]
 
 
 def test_event_management_route_uses_only_the_guarded_admin_store() -> None:
