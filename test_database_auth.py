@@ -26,8 +26,9 @@ class _Postgrest:
 
 
 class _ProfileQuery:
-    def __init__(self, role: str) -> None:
+    def __init__(self, role: str, member_id: str | None = None) -> None:
         self.role = role
+        self.member_id = member_id
 
     def select(self, _columns: str) -> "_ProfileQuery":
         return self
@@ -46,7 +47,7 @@ class _ProfileQuery:
                     "display_name": "Planner",
                     "role": self.role,
                     "active": True,
-                    "member_id": None,
+                    "member_id": self.member_id,
                 }
             ]
         )
@@ -85,14 +86,19 @@ class _FakeAuth:
 
 
 class _FakeClient:
-    def __init__(self, role: str = "planner") -> None:
+    def __init__(
+        self,
+        role: str = "planner",
+        member_id: str | None = None,
+    ) -> None:
         self.auth = _FakeAuth()
         self.postgrest = _Postgrest()
         self.role = role
+        self.member_id = member_id
 
     def table(self, table_name: str) -> _ProfileQuery:
         assert table_name == "profiles"
-        return _ProfileQuery(self.role)
+        return _ProfileQuery(self.role, self.member_id)
 
 
 def _config() -> SupabaseConfig:
@@ -136,7 +142,7 @@ def test_existing_planner_password_login_returns_complete_session() -> None:
 
 
 def test_session_restoration_rotates_both_tokens() -> None:
-    client = _FakeClient(role="participant")
+    client = _FakeClient(role="participant", member_id="member-participant")
     service = SupabaseAuthService(
         _config().public,
         client_factory=lambda _url, _key: client,  # type: ignore[arg-type]
@@ -146,6 +152,8 @@ def test_session_restoration_rotates_both_tokens() -> None:
 
     assert client.auth.refresh_token == "refresh-old"
     assert session.user.role == "participant"
+    assert session.user.member_id == "member-participant"
+    assert session.user.has_member_link
     assert not session.user.can_plan
     assert session.access_token == "access-rotated"
     assert session.refresh_token == "refresh-rotated"

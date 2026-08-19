@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from enum import Enum
 from typing import Literal, Mapping
 
 
@@ -19,12 +20,46 @@ MEMBER_MANAGEMENT_PAGE = "Leden & niveaus"
 
 PLANNER_ROLES = frozenset({"planner", "admin"})
 ADMIN_ROLES = frozenset({"admin"})
-PARTICIPANT_ROLES = frozenset({"participant"})
 _EVENT_SLUG_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 
 
 class AuthorizationError(PermissionError):
     """De applicatierol geeft geen toegang tot de gevraagde pagina."""
+
+
+class MembershipStatus(str, Enum):
+    """Frontend- en database-onafhankelijke toestand van de eigen ledenkoppeling."""
+
+    NEEDS_ONBOARDING = "needs_onboarding"
+    PENDING_APPROVAL = "pending_approval"
+    REJECTED = "rejected"
+    MEMBER_INACTIVE = "inactive"
+    ACCOUNT_INACTIVE = "account_inactive"
+    UNAVAILABLE = "member_unavailable"
+    READY = "ready"
+
+
+@dataclass(frozen=True)
+class MembershipCapability:
+    """Alleen membership bepaalt deelname; ``role`` hoort hier bewust niet in."""
+
+    status: MembershipStatus
+    member_id: str | None = None
+
+    @property
+    def can_participate(self) -> bool:
+        return self.status is MembershipStatus.READY
+
+    @property
+    def can_onboard(self) -> bool:
+        return self.status is MembershipStatus.NEEDS_ONBOARDING
+
+    @property
+    def can_open_participant_area(self) -> bool:
+        return self.status not in {
+            MembershipStatus.ACCOUNT_INACTIVE,
+            MembershipStatus.UNAVAILABLE,
+        }
 
 
 @dataclass(frozen=True)
@@ -97,15 +132,17 @@ def can_access_admin(role: str) -> bool:
     return role in ADMIN_ROLES
 
 
-def can_access_participant(role: str) -> bool:
-    return role in PARTICIPANT_ROLES
-
-
-def navigation_pages_for_role(role: str | None) -> tuple[str, ...]:
-    if role and can_access_participant(role):
-        return (MY_TOS_PAGE, OPEN_TOS_PAGE, MY_PROFILE_PAGE, PUBLIC_PAGE)
-
-    pages = [PUBLIC_PAGE]
+def navigation_pages_for_capabilities(
+    role: str | None,
+    *,
+    participant_area: bool,
+) -> tuple[str, ...]:
+    """Combineer membershippagina's en staffpagina's zonder rechten te mengen."""
+    pages = (
+        [MY_TOS_PAGE, OPEN_TOS_PAGE, MY_PROFILE_PAGE, PUBLIC_PAGE]
+        if participant_area
+        else [PUBLIC_PAGE]
+    )
     if role and can_access_planner(role):
         pages.extend(
             (
@@ -121,13 +158,21 @@ def navigation_pages_for_role(role: str | None) -> tuple[str, ...]:
 
 
 def default_page_for_role(role: str | None) -> str:
-    if role and can_access_participant(role):
+    if role == "participant":
         return MY_TOS_PAGE
     return PLANNER_PAGE if role and can_access_planner(role) else PUBLIC_PAGE
 
 
-def can_access_page(role: str | None, page: str) -> bool:
-    return page in navigation_pages_for_role(role)
+def can_access_page(
+    role: str | None,
+    page: str,
+    *,
+    participant_area: bool,
+) -> bool:
+    return page in navigation_pages_for_capabilities(
+        role,
+        participant_area=participant_area,
+    )
 
 
 def require_planner_role(role: str) -> None:
@@ -140,6 +185,14 @@ def require_admin_role(role: str) -> None:
         raise AuthorizationError("Alleen beheerders hebben toegang.")
 
 
-def require_participant_role(role: str) -> None:
-    if not can_access_participant(role):
-        raise AuthorizationError("Alleen deelnemers hebben toegang.")
+def require_participant_access(
+    capability: MembershipCapability,
+    *,
+    allow_onboarding: bool = False,
+) -> None:
+    """Beveilig participantpagina's op membership, nooit op staffrol."""
+    if capability.can_participate:
+        return
+    if allow_onboarding and capability.can_open_participant_area:
+        return
+    raise AuthorizationError("Je ledenkoppeling geeft geen toegang tot deze functie.")

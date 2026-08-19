@@ -67,6 +67,7 @@ class AuthenticatedUser:
     email: str
     display_name: str
     role: str
+    member_id: str | None = None
 
     @property
     def is_admin(self) -> bool:
@@ -75,6 +76,10 @@ class AuthenticatedUser:
     @property
     def can_plan(self) -> bool:
         return can_access_planner(self.role)
+
+    @property
+    def has_member_link(self) -> bool:
+        return self.member_id is not None
 
 
 @dataclass(frozen=True)
@@ -811,6 +816,7 @@ class SupabaseAuthService:
                 email=user_email,
                 display_name=str(profile.get("display_name") or user_email),
                 role=role,
+                member_id=str(profile.get("member_id") or "") or None,
             ),
             access_token=access_token,
             refresh_token=refresh_token,

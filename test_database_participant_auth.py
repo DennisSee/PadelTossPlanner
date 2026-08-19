@@ -22,8 +22,13 @@ class _Postgrest:
 
 
 class _ProfileQuery:
-    def __init__(self, role: str = "participant") -> None:
+    def __init__(
+        self,
+        role: str = "participant",
+        member_id: str | None = None,
+    ) -> None:
         self.role = role
+        self.member_id = member_id
 
     def select(self, _columns: str) -> "_ProfileQuery":
         return self
@@ -42,7 +47,7 @@ class _ProfileQuery:
                     "display_name": self.role.title(),
                     "role": self.role,
                     "active": True,
-                    "member_id": None,
+                    "member_id": self.member_id,
                 }
             ]
         )
@@ -113,22 +118,29 @@ class _B2Client:
         *,
         fail_verify: bool,
         role: str,
+        member_id: str | None,
     ) -> None:
         self.auth = _B2Auth(options, verifier, fail_verify=fail_verify)
         self.postgrest = _Postgrest()
         self.role = role
+        self.member_id = member_id
 
     def table(self, table_name: str) -> _ProfileQuery:
         assert table_name == "profiles"
-        return _ProfileQuery(self.role)
+        return _ProfileQuery(self.role, self.member_id)
 
 
 class _ClientFactory:
-    def __init__(self, role: str = "participant") -> None:
+    def __init__(
+        self,
+        role: str = "participant",
+        member_id: str | None = None,
+    ) -> None:
         self.clients: list[_B2Client] = []
         self.calls: list[tuple[str, str, Any]] = []
         self.fail_verify = False
         self.role = role
+        self.member_id = member_id
 
     def __call__(
         self,
@@ -142,6 +154,7 @@ class _ClientFactory:
             verifier_character * 43,
             fail_verify=self.fail_verify,
             role=self.role,
+            member_id=self.member_id,
         )
         self.clients.append(client)
         self.calls.append((url, key, options))
@@ -259,7 +272,7 @@ def test_email_otp_returns_the_same_profile_identity_for_every_existing_role(
     can_plan: bool,
     is_admin: bool,
 ) -> None:
-    factory = _ClientFactory(role=role)
+    factory = _ClientFactory(role=role, member_id=f"member-{role}")
     session = _service(factory).verify_email_otp(
         f"{role}@example.test",
         "12345678",
@@ -267,6 +280,7 @@ def test_email_otp_returns_the_same_profile_identity_for_every_existing_role(
 
     assert session.user.id == "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
     assert session.user.role == role
+    assert session.user.member_id == f"member-{role}"
     assert session.user.can_plan is can_plan
     assert session.user.is_admin is is_admin
     assert factory.clients[0].postgrest.access_token == "participant-access-token"

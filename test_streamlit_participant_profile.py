@@ -28,11 +28,10 @@ def _function_source(function_name: str) -> str:
 
 def test_profile_page_is_user_scoped_guarded_and_edits_only_the_name() -> None:
     source = _function_source("_render_participant_profile_page")
-    assert "require_participant_role" in source
-    assert "get_own_profile" in source
-    assert "get_linked_club_member" in source
+    assert "require_participant_access" in source
+    assert "_load_participant_capability" in source
     assert "update_own_display_name(display_name)" in source
-    assert "_refresh_participant_session_display_name" in source
+    assert "_refresh_participant_session_profile" in source
     assert '"E-mailadres"' in source
     assert "disabled=True" in source
     assert '"Naam opslaan"' in source
@@ -68,10 +67,11 @@ def test_profile_save_refreshes_visible_user_but_preserves_all_tokens(monkeypatc
         SimpleNamespace(session_state={"auth_persisted": True}),
     )
 
-    updated_user = streamlit_app._refresh_participant_session_display_name(
+    updated_user = streamlit_app._refresh_participant_session_profile(
         {
             "id": original.user.id,
             "display_name": "Dennis Seesing",
+            "member_id": "member-dennis",
         }
     )
 
@@ -79,6 +79,7 @@ def test_profile_save_refreshes_visible_user_but_preserves_all_tokens(monkeypatc
     assert isinstance(updated_session, PersistentAuthSession)
     assert updated_user.display_name == "Dennis Seesing"
     assert updated_session.user.display_name == "Dennis Seesing"
+    assert updated_session.user.member_id == "member-dennis"
     assert updated_session.access_token == original.access_token
     assert updated_session.refresh_token == original.refresh_token
     assert updated_session.expires_at == original.expires_at

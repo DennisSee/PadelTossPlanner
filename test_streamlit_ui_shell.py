@@ -55,8 +55,9 @@ def test_sidebar_keeps_existing_routing_and_direct_guards() -> None:
     login_source = ast.get_source_segment(SOURCE, _function("_render_login"))
     assert main_source is not None
     assert login_source is not None
-    assert "navigation_pages_for_role" in main_source
-    assert 'st.radio("Navigatie"' in main_source
+    assert "navigation_pages_for_capabilities" in main_source
+    assert "st.radio(navigation_label" in main_source
+    assert '"TOS & beheer"' in main_source
     assert "st.navigation" not in SOURCE
     assert "sidebar_account_html" in login_source
     assert 'key="sidebar_logout"' in login_source

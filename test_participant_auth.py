@@ -8,7 +8,7 @@ from authorization import ParticipantReturnContext
 from participant_auth import (
     PARTICIPANT_STATUS_INACTIVE,
     PARTICIPANT_STATUS_NEEDS_ONBOARDING,
-    PARTICIPANT_STATUS_NOT_PARTICIPANT,
+    PARTICIPANT_STATUS_ACCOUNT_INACTIVE,
     PARTICIPANT_STATUS_PENDING_APPROVAL,
     PARTICIPANT_STATUS_READY,
     PARTICIPANT_STATUS_REJECTED,
@@ -25,6 +25,7 @@ from participant_auth import (
     oauth_redirect_base_from_secrets,
     oauth_storage_user_error,
     parse_oauth_callback,
+    participant_capability,
     participant_link_status,
 )
 
@@ -314,18 +315,23 @@ def test_participant_link_status_distinguishes_onboarding_and_approval() -> None
     new_profile = {
         "id": "user-a",
         "role": "participant",
+        "active": True,
         "member_id": None,
     }
     assert participant_link_status(new_profile) == PARTICIPANT_STATUS_NEEDS_ONBOARDING
-    assert participant_link_status({"role": "planner"}) == (
-        PARTICIPANT_STATUS_NOT_PARTICIPANT
-    )
-    assert participant_link_status({"role": "admin"}) == (
-        PARTICIPANT_STATUS_NOT_PARTICIPANT
-    )
+    assert participant_link_status(
+        {"role": "planner", "active": True, "member_id": None}
+    ) == PARTICIPANT_STATUS_NEEDS_ONBOARDING
+    assert participant_link_status(
+        {"role": "admin", "active": True, "member_id": None}
+    ) == PARTICIPANT_STATUS_NEEDS_ONBOARDING
+    assert participant_link_status(
+        {"role": "admin", "active": False, "member_id": None}
+    ) == PARTICIPANT_STATUS_ACCOUNT_INACTIVE
 
     linked_profile = {
         "role": "participant",
+        "active": True,
         "member_id": "member-a",
     }
     assert participant_link_status(
@@ -349,3 +355,18 @@ def test_participant_link_status_distinguishes_onboarding_and_approval() -> None
         linked_profile,
         {"id": "member-b", "approval_status": "approved", "active": True},
     ) == PARTICIPANT_STATUS_UNAVAILABLE
+
+
+@pytest.mark.parametrize("role", ["participant", "planner", "admin"])
+def test_membership_capability_is_independent_from_staff_role(role: str) -> None:
+    capability = participant_capability(
+        {"role": role, "active": True, "member_id": "member-a"},
+        {
+            "id": "member-a",
+            "approval_status": "approved",
+            "active": True,
+        },
+    )
+
+    assert capability.can_participate
+    assert capability.member_id == "member-a"

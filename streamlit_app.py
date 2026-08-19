@@ -21,6 +21,7 @@ from authorization import (
     AuthorizationError,
     EVENT_MANAGEMENT_PAGE,
     MEMBER_MANAGEMENT_PAGE,
+    MembershipCapability,
     MY_PROFILE_PAGE,
     MY_TOS_PAGE,
     OPEN_TOS_PAGE,
@@ -28,9 +29,9 @@ from authorization import (
     PUBLIC_PAGE,
     ParticipantReturnContext,
     default_page_for_role,
-    navigation_pages_for_role,
+    navigation_pages_for_capabilities,
     require_admin_role,
-    require_participant_role,
+    require_participant_access,
     require_planner_role,
     signup_context_from_query_params,
 )
@@ -88,7 +89,6 @@ from participant_auth import (
     OTP_CODE_USER_ERROR,
     PARTICIPANT_STATUS_INACTIVE,
     PARTICIPANT_STATUS_NEEDS_ONBOARDING,
-    PARTICIPANT_STATUS_NOT_PARTICIPANT,
     PARTICIPANT_STATUS_PENDING_APPROVAL,
     PARTICIPANT_STATUS_REJECTED,
     PARTICIPANT_STATUS_UNAVAILABLE,
@@ -102,7 +102,7 @@ from participant_auth import (
     oauth_redirect_base_from_secrets,
     oauth_storage_user_error,
     parse_oauth_callback,
-    participant_link_status,
+    participant_capability,
 )
 from participant_registration import (
     ParticipantRegistrationError,
@@ -2408,7 +2408,9 @@ def _finish_participant_login(
         st.session_state["signup_return_context"] = context
     else:
         st.session_state.pop("signup_return_context", None)
-    st.session_state["navigation_page"] = _post_login_page(session.user)
+    st.session_state["navigation_page"] = (
+        PUBLIC_PAGE if context.is_signup else MY_TOS_PAGE
+    )
     st.session_state["login_success"] = True
     _replace_query_params(context.query_params)
 
@@ -2632,17 +2634,21 @@ def _current_user() -> AuthenticatedUser | None:
     return user if isinstance(user, AuthenticatedUser) else None
 
 
-def _refresh_participant_session_display_name(
+def _refresh_participant_session_profile(
     profile: Mapping[str, object],
 ) -> AuthenticatedUser:
-    """Ververs alleen de zichtbare naam en behoud de geroteerde auth-tokens."""
+    """Ververs eigen profielvelden en behoud de geroteerde auth-tokens."""
     session = _current_auth_session()
     profile_id = str(profile.get("id") or "")
     display_name = str(profile.get("display_name") or "").strip()
     if session is None or profile_id != session.user.id or not display_name:
         raise RuntimeError("De actuele profielnaam kon niet veilig worden ververst.")
 
-    updated_user = replace(session.user, display_name=display_name)
+    updated_user = replace(
+        session.user,
+        display_name=display_name,
+        member_id=str(profile.get("member_id") or "") or None,
+    )
     updated_session = replace(session, user=updated_user)
     _set_auth_session(
         updated_session,
@@ -2965,6 +2971,88 @@ def _render_participant_root_login_cta() -> None:
             st.rerun()
 
 
+def _load_participant_capability(
+    repository: UserScopedRegistrationRepository,
+    user: AuthenticatedUser,
+) -> tuple[dict[str, Any], dict[str, Any] | None, MembershipCapability]:
+    """Laad uitsluitend de eigen membership en bereken één centrale capability."""
+    profile = repository.get_own_profile()
+    if (
+        not profile
+        or str(profile.get("id") or "") != user.id
+        or str(profile.get("role") or "") != user.role
+    ):
+        raise AuthorizationError(
+            "Je eigen accountprofiel ontbreekt of is niet toegankelijk."
+        )
+
+    member = repository.get_linked_club_member() if profile.get("member_id") else None
+    capability = participant_capability(profile, member)
+    if (
+        user.member_id != (str(profile.get("member_id") or "") or None)
+        or user.display_name != str(profile.get("display_name") or "")
+    ):
+        _refresh_participant_session_profile(profile)
+    return profile, member, capability
+
+
+def _render_participant_membership_gate(
+    repository: UserScopedRegistrationRepository,
+    user: AuthenticatedUser,
+    profile: Mapping[str, object],
+    capability: MembershipCapability,
+    *,
+    form_key: str,
+) -> bool:
+    """Toon onboarding/status of bevestig dat self-service deelname is toegestaan."""
+    status = capability.status.value
+    if status == PARTICIPANT_STATUS_NEEDS_ONBOARDING:
+        st.info(
+            "Maak eenmalig je clubprofiel aan. Je bestaande planner- of "
+            "beheerrechten blijven ongewijzigd."
+        )
+        with st.form(form_key):
+            display_name = st.text_input(
+                "Naam",
+                value=str(profile.get("display_name") or user.display_name),
+                max_chars=120,
+            )
+            onboarded = st.form_submit_button(
+                "Clubprofiel aanmaken",
+                width="stretch",
+                type="primary",
+            )
+        if onboarded:
+            try:
+                repository.self_onboard_member(display_name)
+                refreshed_profile = repository.get_own_profile()
+                if not refreshed_profile:
+                    raise RuntimeError("Het bijgewerkte accountprofiel ontbreekt.")
+                _refresh_participant_session_profile(refreshed_profile)
+                st.rerun()
+            except (ValueError, RuntimeError) as exc:
+                st.error(str(exc))
+            except Exception:
+                st.error("Je clubprofiel kon niet veilig worden aangemaakt.")
+        return False
+    if status == PARTICIPANT_STATUS_PENDING_APPROVAL:
+        st.warning(
+            "Je clubprofiel wacht op goedkeuring. Je kunt al inloggen, maar nog "
+            "geen TOS-aanmelding opslaan."
+        )
+        return False
+    if status == PARTICIPANT_STATUS_REJECTED:
+        st.error("Je clubprofiel is niet goedgekeurd. Neem contact op met de beheerder.")
+        return False
+    if status == PARTICIPANT_STATUS_INACTIVE:
+        st.warning("Je clubprofiel is niet actief. Neem contact op met de beheerder.")
+        return False
+    if status == PARTICIPANT_STATUS_UNAVAILABLE:
+        st.warning("De ledenkoppeling is niet beschikbaar. Neem contact op met de beheerder.")
+        return False
+    return capability.can_participate
+
+
 def _render_signup_event_summary(event: Mapping[str, object]) -> bool:
     """Toon compacte lokale eventdata zonder technische route-informatie."""
     try:
@@ -3050,77 +3138,25 @@ def _render_participant_signup_page(
         st.error("Je deelnemerssessie kon niet veilig worden geladen.")
         return
     try:
-        profile = repository.get_own_profile()
+        profile, _member, capability = _load_participant_capability(
+            repository,
+            session.user,
+        )
+        require_participant_access(capability, allow_onboarding=True)
+    except AuthorizationError as exc:
+        st.error(str(exc))
+        return
     except Exception:
-        st.error("Je eigen deelnemersprofiel kon niet veilig worden geladen.")
+        st.error("Je eigen ledenstatus kon niet veilig worden geladen.")
         return
 
-    if not profile or str(profile.get("id") or "") != session.user.id:
-        st.error("Je eigen deelnemersprofiel ontbreekt of is niet toegankelijk.")
-        return
-
-    profile_role = str(profile.get("role") or "")
-    if profile_role != session.user.role:
-        st.error("De actuele accountrol kon niet betrouwbaar worden vastgesteld.")
-        return
-
-    link_status = participant_link_status(profile)
-    if link_status == PARTICIPANT_STATUS_NOT_PARTICIPANT:
-        st.info(
-            "Je bent ingelogd met een planner- of beheerdersaccount. "
-            "De participant-aanmelding wordt niet voor dit account geopend."
-        )
-        return
-
-    if link_status == PARTICIPANT_STATUS_NEEDS_ONBOARDING:
-        st.info(
-            "Maak eenmalig je clubprofiel aan. Je krijgt hierdoor geen planner- "
-            "of beheerrechten."
-        )
-        with st.form(f"self_onboarding_{context.event_slug}"):
-            display_name = st.text_input(
-                "Naam",
-                value=str(profile.get("display_name") or session.user.display_name),
-                max_chars=120,
-            )
-            onboarded = st.form_submit_button(
-                "Clubprofiel aanmaken",
-                width="stretch",
-                type="primary",
-            )
-        if onboarded:
-            try:
-                repository.self_onboard_member(display_name)
-                st.rerun()
-            except (ValueError, RuntimeError) as exc:
-                st.error(str(exc))
-            except Exception:
-                st.error("Je clubprofiel kon niet veilig worden aangemaakt.")
-        return
-
-    try:
-        member = repository.get_linked_club_member()
-    except Exception:
-        st.error("De gekoppelde clublidstatus kon niet veilig worden geladen.")
-        return
-
-    link_status = participant_link_status(profile, member)
-    if link_status == PARTICIPANT_STATUS_PENDING_APPROVAL:
-        st.warning(
-            "Je clubprofiel wacht op goedkeuring. Je kunt al inloggen, maar nog "
-            "geen TOS-aanmelding opslaan."
-        )
-        return
-    if link_status == PARTICIPANT_STATUS_REJECTED:
-        st.error(
-            "Je clubprofiel is niet goedgekeurd. Neem contact op met de beheerder."
-        )
-        return
-    if link_status == PARTICIPANT_STATUS_INACTIVE:
-        st.warning("Je clubprofiel is niet actief. Neem contact op met de beheerder.")
-        return
-    if link_status == PARTICIPANT_STATUS_UNAVAILABLE:
-        st.warning("De ledenkoppeling is nog niet beschikbaar. Neem contact op met de beheerder.")
+    if not _render_participant_membership_gate(
+        repository,
+        session.user,
+        profile,
+        capability,
+        form_key=f"self_onboarding_{context.event_slug}",
+    ):
         return
 
     try:
@@ -3473,9 +3509,22 @@ def _render_participant_home_page(
 ) -> None:
     """Compact participantdashboard met eigen TOS, open events en schema."""
     try:
-        require_participant_role(user.role)
+        profile, member, capability = _load_participant_capability(repository, user)
+        require_participant_access(capability, allow_onboarding=True)
     except AuthorizationError as exc:
         st.error(str(exc))
+        return
+    except Exception:
+        st.error("Je ledenstatus kon niet veilig worden geladen.")
+        return
+
+    if not _render_participant_membership_gate(
+        repository,
+        user,
+        profile,
+        capability,
+        form_key="participant_home_onboarding",
+    ):
         return
 
     registration_notice = st.session_state.pop(
@@ -3486,7 +3535,6 @@ def _render_participant_home_page(
         st.toast(str(registration_notice), icon="✅")
 
     try:
-        member = repository.get_linked_club_member()
         registrations, open_events = _load_participant_dashboard_data(repository)
     except Exception:
         st.error("Je TOS-overzicht kon niet veilig worden geladen.")
@@ -3551,9 +3599,22 @@ def _render_open_tos_page(
 ) -> None:
     """Toon alle events waarvoor de participant zichzelf nu kan aanmelden."""
     try:
-        require_participant_role(user.role)
+        profile, _member, capability = _load_participant_capability(repository, user)
+        require_participant_access(capability, allow_onboarding=True)
     except AuthorizationError as exc:
         st.error(str(exc))
+        return
+    except Exception:
+        st.error("Je ledenstatus kon niet veilig worden geladen.")
+        return
+
+    if not _render_participant_membership_gate(
+        repository,
+        user,
+        profile,
+        capability,
+        form_key="open_tos_onboarding",
+    ):
         return
 
     st.title("Open TOS-avonden")
@@ -3583,26 +3644,31 @@ def _render_participant_profile_page(
 ) -> None:
     """Laat een participant uitsluitend de eigen zichtbare clubnaam beheren."""
     try:
-        require_participant_role(user.role)
+        profile, member, capability = _load_participant_capability(repository, user)
+        require_participant_access(capability, allow_onboarding=True)
     except AuthorizationError as exc:
         st.error(str(exc))
+        return
+    except Exception:
+        st.error("Je profiel kon niet veilig worden geladen.")
+        return
+
+    if not _render_participant_membership_gate(
+        repository,
+        user,
+        profile,
+        capability,
+        form_key="participant_profile_onboarding",
+    ):
         return
 
     profile_notice = st.session_state.pop(PARTICIPANT_PROFILE_NOTICE_STATE, None)
     if profile_notice:
         st.toast(str(profile_notice), icon="✅")
 
-    try:
-        profile = repository.get_own_profile()
-        member = repository.get_linked_club_member()
-    except Exception:
-        st.error("Je profiel kon niet veilig worden geladen.")
-        return
-
     if (
-        not profile
-        or str(profile.get("id") or "") != user.id
-        or str(profile.get("role") or "") != "participant"
+        str(profile.get("id") or "") != user.id
+        or str(profile.get("role") or "") != user.role
     ):
         st.error("Je eigen deelnemersprofiel ontbreekt of is niet toegankelijk.")
         return
@@ -3642,7 +3708,7 @@ def _render_participant_profile_page(
         refreshed_profile = repository.get_own_profile()
         if refreshed_profile is None:
             raise RuntimeError("De bijgewerkte profielnaam kon niet worden geladen.")
-        _refresh_participant_session_display_name(refreshed_profile)
+        _refresh_participant_session_profile(refreshed_profile)
         st.session_state[PARTICIPANT_PROFILE_NOTICE_STATE] = "Naam opgeslagen"
         st.rerun()
     except (ValueError, RuntimeError) as exc:
@@ -5385,13 +5451,19 @@ def main() -> None:
 
     with st.sidebar:
         if user:
-            options = list(navigation_pages_for_role(user.role))
+            options = list(
+                navigation_pages_for_capabilities(
+                    user.role,
+                    participant_area=True,
+                )
+            )
             current_page = st.session_state.get("navigation_page")
             if current_page not in options:
                 st.session_state["navigation_page"] = default_page_for_role(
                     user.role
                 )
-            page = st.radio("Navigatie", options, key="navigation_page")
+            navigation_label = "TOS & beheer" if user.can_plan else "Navigatie"
+            page = st.radio(navigation_label, options, key="navigation_page")
         else:
             page = PUBLIC_PAGE
             st.info("Bezoekers zien alleen deelnemers en het gepubliceerde schema.")

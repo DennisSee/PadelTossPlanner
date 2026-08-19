@@ -22,6 +22,7 @@ def _session(role: str) -> PersistentAuthSession:
             email=f"{role}@example.test",
             display_name=role.title(),
             role=role,
+            member_id=f"member-{role}",
         ),
         access_token=f"{role}-access-token",
         refresh_token=f"{role}-refresh-token",
@@ -71,13 +72,15 @@ def test_root_otp_success_cleans_auth_state_and_navigates_to_my_tos(
     assert query_replacements == [{}]
 
 
-def test_signup_otp_success_preserves_exact_validated_event_context(
+@pytest.mark.parametrize("role", ["participant", "planner", "admin"])
+def test_signup_auth_success_preserves_exact_validated_event_context(
     monkeypatch: pytest.MonkeyPatch,
+    role: str,
 ) -> None:
     state, query_replacements = _install_finish_fakes(monkeypatch, {})
     context = ParticipantReturnContext.signup("vrijdag-tos")
 
-    app._finish_participant_login(_session("participant"), object(), context)
+    app._finish_participant_login(_session(role), object(), context)
 
     assert state["signup_return_context"] == context
     assert state["navigation_page"] == PUBLIC_PAGE
@@ -85,10 +88,13 @@ def test_signup_otp_success_preserves_exact_validated_event_context(
 
 
 @pytest.mark.parametrize("role", ["planner", "admin"])
-def test_staff_otp_session_finishes_without_participant_route_exception(
+@pytest.mark.parametrize("auth_method", ["otp", "oauth"])
+def test_staff_root_otp_or_oauth_starts_on_my_tos(
     monkeypatch: pytest.MonkeyPatch,
     role: str,
+    auth_method: str,
 ) -> None:
+    assert auth_method in {"otp", "oauth"}
     state, query_replacements = _install_finish_fakes(monkeypatch, {})
 
     app._finish_participant_login(
@@ -97,8 +103,16 @@ def test_staff_otp_session_finishes_without_participant_route_exception(
         ParticipantReturnContext.home(),
     )
 
-    assert state["navigation_page"] == PLANNER_PAGE
+    assert state["navigation_page"] == MY_TOS_PAGE
     assert query_replacements == [{}]
+
+
+def test_staff_password_login_keeps_planner_as_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(app, "st", SimpleNamespace(session_state={}))
+
+    assert app._post_login_page(_session("admin").user) == PLANNER_PAGE
 
 
 def test_auth_options_uses_one_non_optional_context_for_otp_and_oauth() -> None:

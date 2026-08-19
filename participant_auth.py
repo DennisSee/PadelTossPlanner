@@ -9,7 +9,12 @@ from time import time
 from typing import Mapping
 from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
 
-from authorization import ParticipantReturnContext, is_valid_event_slug
+from authorization import (
+    MembershipCapability,
+    MembershipStatus,
+    ParticipantReturnContext,
+    is_valid_event_slug,
+)
 
 
 SUPPORTED_OAUTH_PROVIDERS = ("google", "apple")
@@ -19,7 +24,7 @@ PARTICIPANT_STATUS_REJECTED = "rejected"
 PARTICIPANT_STATUS_INACTIVE = "inactive"
 PARTICIPANT_STATUS_UNAVAILABLE = "member_unavailable"
 PARTICIPANT_STATUS_READY = "ready"
-PARTICIPANT_STATUS_NOT_PARTICIPANT = "not_participant"
+PARTICIPANT_STATUS_ACCOUNT_INACTIVE = "account_inactive"
 OAUTH_PENDING_MAX_AGE_SECONDS = 10 * 60
 OAUTH_CALLBACK_MARKER = "auth_callback"
 OAUTH_COOKIE_SYNC_MAX_RUNS = 2
@@ -362,30 +367,38 @@ def confirmed_oauth_pending_cookie(
     return pending
 
 
-def participant_link_status(
+def participant_capability(
     profile: Mapping[str, object],
     member: Mapping[str, object] | None = None,
-) -> str:
-    """Bepaal zonder frontendstate of een participant veilig verder mag."""
-    if str(profile.get("role") or "") != "participant":
-        return PARTICIPANT_STATUS_NOT_PARTICIPANT
+) -> MembershipCapability:
+    """Bereken membership uitsluitend uit het eigen profiel en clublidrecord."""
+    if not bool(profile.get("active", False)):
+        return MembershipCapability(MembershipStatus.ACCOUNT_INACTIVE)
 
     member_id = str(profile.get("member_id") or "")
     if not member_id:
-        return PARTICIPANT_STATUS_NEEDS_ONBOARDING
+        return MembershipCapability(MembershipStatus.NEEDS_ONBOARDING)
     if (
         member is None
         or str(member.get("id") or "") != member_id
     ):
-        return PARTICIPANT_STATUS_UNAVAILABLE
+        return MembershipCapability(MembershipStatus.UNAVAILABLE, member_id)
 
     approval_status = str(member.get("approval_status") or "")
     if approval_status == "pending":
-        return PARTICIPANT_STATUS_PENDING_APPROVAL
+        return MembershipCapability(MembershipStatus.PENDING_APPROVAL, member_id)
     if approval_status == "rejected":
-        return PARTICIPANT_STATUS_REJECTED
+        return MembershipCapability(MembershipStatus.REJECTED, member_id)
     if approval_status != "approved":
-        return PARTICIPANT_STATUS_UNAVAILABLE
+        return MembershipCapability(MembershipStatus.UNAVAILABLE, member_id)
     if not bool(member.get("active", False)):
-        return PARTICIPANT_STATUS_INACTIVE
-    return PARTICIPANT_STATUS_READY
+        return MembershipCapability(MembershipStatus.MEMBER_INACTIVE, member_id)
+    return MembershipCapability(MembershipStatus.READY, member_id)
+
+
+def participant_link_status(
+    profile: Mapping[str, object],
+    member: Mapping[str, object] | None = None,
+) -> str:
+    """Compatibele statuswaarde voor bestaande presentatielogica."""
+    return participant_capability(profile, member).status.value

@@ -162,12 +162,18 @@ def test_participant_signup_route_uses_only_user_scoped_repository() -> None:
         for node in ast.walk(function)
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
     }
-    assert "get_own_profile" in attributes
+    assert "_load_participant_capability" in calls
+    assert "_render_participant_membership_gate" in calls
     assert "get_event_by_slug" in attributes
-    assert "self_onboard_member" in attributes
     assert "get_own_registration" in attributes
     assert "save_own_registration" in attributes
     assert not {"insert", "update", "upsert", "delete"} & attributes
+
+    capability_calls = _function_calls("_load_participant_capability")
+    gate_calls = _function_calls("_render_participant_membership_gate")
+    assert "participant_capability" in capability_calls
+    assert "_refresh_participant_session_profile" in capability_calls
+    assert "_refresh_participant_session_profile" in gate_calls
 
 
 def test_participant_dashboard_routes_have_direct_guards_and_no_admin_store() -> None:
@@ -177,7 +183,8 @@ def test_participant_dashboard_routes_have_direct_guards_and_no_admin_store() ->
         "_render_participant_profile_page",
     ):
         calls = _function_calls(function_name)
-        assert "require_participant_role" in calls
+        assert "require_participant_access" in calls
+        assert "_load_participant_capability" in calls
         assert "_get_admin_store" not in calls
 
     home_calls = _function_calls("_render_participant_home_page")
@@ -185,7 +192,34 @@ def test_participant_dashboard_routes_have_direct_guards_and_no_admin_store() ->
     open_calls = _function_calls("_render_open_tos_page")
     assert "_load_participant_dashboard_data" in open_calls
     profile_calls = _function_calls("_render_participant_profile_page")
-    assert "_refresh_participant_session_display_name" in profile_calls
+    assert "_refresh_participant_session_profile" in profile_calls
+
+
+def test_staff_without_member_reuses_the_user_scoped_onboarding_gate() -> None:
+    tree = ast.parse(APP_PATH.read_text(encoding="utf-8"))
+    gate = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef)
+        and node.name == "_render_participant_membership_gate"
+    )
+    gate_attributes = {
+        node.func.attr
+        for node in ast.walk(gate)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+    }
+
+    assert "self_onboard_member" in gate_attributes
+    assert "get_own_profile" in gate_attributes
+    assert "_get_admin_store" not in _function_calls(
+        "_render_participant_membership_gate"
+    )
+    for page in (
+        "_render_participant_home_page",
+        "_render_open_tos_page",
+        "_render_participant_profile_page",
+    ):
+        assert "_render_participant_membership_gate" in _function_calls(page)
 
 
 def test_oauth_callback_runs_before_restore_and_uses_current_query_api() -> None:
