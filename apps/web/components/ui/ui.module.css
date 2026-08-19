@@ -1,0 +1,128 @@
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.logo {
+  width: 3.25rem;
+  height: 3.25rem;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  box-shadow: var(--shadow-sm);
+}
+
+.brandText {
+  min-width: 0;
+}
+
+.brandName {
+  margin: 0;
+  color: var(--club-green-dark);
+  font-size: clamp(1.05rem, 3vw, 1.35rem);
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.subtitle {
+  margin: 0.2rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.75rem;
+  padding: 0.25rem 0.65rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.025em;
+}
+
+.badgeNeutral {
+  color: var(--text-muted);
+  border-color: var(--border);
+  background: var(--surface-subtle);
+}
+
+.badgeSuccess {
+  color: var(--club-green-dark);
+  border-color: #b9decf;
+  background: var(--success-soft);
+}
+
+.badgeWarning {
+  color: #624f00;
+  border-color: #ead46e;
+  background: var(--warning-soft);
+}
+
+.badgeDanger {
+  color: var(--danger);
+  border-color: #efc3bd;
+  background: var(--danger-soft);
+}
+
+.linkButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 3rem;
+  padding: 0.75rem 1.15rem;
+  border: 2px solid var(--club-green);
+  border-radius: var(--radius-md);
+  color: var(--surface);
+  background: var(--club-green);
+  font-weight: 800;
+  text-decoration: none;
+  transition: background-color 140ms ease, border-color 140ms ease, transform 140ms ease;
+}
+
+.linkButton:hover {
+  border-color: var(--club-green-dark);
+  background: var(--club-green-dark);
+}
+
+.linkButton:active {
+  transform: translateY(1px);
+}
+
+.state {
+  padding: clamp(1.25rem, 4vw, 2rem);
+  text-align: center;
+}
+
+.stateTitle {
+  margin: 0;
+  color: var(--club-green-dark);
+  font-size: 1.15rem;
+}
+
+.stateText {
+  max-width: 34rem;
+  margin: 0.5rem auto 0;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+
+@media (max-width: 30rem) {
+  .logo {
+    width: 2.9rem;
+    height: 2.9rem;
+  }
+
+  .linkButton {
+    width: 100%;
+  }
+}

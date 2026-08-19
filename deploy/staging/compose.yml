@@ -37,6 +37,10 @@ services:
     build:
       context: ../../apps/web
     restart: unless-stopped
+    environment:
+      APP_ENV: ${APP_ENV:-staging}
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY:-}
     logging:
       driver: json-file
       options:
@@ -46,6 +50,7 @@ services:
       - "3000"
     networks:
       - application
+      - web-egress
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1:3000/api/health"]
       interval: 30s
@@ -83,6 +88,7 @@ networks:
   edge: {}
   application:
     internal: true
+  web-egress: {}
 
 volumes:
   caddy_data:

@@ -16,7 +16,7 @@ Staging gebruikt `test-tos.oddbounce.nl`:
 - `/api/planner/*` gaat met verwijderde prefix naar FastAPI. Daardoor bereikt `/api/planner/health` intern FastAPI `/health`.
 - alle overige routes gaan naar Next.js. Daardoor blijft `/api/health` de healthroute van de webservice.
 
-Next.js en FastAPI publiceren geen hostpoorten en delen alleen het interne Compose-netwerk `application`. Caddy heeft daarnaast het netwerk `edge` nodig voor internetverkeer en TLS-certificaten. Alleen Caddy bewaart infrastructuurdata voor automatische HTTPS; er is geen persistente applicatiedata en geen lokale database.
+Next.js en FastAPI publiceren geen hostpoorten en delen het interne Compose-netwerk `application`. Caddy heeft daarnaast `edge` voor internetverkeer en TLS-certificaten. Vanaf WEB-2 heeft uitsluitend Next.js daarnaast `web-egress` voor de server-side openbare Supabase-read. FastAPI blijft volledig intern. Alleen Caddy bewaart infrastructuurdata voor automatische HTTPS; er is geen persistente applicatiedata en geen lokale database.
 
 Voor een lokale end-to-endcontrole kan `SITE_ADDRESS` tijdelijk op `http://:80` worden gezet. De stagingwaarde blijft standaard `test-tos.oddbounce.nl`; er is daarom geen `.env`-bestand nodig.
 
@@ -37,9 +37,9 @@ docker run --rm --platform linux/amd64 \
 
 Na een wijziging aan een `.in`-bestand moeten beide lockfiles bewust opnieuw worden gegenereerd en beoordeeld.
 
-## Netwerkgrens vóór WEB-Auth
+## Netwerkgrens vanaf WEB-2
 
-`application` is in WEB-1 bewust een intern Docker-netwerk: de huidige web- en plannerservices hebben geen externe runtimeafhankelijkheden. Vóór WEB-Auth heeft de Next.js-container gecontroleerde outbound HTTPS-toegang nodig voor Supabase Auth, SSR-cookieverversing en user-scoped databaseverzoeken. Daarvoor is geen publieke hostpoort op de webcontainer nodig. `planner-api` kan intern blijven. Deze netwerkgrens wordt vóór die fase opnieuw security-reviewed.
+`application` blijft een intern Docker-netwerk. Next.js is vanaf WEB-2 daarnaast aan het niet-interne `web-egress` gekoppeld voor uitsluitend server-side HTTPS-verkeer naar de bestaande publieke Supabase-projectie. Dit geeft de webcontainer geen hostpoort. `planner-api` blijft alleen op `application` en krijgt geen internet- of Supabasetoegang. Vóór WEB-Auth wordt deze netwerkgrens opnieuw beoordeeld voor Auth, SSR-cookieverversing en user-scoped databaseverzoeken.
 
 ## Parallelle migratie
 
