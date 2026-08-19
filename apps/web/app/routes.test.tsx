@@ -48,4 +48,15 @@ describe("WEB-2 routes", () => {
     expect(compose).toContain("web-egress");
     expect(compose).toContain("internal: true");
   });
+
+  it("keeps UI hierarchy and keyboard focus structural rather than pixel-bound", () => {
+    const liveCss = readFileSync(
+      resolve(process.cwd(), "components/live/live-schedule.module.css"),
+      "utf8",
+    );
+    expect(liveCss).toContain(".select:focus-visible");
+    expect(liveCss).toContain(".roundNeutral");
+    expect(liveCss).toContain(".currentPanel");
+    expect(liveCss).toContain(".nextPanel");
+  });
 });

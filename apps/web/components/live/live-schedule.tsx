@@ -126,7 +126,9 @@ function StatusChips({ round }: { round: GroupedRound }) {
           className={`${styles.footerChip} ${group.rest ? styles.restChip : ""}`.trim()}
           key={group.label}
         >
-          {group.label}: {group.names.join(", ")}
+          <strong>{group.label}</strong>
+          <span aria-hidden="true">: </span>
+          {group.names.join(", ")}
         </span>
       ))}
     </div>
@@ -143,7 +145,11 @@ function RoundCard({
   return (
     <Card
       className={`${styles.roundCard} ${
-        state === "current" ? styles.roundCurrent : state === "next" ? styles.roundNext : ""
+        state === "current"
+          ? styles.roundCurrent
+          : state === "next"
+            ? styles.roundNext
+            : styles.roundNeutral
       }`.trim()}
     >
       <div className={styles.roundHeader}>
@@ -186,7 +192,11 @@ function PersonalRoundCard({
   return (
     <Card
       className={`${styles.roundCard} ${
-        state === "current" ? styles.roundCurrent : state === "next" ? styles.roundNext : ""
+        state === "current"
+          ? styles.roundCurrent
+          : state === "next"
+            ? styles.roundNext
+            : styles.roundNeutral
       }`.trim()}
     >
       <div className={styles.roundHeader}>
@@ -437,8 +447,7 @@ export function LiveSchedule({
         </div>
 
         <Card className={styles.eventCard}>
-          <div>
-            <p className={styles.eventEyebrow}>T.C. Zuid TOS</p>
+          <div className={styles.eventSummary}>
             <h1 className={styles.eventTitle}>{formatEventDate(schedule.eventDate)}</h1>
             <p className={styles.eventMeta}>
               <span>{schedule.startTime}–{schedule.endTime}</span>
@@ -446,11 +455,11 @@ export function LiveSchedule({
               <span>{participants.length} deelnemers</span>
             </p>
           </div>
-          <div><Badge tone={status.tone}>{status.label}</Badge></div>
+          <div className={styles.eventStatus}><Badge tone={status.tone}>{status.label}</Badge></div>
         </Card>
 
-        <div className={styles.controls}>
-          <Card className={styles.selectCard}>
+        <Card className={styles.controlSurface}>
+          <div className={styles.selectBlock}>
             <label className={styles.label} htmlFor="player-select">Kies je naam</label>
             <select
               className={styles.select}
@@ -463,10 +472,10 @@ export function LiveSchedule({
                 <option key={participant} value={participant}>{participant}</option>
               ))}
             </select>
-            <p className={styles.hint}>Je keuze wordt alleen in deze browser onthouden.</p>
-          </Card>
+            <p className={styles.hint}>Alleen onthouden op dit apparaat.</p>
+          </div>
 
-          <Card className={styles.participants}>
+          <div className={styles.participants}>
             <details>
               <summary>Deelnemers ({participants.length})</summary>
               <div className={styles.chips}>
@@ -475,8 +484,8 @@ export function LiveSchedule({
                 ))}
               </div>
             </details>
-          </Card>
-        </div>
+          </div>
+        </Card>
 
         <h2 className={styles.scheduleTitle}>
           {selectedPlayer === EVERYONE ? "Wedstrijdschema" : `Schema voor ${selectedPlayer}`}

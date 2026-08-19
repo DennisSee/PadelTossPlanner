@@ -1,12 +1,12 @@
 .header {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: 0.65rem;
   min-width: 0;
 }
 .logo {
-  width: 3.25rem;
-  height: 3.25rem;
+  width: 2.8rem;
+  height: 2.8rem;
   flex: 0 0 auto;
   border-radius: 50%;
   box-shadow: var(--shadow-sm);
@@ -19,20 +19,20 @@
 .brandName {
   margin: 0;
   color: var(--club-green-dark);
-  font-size: clamp(1.05rem, 3vw, 1.35rem);
-  font-weight: 800;
+  font-size: clamp(1rem, 2.6vw, 1.22rem);
+  font-weight: 750;
   line-height: 1.15;
 }
 
 .subtitle {
-  margin: 0.2rem 0 0;
+  margin: 0.12rem 0 0;
   color: var(--text-muted);
   font-size: 0.85rem;
 }
 
 .card {
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   background: var(--surface);
   box-shadow: var(--shadow-sm);
 }
@@ -84,7 +84,7 @@
   border-radius: var(--radius-md);
   color: var(--surface);
   background: var(--club-green);
-  font-weight: 800;
+  font-weight: 750;
   text-decoration: none;
   transition: background-color 140ms ease, border-color 140ms ease, transform 140ms ease;
 }
@@ -118,8 +118,8 @@
 
 @media (max-width: 30rem) {
   .logo {
-    width: 2.9rem;
-    height: 2.9rem;
+    width: 2.55rem;
+    height: 2.55rem;
   }
 
   .linkButton {

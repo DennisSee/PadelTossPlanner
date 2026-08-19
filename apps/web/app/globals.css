@@ -56,8 +56,17 @@ input {
 }
 
 :focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--club-yellow) 85%, white);
-  outline-offset: 3px;
+  outline: 2px solid var(--club-green);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 ::selection {

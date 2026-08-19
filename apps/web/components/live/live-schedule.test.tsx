@@ -61,12 +61,14 @@ describe("live schedule UI", () => {
 
   it("shows event metadata, participants and current/next rounds", () => {
     render(<LiveSchedule schedule={schedule()} initialNowIso="2026-08-21T18:05:00.000Z" />);
+    expect(screen.getAllByText("T.C. Zuid TOS")).toHaveLength(1);
     expect(screen.getByRole("heading", { name: "vrijdag 21 augustus 2026" })).toBeInTheDocument();
     expect(screen.getByText("20:00–20:40")).toBeInTheDocument();
     expect(screen.getByText("2 banen")).toBeInTheDocument();
     expect(screen.getByText("Deelnemers (2)")).toBeInTheDocument();
     expect(screen.getAllByText("Nu").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Hierna").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Rust").length).toBeGreaterThan(0);
   });
 
   it("supports Iedereen and a selected personal schedule", async () => {
