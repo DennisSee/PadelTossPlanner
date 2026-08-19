@@ -76,12 +76,76 @@ describe("live schedule UI", () => {
     render(<LiveSchedule schedule={schedule()} initialNowIso="2026-08-21T17:55:00.000Z" />);
     const select = screen.getByLabelText("Kies je naam");
     expect(select).toHaveValue("Iedereen");
-    expect(screen.getAllByText("Cato & Daan").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Cato", { exact: true }).length).toBeGreaterThan(0);
+    expect(document.querySelectorAll('[data-selected-player="true"]')).toHaveLength(0);
 
     await user.selectOptions(select, "Zoë");
     expect(select).toHaveValue("Zoë");
-    expect(screen.getAllByText("Deze ronde heb je rust.").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Deze ronde speel je niet.").length).toBeGreaterThan(0);
+    expect(document.querySelectorAll('[data-selected-player="true"]').length).toBeGreaterThan(0);
     expect(window.localStorage.getItem("tc-zuid-tos/preferred-player")).toBe("Zoë");
+  });
+
+  it("highlights an exact selected player in both teams without partial matches", async () => {
+    const user = userEvent.setup();
+    const data = schedule(["Zoë", "Anna", "Ann"]);
+    data.rows[0]["Team 1"] = "Bram & Anna";
+    data.rows[1]["Team 2"] = "Daan & Anna";
+    render(<LiveSchedule schedule={data} initialNowIso="2026-08-21T17:55:00.000Z" />);
+
+    const select = screen.getByLabelText("Kies je naam");
+    await user.selectOptions(select, "Anna");
+    const selectedAnna = document.querySelectorAll(
+      '[data-selected-player="true"][data-player-name="Anna"]',
+    );
+    expect(selectedAnna.length).toBeGreaterThanOrEqual(2);
+
+    await user.selectOptions(select, "Ann");
+    expect(screen.getByRole("heading", { level: 2, name: "Schema voor Ann" })).toBeInTheDocument();
+    expect(document.querySelectorAll('[data-selected-player="true"]')).toHaveLength(0);
+  });
+
+  it("restores canonical casing and highlights case-insensitively", async () => {
+    window.localStorage.setItem("tc-zuid-tos/preferred-player", "zoë");
+    render(<LiveSchedule schedule={schedule()} initialNowIso="2026-08-21T17:55:00.000Z" />);
+    await waitFor(() => expect(screen.getByLabelText("Kies je naam")).toHaveValue("Zoë"));
+    expect(document.querySelectorAll('[data-selected-player="true"]').length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Zoë", { exact: true }).length).toBeGreaterThan(0);
+  });
+
+  it("renders compact court badges with their court labels", () => {
+    render(<LiveSchedule schedule={schedule()} initialNowIso="2026-08-21T18:05:00.000Z" />);
+    const badges = screen.getAllByTestId("court-badge");
+    expect(badges.length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Kremer Baan", { exact: true }).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("PlaySeat Baan", { exact: true }).length).toBeGreaterThan(0);
+  });
+
+  it("keeps personal availability states compact and textual", async () => {
+    const user = userEvent.setup();
+    const data = schedule(["Rust Speler", "Nog Niet Speler", "Niet Meer Speler"]);
+    data.rows[0]["Team 1"] = "A & B";
+    data.rows[0]["Team 2"] = "C & D";
+    data.rows[0].Rust = "Rust Speler";
+    data.rows[0]["Nog niet aanwezig"] = "Nog Niet Speler";
+    data.rows[1]["Team 1"] = "E & F";
+    data.rows[1]["Team 2"] = "G & H";
+    data.rows[1]["Niet meer beschikbaar"] = "Niet Meer Speler";
+    render(<LiveSchedule schedule={data} initialNowIso="2026-08-21T17:55:00.000Z" />);
+    const select = screen.getByLabelText("Kies je naam");
+
+    await user.selectOptions(select, "Rust Speler");
+    expect(document.querySelector('[data-personal-status="rest"]')).toHaveTextContent(
+      "RustDeze ronde speel je niet.",
+    );
+    await user.selectOptions(select, "Nog Niet Speler");
+    expect(document.querySelector('[data-personal-status="not-arrived"]')).toHaveTextContent(
+      "Nog niet aanwezigJe bent deze ronde nog niet beschikbaar.",
+    );
+    await user.selectOptions(select, "Niet Meer Speler");
+    expect(document.querySelector('[data-personal-status="unavailable"]')).toHaveTextContent(
+      "Niet meer beschikbaarDeze ronde valt na jouw eindtijd.",
+    );
   });
 
   it("uses a logical h1, h2 and round h3 heading structure", async () => {
@@ -146,7 +210,7 @@ describe("live schedule UI", () => {
     const select = screen.getByLabelText("Kies je naam");
     await user.selectOptions(select, "Zoë");
     expect(select).toHaveValue("Zoë");
-    expect(screen.getAllByText("Deze ronde heb je rust.").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Deze ronde speel je niet.").length).toBeGreaterThan(0);
   });
 
   it("uses the in-memory fallback when reads and writes are blocked", async () => {

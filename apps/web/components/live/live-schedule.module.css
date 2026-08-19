@@ -124,15 +124,15 @@
 }
 
 .hint {
-  margin: var(--space-2) 0 0;
+  margin: 0.35rem 0 0;
   color: var(--text-muted);
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   line-height: 1.45;
 }
 
 .participants summary,
 .allRounds summary {
-  min-height: 2.2rem;
+  min-height: 2rem;
   color: var(--club-green-dark);
   font-weight: 700;
   cursor: pointer;
@@ -140,7 +140,7 @@
 
 .participants {
   min-width: 0;
-  padding: 0.55rem 0 0.1rem var(--space-4);
+  padding: 0.35rem 0 0.1rem var(--space-4);
   border-left: 1px solid var(--border);
 }
 
@@ -286,7 +286,13 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
-  margin-bottom: var(--space-3);
+  margin-bottom: 0.65rem;
+}
+
+.roundMeta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
 }
 
 .roundTitle {
@@ -306,49 +312,106 @@
 
 .matches {
   display: grid;
-  gap: var(--space-2);
+  gap: 0.65rem;
 }
 
 .match {
-  display: grid;
-  grid-template-columns: minmax(6rem, 0.27fr) minmax(0, 1fr);
-  gap: var(--space-2);
-  align-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
   min-width: 0;
 }
 
-.court {
-  display: grid;
-  place-items: center;
-  min-height: 2.1rem;
-  padding: 0.35rem 0.5rem;
-  border-radius: var(--radius-sm);
-  color: #173b31;
-  background: #dce8e3;
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-align: center;
+.match + .match {
+  padding-top: 0.65rem;
+  border-top: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
 }
 
-.courtKremer { background: #d9efc1; }
-.courtZga { background: #ffe393; }
-.courtPlayseat { background: #cce8f4; }
-.courtSeppworks { background: #f1d7ed; }
+.personalMatch {
+  gap: 0.45rem;
+}
+
+.court {
+  --court-accent: #547268;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: fit-content;
+  max-width: 100%;
+  min-height: 1.9rem;
+  padding: 0.28rem 0.65rem;
+  border: 1px solid color-mix(in srgb, var(--court-accent) 35%, var(--border));
+  border-radius: 999px;
+  color: #173b31;
+  background: color-mix(in srgb, var(--court-accent) 14%, white);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.courtDot {
+  width: 0.5rem;
+  height: 0.5rem;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--court-accent);
+}
+
+.courtKremer { --court-accent: #6d9f3e; }
+.courtZga { --court-accent: #c99900; }
+.courtPlayseat { --court-accent: #2e88ab; }
+.courtSeppworks { --court-accent: #9b5b91; }
 
 .matchup {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   gap: 0.35rem;
   align-items: center;
+  width: 100%;
   min-width: 0;
-  padding: 0.45rem 0.6rem;
+  padding: 0.55rem 0.65rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--surface);
   font-size: 0.86rem;
-  font-weight: 600;
+  font-weight: 620;
   text-align: center;
   overflow-wrap: anywhere;
+}
+
+.teamNames {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.teamNamePart {
+  white-space: normal;
+}
+
+.teamSeparator {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.selectedPlayer {
+  display: inline;
+  padding: 0.12rem 0.3rem;
+  border: 1px solid color-mix(in srgb, var(--club-green) 38%, transparent);
+  border-radius: 0.35rem;
+  color: var(--club-green-dark);
+  background: color-mix(in srgb, var(--success-soft) 78%, white);
+  font-weight: 760;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.youLabel {
+  color: var(--club-green);
+  font-size: 0.68rem;
+  font-weight: 750;
+  white-space: nowrap;
 }
 
 .versus {
@@ -381,22 +444,41 @@
   background: var(--warning-soft);
 }
 
+.personalStateCard {
+  padding-block: 0.75rem;
+}
+
 .personalBody {
-  display: grid;
-  gap: var(--space-3);
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
 }
 
 .personalStatus {
-  margin: 0;
-  color: var(--club-green-dark);
-  font-size: 1.05rem;
-  font-weight: 850;
+  flex: 0 0 auto;
+  padding: 0.24rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 750;
+  line-height: 1.3;
+}
+
+.personalStatusRest {
+  color: #624f00;
+  background: var(--warning-soft);
+}
+
+.personalStatusMuted {
+  color: var(--text-muted);
+  background: var(--surface-subtle);
 }
 
 .personalText {
-  margin: 0;
+  min-width: 0;
   color: var(--text-muted);
-  line-height: 1.5;
+  font-size: 0.82rem;
+  line-height: 1.4;
 }
 
 .allRounds {
@@ -472,18 +554,17 @@
   }
 
   .eventCard {
-    position: relative;
     grid-template-columns: 1fr;
+    gap: 0.65rem;
   }
 
   .eventTitle {
-    padding-right: 3.6rem;
+    padding-right: 0;
   }
 
   .eventStatus {
-    position: absolute;
-    top: 0.9rem;
-    right: 0.9rem;
+    position: static;
+    justify-self: start;
   }
 
   .eventMeta {
@@ -500,11 +581,12 @@
     padding: var(--space-3);
   }
 
-  .match {
-    grid-template-columns: 1fr;
+  .court {
+    min-height: 1.9rem;
   }
 
-  .court {
-    min-height: 2.2rem;
+  .personalBody {
+    align-items: flex-start;
+    flex-wrap: wrap;
   }
 }

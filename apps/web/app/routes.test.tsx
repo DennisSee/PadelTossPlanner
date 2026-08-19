@@ -10,6 +10,12 @@ import { GET } from "./api/health/route";
 describe("WEB-2 routes", () => {
   it("links the public homepage to the live schedule", () => {
     render(<Home />);
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+      "Jouw TOS-avond in één oogopslag",
+    );
+    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
+      "Online aanmelden volgt later",
+    );
     expect(screen.getByRole("link", { name: "Bekijk live TOS-schema" })).toHaveAttribute(
       "href",
       "/live",
@@ -58,5 +64,8 @@ describe("WEB-2 routes", () => {
     expect(liveCss).toContain(".roundNeutral");
     expect(liveCss).toContain(".currentPanel");
     expect(liveCss).toContain(".nextPanel");
+    expect(liveCss).toContain(".courtKremer { --court-accent:");
+    expect(liveCss).toContain(".courtZga { --court-accent:");
+    expect(liveCss).toContain(".selectedPlayer");
   });
 });

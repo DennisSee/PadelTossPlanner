@@ -26,6 +26,12 @@ test("homepage toont de publieke stagingingang en navigeert met toetsenbord", as
   await expect(page.getByRole("img", { name: "Logo T.C. Zuid" })).toBeVisible();
   await expect(page.getByText("T.C. Zuid TOS", { exact: true })).toBeVisible();
   await expect(page.getByText("Staging", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+    "Jouw TOS-avond in één oogopslag",
+  );
+  await expect(page.getByRole("heading", { level: 2 })).toHaveText(
+    "Online aanmelden volgt later",
+  );
   await expect(page.getByRole("button", { name: /inloggen/i })).toHaveCount(0);
 
   const liveLink = page.getByRole("link", { name: "Bekijk live TOS-schema" });
@@ -52,6 +58,7 @@ test("iedereenweergave toont event, rondes, banen, teams en statussen", async ({
   const select = page.getByLabel("Kies je naam");
   await expect(select).toBeVisible();
   await expect(select).toHaveValue("Iedereen");
+  await expect(page.locator('[data-selected-player="true"]')).toHaveCount(0);
 
   const current = page.getByRole("region", { name: "Huidige ronde" });
   const next = page.getByRole("region", { name: "Volgende ronde" });
@@ -59,7 +66,8 @@ test("iedereenweergave toont event, rondes, banen, teams en statussen", async ({
   await expect(next).toBeVisible();
   await expect(current.getByText(LONG_COURT_NAME, { exact: true })).toBeVisible();
   await expect(current.getByText("Kremer Baan", { exact: true })).toBeVisible();
-  await expect(current.getByText("Zoë Accent & Anna", { exact: true })).toBeVisible();
+  await expect(current.getByText("Zoë Accent", { exact: true })).toBeVisible();
+  await expect(current.getByText("Anna", { exact: true }).first()).toBeVisible();
   await expect(current.getByText(/Rust: Rust Speler, Ann/)).toBeVisible();
   await expect(current.getByText(/Nog niet aanwezig: Nog Niet Speler/)).toBeVisible();
   await expect(next.getByText(/Niet meer beschikbaar: Niet Meer Speler/)).toBeVisible();
@@ -79,19 +87,32 @@ test("persoonlijke selectie onderscheidt teams, rust, afwezigheid en exacte name
   await expect(page.getByRole("heading", { level: 2, name: "Schema voor Zoë Accent" })).toBeVisible();
   await expect(current.getByRole("heading", { level: 3 })).toHaveCount(1);
   await expect(next.getByRole("heading", { level: 3 })).toHaveCount(1);
-  await expect(current.getByText("Zoë Accent & Anna", { exact: true })).toBeVisible();
-  await expect(current.getByText(`${LONG_PLAYER_NAME} & Niet Meer Speler`, { exact: true })).toBeVisible();
+  await expect(current.getByText("Zoë Accent", { exact: true })).toBeVisible();
+  await expect(current.getByText(LONG_PLAYER_NAME, { exact: true })).toBeVisible();
+  const selectedHighlights = page.locator('[data-selected-player="true"]');
+  expect(await selectedHighlights.count()).toBeGreaterThan(0);
+  await expect(selectedHighlights.first()).toContainText("Zoë Accent");
+  await expect(selectedHighlights.first()).toContainText("jij");
+
+  const playingCard = current.getByTestId("court-badge").first().locator("..").locator("..");
+  const playingBox = await playingCard.boundingBox();
 
   await select.selectOption({ label: "Rust Speler" });
-  await expect(current.getByText("Deze ronde heb je rust.")).toBeVisible();
+  const restState = current.locator('[data-personal-status="rest"]');
+  await expect(restState).toContainText("Rust");
+  await expect(restState).toContainText("Deze ronde speel je niet.");
+  const restBox = await restState.locator("..").boundingBox();
+  expect(restBox?.height ?? Number.POSITIVE_INFINITY).toBeLessThan(
+    playingBox?.height ?? 0,
+  );
   await select.selectOption({ label: "Nog Niet Speler" });
-  await expect(current.getByText("Deze ronde ben je nog niet beschikbaar.")).toBeVisible();
+  await expect(current.getByText("Je bent deze ronde nog niet beschikbaar.")).toBeVisible();
   await select.selectOption({ label: "Niet Meer Speler" });
   await expect(next.getByText("Deze ronde valt na jouw eindtijd.")).toBeVisible();
 
   await select.selectOption({ label: "Ann" });
-  await expect(current.getByText("Deze ronde heb je rust.")).toBeVisible();
-  await expect(current.getByText("Zoë Accent & Anna", { exact: true })).toHaveCount(0);
+  await expect(current.getByText("Deze ronde speel je niet.")).toBeVisible();
+  await expect(page.locator('[data-selected-player="true"]')).toHaveCount(0);
 });
 
 test("geldige, verouderde en same-tab localStoragevoorkeuren blijven veilig", async ({ page }) => {
@@ -132,7 +153,7 @@ test("geblokkeerde localStorage-setter laat same-tab selectie bruikbaar", async 
   await select.selectOption({ label: "Rust Speler" });
   await expect(select).toHaveValue("Rust Speler");
   await expect(page.getByRole("region", { name: "Huidige ronde" })).toContainText(
-    "Deze ronde heb je rust.",
+    "Deze ronde speel je niet.",
   );
 });
 
@@ -188,13 +209,28 @@ test("homepage en livepagina blijven binnen iedere geconfigureerde viewport", as
   const viewport = page.viewportSize();
   const select = await page.getByLabel("Kies je naam").boundingBox();
   const longName = await participants.locator("..").getByText(LONG_PLAYER_NAME, { exact: true }).boundingBox();
-  const longCourt = await page.getByText(LONG_COURT_NAME, { exact: true }).first().boundingBox();
+  const courtBadge = page.getByTestId("court-badge").filter({ hasText: LONG_COURT_NAME }).first();
+  const longCourt = await courtBadge.boundingBox();
+  const compactCourt = page.getByTestId("court-badge").filter({ hasText: "Kremer Baan" }).first();
+  const compactCourtBox = await compactCourt.boundingBox();
+  const courtMatch = await compactCourt.locator("..").boundingBox();
+  const eventSummary = await page.getByTestId("event-summary").boundingBox();
+  const eventStatus = await page.getByTestId("event-status").boundingBox();
   expect(select).not.toBeNull();
   expect(longName).not.toBeNull();
   expect(longCourt).not.toBeNull();
   expect((select?.x ?? 0) + (select?.width ?? 0)).toBeLessThanOrEqual(viewport?.width ?? 0);
   expect((longName?.x ?? 0) + (longName?.width ?? 0)).toBeLessThanOrEqual(viewport?.width ?? 0);
   expect((longCourt?.x ?? 0) + (longCourt?.width ?? 0)).toBeLessThanOrEqual(viewport?.width ?? 0);
+  expect(compactCourtBox?.width ?? Number.POSITIVE_INFINITY).toBeLessThan(courtMatch?.width ?? 0);
+  const eventOverlaps = Boolean(
+    eventSummary && eventStatus &&
+    eventSummary.x < eventStatus.x + eventStatus.width &&
+    eventSummary.x + eventSummary.width > eventStatus.x &&
+    eventSummary.y < eventStatus.y + eventStatus.height &&
+    eventSummary.y + eventSummary.height > eventStatus.y
+  );
+  expect(eventOverlaps).toBe(false);
 });
 
 test("reduced motion schakelt de skeletonanimatie structureel uit", async ({ page, request }) => {

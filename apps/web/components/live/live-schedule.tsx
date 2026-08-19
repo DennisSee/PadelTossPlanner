@@ -28,6 +28,7 @@ import type {
 } from "../../lib/public-schedule/types";
 
 import styles from "./live-schedule.module.css";
+import { TeamNames } from "./team-names";
 
 const EVERYONE = "Iedereen";
 const PLAYER_PREFERENCE_KEY = "tc-zuid-tos/preferred-player";
@@ -100,6 +101,19 @@ function RoundStateBadge({ state }: { state?: "current" | "next" }) {
   return null;
 }
 
+function CourtBadge({ court }: { court: string }) {
+  const label = court || "Baan";
+  return (
+    <span
+      className={`${styles.court} ${courtClass(court)}`.trim()}
+      data-testid="court-badge"
+    >
+      <span className={styles.courtDot} aria-hidden="true" />
+      <span>{label}</span>
+    </span>
+  );
+}
+
 function StatusChips({ round }: { round: GroupedRound }) {
   const first = round.rows[0];
   const groups = [
@@ -154,7 +168,7 @@ function RoundCard({
     >
       <div className={styles.roundHeader}>
         <h3 className={styles.roundTitle}>Ronde {round.roundNumber}</h3>
-        <div className={styles.roundHeader}>
+        <div className={styles.roundMeta}>
           <RoundStateBadge state={state} />
           <span className={styles.roundTime}>{round.roundTime}</span>
         </div>
@@ -162,11 +176,11 @@ function RoundCard({
       <div className={styles.matches}>
         {round.rows.map((row, index) => (
           <div className={styles.match} key={`${row.Baan}-${index}`}>
-            <div className={`${styles.court} ${courtClass(row.Baan)}`.trim()}>{row.Baan || "Baan"}</div>
+            <CourtBadge court={row.Baan} />
             <div className={styles.matchup}>
-              <span>{row["Team 1"] || "—"}</span>
+              <TeamNames team={row["Team 1"]} />
               <span className={styles.versus}>vs</span>
-              <span>{row["Team 2"] || "—"}</span>
+              <TeamNames team={row["Team 2"]} />
             </div>
           </div>
         ))}
@@ -178,15 +192,17 @@ function RoundCard({
 
 function PersonalRoundCard({
   round,
+  selectedPlayer,
   state,
 }: {
   round: PersonalRound;
+  selectedPlayer: string;
   state?: "current" | "next";
 }) {
   const copy = {
-    rest: ["Rust", "Deze ronde heb je rust."],
-    "not-arrived": ["Nog niet aanwezig", "Deze ronde ben je nog niet beschikbaar."],
-    unavailable: ["Niet meer beschikbaar", "Deze ronde valt na jouw eindtijd."],
+    rest: ["Rust", "Deze ronde speel je niet.", styles.personalStatusRest],
+    "not-arrived": ["Nog niet aanwezig", "Je bent deze ronde nog niet beschikbaar.", styles.personalStatusMuted],
+    unavailable: ["Niet meer beschikbaar", "Deze ronde valt na jouw eindtijd.", styles.personalStatusMuted],
   } as const;
 
   return (
@@ -197,28 +213,30 @@ function PersonalRoundCard({
           : state === "next"
             ? styles.roundNext
             : styles.roundNeutral
-      }`.trim()}
+      } ${round.status === "playing" ? "" : styles.personalStateCard}`.trim()}
     >
       <div className={styles.roundHeader}>
         <h3 className={styles.roundTitle}>Ronde {round.roundNumber}</h3>
-        <div className={styles.roundHeader}>
+        <div className={styles.roundMeta}>
           <RoundStateBadge state={state} />
           <span className={styles.roundTime}>{round.roundTime}</span>
         </div>
       </div>
       {round.status === "playing" ? (
-        <div className={styles.match}>
-          <div className={`${styles.court} ${courtClass(round.court)}`.trim()}>{round.court}</div>
+        <div className={`${styles.match} ${styles.personalMatch}`}>
+          <CourtBadge court={round.court} />
           <div className={styles.matchup}>
-            <span>{round.teamOne}</span>
+            <TeamNames team={round.teamOne} selectedPlayer={selectedPlayer} />
             <span className={styles.versus}>vs</span>
-            <span>{round.teamTwo}</span>
+            <TeamNames team={round.teamTwo} selectedPlayer={selectedPlayer} />
           </div>
         </div>
       ) : (
-        <div className={styles.personalBody}>
-          <p className={styles.personalStatus}>{copy[round.status][0]}</p>
-          <p className={styles.personalText}>{copy[round.status][1]}</p>
+        <div className={styles.personalBody} data-personal-status={round.status}>
+          <span className={`${styles.personalStatus} ${copy[round.status][2] ?? styles.personalStatusMuted}`.trim()}>
+            {copy[round.status][0]}
+          </span>
+          <span className={styles.personalText}>{copy[round.status][1]}</span>
         </div>
       )}
     </Card>
@@ -290,6 +308,7 @@ function FullSchedule({
         <PersonalRoundCard
           key={`${round.roundNumber}-${round.roundTime}`}
           round={round}
+          selectedPlayer={selectedPlayer}
           state={stateForRound(round.roundNumber, state)}
         />
       ))}
@@ -310,7 +329,9 @@ function FocusRound({
     return <RoundCard round={round} state={state} />;
   }
   const personal = personalScheduleRows(round.rows, selectedPlayer)[0];
-  return personal ? <PersonalRoundCard round={personal} state={state} /> : null;
+  return personal
+    ? <PersonalRoundCard round={personal} selectedPlayer={selectedPlayer} state={state} />
+    : null;
 }
 
 function LiveContent({
@@ -447,7 +468,7 @@ export function LiveSchedule({
         </div>
 
         <Card className={styles.eventCard}>
-          <div className={styles.eventSummary}>
+          <div className={styles.eventSummary} data-testid="event-summary">
             <h1 className={styles.eventTitle}>{formatEventDate(schedule.eventDate)}</h1>
             <p className={styles.eventMeta}>
               <span>{schedule.startTime}–{schedule.endTime}</span>
@@ -455,7 +476,9 @@ export function LiveSchedule({
               <span>{participants.length} deelnemers</span>
             </p>
           </div>
-          <div className={styles.eventStatus}><Badge tone={status.tone}>{status.label}</Badge></div>
+          <div className={styles.eventStatus} data-testid="event-status">
+            <Badge tone={status.tone}>{status.label}</Badge>
+          </div>
         </Card>
 
         <Card className={styles.controlSurface}>
