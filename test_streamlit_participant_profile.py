@@ -7,6 +7,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import streamlit_app
+from authorization import MY_TOS_PAGE
 from database import AuthenticatedUser, PersistentAuthSession
 
 
@@ -89,7 +90,7 @@ def test_profile_save_refreshes_visible_user_but_preserves_all_tokens(monkeypatc
 def test_successful_registration_clears_deeplink_and_returns_to_my_tos(monkeypatch) -> None:
     state = {
         "signup_return_context": object(),
-        "navigation_page": "Openbaar schema",
+        "navigation_page": "Live TOS-schema",
     }
     replaced: list[dict[str, str]] = []
     reruns: list[bool] = []
@@ -110,7 +111,7 @@ def test_successful_registration_clears_deeplink_and_returns_to_my_tos(monkeypat
     streamlit_app._finish_participant_registration_save(was_existing=False)
 
     assert "signup_return_context" not in state
-    assert state["navigation_page"] == "Mijn TOS"
+    assert state["navigation_page"] == MY_TOS_PAGE
     assert state["participant_registration_notice"] == "Aanmelding opgeslagen"
     assert replaced == [{}]
     assert reruns == [True]

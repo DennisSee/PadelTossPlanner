@@ -8,6 +8,7 @@ from typing import Mapping
 APPROVAL_STATUSES = ("pending", "approved", "rejected")
 MEMBER_SPORTS = ("padel", "tennis")
 RANKING_VALUES = (1, 2, 3, 4, 5)
+RANKING_OPTIONS = (None, *RANKING_VALUES)
 
 _APPROVAL_TRANSITIONS = {
     "pending": frozenset({"approved", "rejected"}),
@@ -66,6 +67,18 @@ def validate_ranking(ranking: object | None) -> int | None:
     }:
         raise MemberManagementError("Ranking moet een geheel getal tussen 1 en 5 zijn.")
     return normalized
+
+
+def ranking_option_label(ranking: object | None) -> str:
+    """Eén expliciete UI-keuze voor zowel ``NULL`` als ranking 1–5."""
+    normalized = validate_ranking(ranking)
+    return "Geen ranking" if normalized is None else str(normalized)
+
+
+def ranking_option_index(ranking: object | None) -> int:
+    """Selecteer de opgeslagen nullable ranking zonder een verborgen oude waarde."""
+    normalized = validate_ranking(ranking)
+    return RANKING_OPTIONS.index(normalized)
 
 
 def is_ready_for_padel_tos(member: Mapping[str, object]) -> bool:

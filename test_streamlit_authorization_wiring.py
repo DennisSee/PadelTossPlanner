@@ -36,6 +36,52 @@ def test_admin_route_has_a_direct_admin_guard() -> None:
     assert "require_admin_role" in _function_calls("_render_user_management")
 
 
+def test_compact_management_hubs_keep_direct_guards_and_admin_tab_nested() -> None:
+    tos_calls = _function_calls("_render_tos_management_hub")
+    member_calls = _function_calls("_render_member_management_hub")
+    assert "require_planner_role" in tos_calls
+    assert "require_planner_role" in member_calls
+    assert {
+        "_render_event_management_page",
+        "_render_planner_page",
+        "_render_saved_page",
+    }.issubset(tos_calls)
+    assert "_render_member_management_page" in member_calls
+    assert "_render_user_management" in member_calls
+
+    source = APP_PATH.read_text(encoding="utf-8")
+    member_hub = ast.get_source_segment(
+        source,
+        next(
+            node
+            for node in ast.parse(source).body
+            if isinstance(node, ast.FunctionDef)
+            and node.name == "_render_member_management_hub"
+        ),
+    )
+    assert member_hub is not None
+    assert "if user.is_admin" in member_hub
+    assert "MEMBER_MANAGEMENT_ACCOUNTS" in member_hub
+
+
+def test_ranking_ui_uses_one_nullable_choice_and_keeps_sport_active() -> None:
+    source = APP_PATH.read_text(encoding="utf-8")
+    function = next(
+        node
+        for node in ast.parse(source).body
+        if isinstance(node, ast.FunctionDef)
+        and node.name == "_render_member_management_page"
+    )
+    member_source = ast.get_source_segment(source, function)
+    assert member_source is not None
+    assert "RANKING_OPTIONS" in member_source
+    assert "ranking_option_index(current_ranking)" in member_source
+    assert "format_func=ranking_option_label" in member_source
+    assert "clear_ranking" not in member_source
+    assert '"Sportprofiel actief"' in member_source
+    assert "selected_ranking," in member_source
+
+
 def test_event_management_route_uses_only_the_guarded_admin_store() -> None:
     calls = _function_calls("_render_event_management_page")
     assert "require_planner_role" in calls

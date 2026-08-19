@@ -52,12 +52,19 @@ def test_one_reusable_header_is_used_by_signup_and_regular_page_shell() -> None:
 
 def test_sidebar_keeps_existing_routing_and_direct_guards() -> None:
     main_source = ast.get_source_segment(SOURCE, _function("main"))
+    sidebar_source = ast.get_source_segment(
+        SOURCE,
+        _function("_render_sidebar_navigation"),
+    )
     login_source = ast.get_source_segment(SOURCE, _function("_render_login"))
     assert main_source is not None
+    assert sidebar_source is not None
     assert login_source is not None
-    assert "navigation_pages_for_capabilities" in main_source
-    assert "st.radio(navigation_label" in main_source
-    assert '"TOS & beheer"' in main_source
+    assert "_render_sidebar_navigation" in main_source
+    assert "navigation_pages_for_capabilities" in sidebar_source
+    assert 'st.caption("BEHEER")' in sidebar_source
+    assert "participant_navigation_" in sidebar_source
+    assert "management_navigation_" in sidebar_source
     assert "st.navigation" not in SOURCE
     assert "sidebar_account_html" in login_source
     assert 'key="sidebar_logout"' in login_source

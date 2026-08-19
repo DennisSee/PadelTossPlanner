@@ -24,7 +24,7 @@ def test_participant_home_contains_requested_sections_and_friendly_empty_state()
     source = _function_source("_render_participant_home_page")
     assert '"Mijn komende TOS"' in source
     assert '"Nog aanmelden"' in source
-    assert '"Openbaar schema"' in source
+    assert '"Live TOS-schema"' in source
     assert "Je bent nog niet aangemeld voor een komende TOS." in source
     assert "Geen andere open TOS-avonden." in source
     assert "latest_published_schedule" in source
@@ -33,8 +33,9 @@ def test_participant_home_contains_requested_sections_and_friendly_empty_state()
 def test_home_never_renders_registered_event_again_under_to_join() -> None:
     source = _function_source("_render_participant_home_page")
     assert "unregistered_open_events(open_events, registrations)" in source
-    assert "for event in events_to_join[:3]" in source
-    assert "if len(events_to_join) > 3" in source
+    assert "for event in events_to_join" in source
+    assert "events_to_join[:3]" not in source
+    assert "home_all_open_events" not in source
     assert "for event in open_events[:3]" not in source
 
 

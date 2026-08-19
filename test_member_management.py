@@ -4,8 +4,11 @@ import pytest
 
 from member_management import (
     MemberManagementError,
+    RANKING_OPTIONS,
     approval_transition_options,
     is_ready_for_padel_tos,
+    ranking_option_index,
+    ranking_option_label,
     validate_approval_transition,
     validate_ranking,
     validate_sport,
@@ -79,6 +82,26 @@ def test_ranking_can_be_explicitly_empty_but_not_outside_one_to_five() -> None:
     for invalid in (0, 6, 3.5, True, "drie"):
         with pytest.raises(MemberManagementError):
             validate_ranking(invalid)
+
+
+@pytest.mark.parametrize("ranking", [None, 1, 2, 3, 4, 5])
+def test_nullable_ranking_choice_roundtrips_without_stale_value(
+    ranking: int | None,
+) -> None:
+    index = ranking_option_index(ranking)
+    selected = RANKING_OPTIONS[index]
+    assert selected == ranking
+    assert validate_ranking(selected) == ranking
+    assert ranking_option_label(selected) == (
+        "Geen ranking" if ranking is None else str(ranking)
+    )
+
+
+def test_ranking_choice_can_move_both_to_and_from_no_ranking() -> None:
+    assert validate_ranking(RANKING_OPTIONS[ranking_option_index(None)]) is None
+    assert validate_ranking(RANKING_OPTIONS[ranking_option_index(3)]) == 3
+    assert validate_ranking(None) is None  # bestaande ranking expliciet wissen
+    assert validate_ranking(4) == 4  # ontbrekende ranking expliciet instellen
 
 
 def test_only_supported_sports_are_accepted() -> None:

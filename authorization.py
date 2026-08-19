@@ -8,15 +8,37 @@ from enum import Enum
 from typing import Literal, Mapping
 
 
-PUBLIC_PAGE = "Openbaar schema"
-MY_TOS_PAGE = "Mijn TOS"
-OPEN_TOS_PAGE = "Open TOS-avonden"
+LIVE_TOS_PAGE = "Live TOS-schema"
+TOS_PAGE = "TOS-avonden"
 MY_PROFILE_PAGE = "Mijn profiel"
-PLANNER_PAGE = "Planner"
-SAVED_SCHEDULES_PAGE = "Opgeslagen schema's"
-USER_MANAGEMENT_PAGE = "Gebruikersbeheer"
-EVENT_MANAGEMENT_PAGE = "TOS-avonden"
-MEMBER_MANAGEMENT_PAGE = "Leden & niveaus"
+TOS_MANAGEMENT_PAGE = "TOS-beheer"
+MEMBER_MANAGEMENT_PAGE = "Ledenbeheer"
+
+# Semantische aliases houden bestaande imports klein, terwijl het hoofdmenu nog
+# maar vijf taken kent. De oude zichtbare labels worden uitsluitend hieronder
+# door ``normalize_navigation_target`` afgehandeld.
+PUBLIC_PAGE = LIVE_TOS_PAGE
+MY_TOS_PAGE = TOS_PAGE
+OPEN_TOS_PAGE = TOS_PAGE
+PLANNER_PAGE = TOS_MANAGEMENT_PAGE
+EVENT_MANAGEMENT_PAGE = TOS_MANAGEMENT_PAGE
+SAVED_SCHEDULES_PAGE = TOS_MANAGEMENT_PAGE
+USER_MANAGEMENT_PAGE = MEMBER_MANAGEMENT_PAGE
+
+TOS_MANAGEMENT_EVENTS = "Avonden"
+TOS_MANAGEMENT_PLANNER = "Schema maken"
+TOS_MANAGEMENT_SAVED = "Opgeslagen schema's"
+MEMBER_MANAGEMENT_MEMBERS = "Leden & niveaus"
+MEMBER_MANAGEMENT_ACCOUNTS = "Accounts"
+
+LEGACY_PUBLIC_PAGE = "Openbaar schema"
+LEGACY_MY_TOS_PAGE = "Mijn TOS"
+LEGACY_OPEN_TOS_PAGE = "Open TOS-avonden"
+LEGACY_PLANNER_PAGE = "Planner"
+LEGACY_EVENT_MANAGEMENT_PAGE = "TOS-avonden"
+LEGACY_MEMBER_MANAGEMENT_PAGE = "Leden & niveaus"
+LEGACY_SAVED_SCHEDULES_PAGE = "Opgeslagen schema's"
+LEGACY_USER_MANAGEMENT_PAGE = "Gebruikersbeheer"
 
 PLANNER_ROLES = frozenset({"planner", "admin"})
 ADMIN_ROLES = frozenset({"admin"})
@@ -60,6 +82,14 @@ class MembershipCapability:
             MembershipStatus.ACCOUNT_INACTIVE,
             MembershipStatus.UNAVAILABLE,
         }
+
+
+@dataclass(frozen=True)
+class NavigationTarget:
+    """Een hoofdroute met hoogstens één veilige interne beheerbestemming."""
+
+    page: str
+    section: str | None = None
 
 
 @dataclass(frozen=True)
@@ -139,28 +169,106 @@ def navigation_pages_for_capabilities(
 ) -> tuple[str, ...]:
     """Combineer membershippagina's en staffpagina's zonder rechten te mengen."""
     pages = (
-        [MY_TOS_PAGE, OPEN_TOS_PAGE, MY_PROFILE_PAGE, PUBLIC_PAGE]
+        [LIVE_TOS_PAGE, TOS_PAGE, MY_PROFILE_PAGE]
         if participant_area
-        else [PUBLIC_PAGE]
+        else [LIVE_TOS_PAGE]
     )
     if role and can_access_planner(role):
-        pages.extend(
-            (
-                PLANNER_PAGE,
-                EVENT_MANAGEMENT_PAGE,
-                MEMBER_MANAGEMENT_PAGE,
-                SAVED_SCHEDULES_PAGE,
-            )
-        )
-    if role and can_access_admin(role):
-        pages.append(USER_MANAGEMENT_PAGE)
+        pages.extend((TOS_MANAGEMENT_PAGE, MEMBER_MANAGEMENT_PAGE))
     return tuple(pages)
 
 
 def default_page_for_role(role: str | None) -> str:
     if role == "participant":
-        return MY_TOS_PAGE
-    return PLANNER_PAGE if role and can_access_planner(role) else PUBLIC_PAGE
+        return TOS_PAGE
+    return (
+        TOS_MANAGEMENT_PAGE
+        if role and can_access_planner(role)
+        else LIVE_TOS_PAGE
+    )
+
+
+def normalize_navigation_target(
+    page: object,
+    role: str | None,
+    *,
+    participant_area: bool,
+    legacy_session: bool = False,
+) -> NavigationTarget:
+    """Vertaal oude session-state centraal en laat onbekende routes fail-closed.
+
+    ``TOS-avonden`` is bewust alleen tijdens een eenmalige legacy-migratie
+    ambigu: voor staff was dit vroeger eventbeheer, terwijl het nu de
+    participanttaak is. Nieuwe navigatie schrijft altijd de actuele stateversie.
+    """
+    requested = str(page or "").strip()
+    target = NavigationTarget(requested)
+
+    legacy_targets = {
+        LEGACY_PUBLIC_PAGE: NavigationTarget(LIVE_TOS_PAGE),
+        LEGACY_MY_TOS_PAGE: NavigationTarget(TOS_PAGE),
+        LEGACY_OPEN_TOS_PAGE: NavigationTarget(TOS_PAGE),
+        LEGACY_PLANNER_PAGE: NavigationTarget(
+            TOS_MANAGEMENT_PAGE,
+            TOS_MANAGEMENT_PLANNER,
+        ),
+        LEGACY_MEMBER_MANAGEMENT_PAGE: NavigationTarget(
+            MEMBER_MANAGEMENT_PAGE,
+            MEMBER_MANAGEMENT_MEMBERS,
+        ),
+        LEGACY_SAVED_SCHEDULES_PAGE: NavigationTarget(
+            TOS_MANAGEMENT_PAGE,
+            TOS_MANAGEMENT_SAVED,
+        ),
+        LEGACY_USER_MANAGEMENT_PAGE: NavigationTarget(
+            MEMBER_MANAGEMENT_PAGE,
+            MEMBER_MANAGEMENT_ACCOUNTS,
+        ),
+    }
+    if requested in legacy_targets:
+        target = legacy_targets[requested]
+    if (
+        legacy_session
+        and requested == LEGACY_EVENT_MANAGEMENT_PAGE
+        and role
+        and can_access_planner(role)
+    ):
+        target = NavigationTarget(
+            TOS_MANAGEMENT_PAGE,
+            TOS_MANAGEMENT_EVENTS,
+        )
+
+    if not can_access_page(
+        role,
+        target.page,
+        participant_area=participant_area,
+    ):
+        target = NavigationTarget(default_page_for_role(role))
+
+    if target.page == TOS_MANAGEMENT_PAGE:
+        section = target.section or TOS_MANAGEMENT_PLANNER
+        if section not in {
+            TOS_MANAGEMENT_EVENTS,
+            TOS_MANAGEMENT_PLANNER,
+            TOS_MANAGEMENT_SAVED,
+        }:
+            section = TOS_MANAGEMENT_PLANNER
+        return NavigationTarget(target.page, section)
+
+    if target.page == MEMBER_MANAGEMENT_PAGE:
+        section = target.section or MEMBER_MANAGEMENT_MEMBERS
+        if section == MEMBER_MANAGEMENT_ACCOUNTS and not (
+            role and can_access_admin(role)
+        ):
+            section = MEMBER_MANAGEMENT_MEMBERS
+        if section not in {
+            MEMBER_MANAGEMENT_MEMBERS,
+            MEMBER_MANAGEMENT_ACCOUNTS,
+        }:
+            section = MEMBER_MANAGEMENT_MEMBERS
+        return NavigationTarget(target.page, section)
+
+    return NavigationTarget(target.page)
 
 
 def can_access_page(

@@ -19,17 +19,22 @@ from streamlit_cookies_manager import EncryptedCookieManager
 
 from authorization import (
     AuthorizationError,
-    EVENT_MANAGEMENT_PAGE,
+    MEMBER_MANAGEMENT_ACCOUNTS,
+    MEMBER_MANAGEMENT_MEMBERS,
     MEMBER_MANAGEMENT_PAGE,
     MembershipCapability,
     MY_PROFILE_PAGE,
     MY_TOS_PAGE,
-    OPEN_TOS_PAGE,
     PLANNER_PAGE,
     PUBLIC_PAGE,
     ParticipantReturnContext,
+    TOS_MANAGEMENT_EVENTS,
+    TOS_MANAGEMENT_PAGE,
+    TOS_MANAGEMENT_PLANNER,
+    TOS_MANAGEMENT_SAVED,
     default_page_for_role,
     navigation_pages_for_capabilities,
+    normalize_navigation_target,
     require_admin_role,
     require_participant_access,
     require_planner_role,
@@ -68,10 +73,12 @@ from event_management import (
 )
 from member_management import (
     MEMBER_SPORTS,
-    RANKING_VALUES,
+    RANKING_OPTIONS,
     MemberManagementError,
     approval_transition_options,
     is_ready_for_padel_tos,
+    ranking_option_index,
+    ranking_option_label,
 )
 from planner_registration_import import (
     IMPORT_METADATA_FIELDS,
@@ -197,6 +204,10 @@ PARTICIPANT_OAUTH_SYNC_RUNS_STATE = "participant_oauth_sync_runs"
 PARTICIPANT_ROOT_LOGIN_STATE = "participant_root_login"
 PARTICIPANT_PROFILE_NOTICE_STATE = "participant_profile_notice"
 PARTICIPANT_REGISTRATION_NOTICE_STATE = "participant_registration_notice"
+NAVIGATION_STATE_VERSION = 3
+NAVIGATION_VERSION_STATE = "navigation_state_version"
+TOS_MANAGEMENT_SECTION_STATE = "tos_management_section"
+MEMBER_MANAGEMENT_SECTION_STATE = "member_management_section"
 PREFERRED_PLAYER_COOKIE_NAME = "preferred_player_name"
 AUTH_COOKIE_PREFIX = "tc-zuid-tos/"
 
@@ -2408,9 +2419,7 @@ def _finish_participant_login(
         st.session_state["signup_return_context"] = context
     else:
         st.session_state.pop("signup_return_context", None)
-    st.session_state["navigation_page"] = (
-        PUBLIC_PAGE if context.is_signup else MY_TOS_PAGE
-    )
+    _set_navigation_page(PUBLIC_PAGE if context.is_signup else MY_TOS_PAGE)
     st.session_state["login_success"] = True
     _replace_query_params(context.query_params)
 
@@ -2557,7 +2566,7 @@ def _restore_persistent_auth(
     try:
         session = auth_service.restore_session(refresh_token)
         _set_auth_session(session, persisted=persisted)
-        st.session_state["navigation_page"] = _post_login_page(session.user)
+        _set_navigation_page(_post_login_page(session.user))
         st.session_state["auth_restored"] = True
 
         # Supabase roteert refresh-tokens. Bewaar daarom direct de nieuwste token.
@@ -2592,7 +2601,7 @@ def _clear_auth_session_state() -> None:
         "last_saved_schedule_id",
     ):
         st.session_state.pop(key, None)
-    st.session_state["navigation_page"] = PUBLIC_PAGE
+    _set_navigation_page(PUBLIC_PAGE)
 
 
 def _capture_signup_return_context() -> None:
@@ -2609,6 +2618,31 @@ def _post_login_page(user: AuthenticatedUser) -> str:
         # De signup-route wordt buiten de planner/adminnavigatie gerenderd.
         return PUBLIC_PAGE
     return default_page_for_role(user.role)
+
+
+def _set_navigation_page(page: str, *, section: str | None = None) -> None:
+    """Schrijf één actuele hoofdroute en optioneel een veilige beheersectie."""
+    st.session_state["navigation_page"] = page
+    st.session_state[NAVIGATION_VERSION_STATE] = NAVIGATION_STATE_VERSION
+    if page == TOS_MANAGEMENT_PAGE and section is not None:
+        st.session_state[TOS_MANAGEMENT_SECTION_STATE] = section
+    elif page == MEMBER_MANAGEMENT_PAGE and section is not None:
+        st.session_state[MEMBER_MANAGEMENT_SECTION_STATE] = section
+
+
+def _normalize_navigation_state(user: AuthenticatedUser) -> str:
+    """Migreer oude zichtbare paginanamen eenmalig en fail-closed."""
+    target = normalize_navigation_target(
+        st.session_state.get("navigation_page"),
+        user.role,
+        participant_area=True,
+        legacy_session=(
+            st.session_state.get(NAVIGATION_VERSION_STATE)
+            != NAVIGATION_STATE_VERSION
+        ),
+    )
+    _set_navigation_page(target.page, section=target.section)
+    return target.page
 
 
 def _set_auth_session(
@@ -2728,8 +2762,14 @@ def _render_login(
 
                     _set_auth_session(auth_session, persisted=remember_login)
                     st.session_state.pop("planner_result", None)
-                    st.session_state["navigation_page"] = _post_login_page(
-                        auth_session.user
+                    destination = _post_login_page(auth_session.user)
+                    _set_navigation_page(
+                        destination,
+                        section=(
+                            TOS_MANAGEMENT_PLANNER
+                            if destination == TOS_MANAGEMENT_PAGE
+                            else None
+                        ),
                     )
                     st.session_state["login_success"] = True
                     st.rerun()
@@ -3083,7 +3123,7 @@ def _finish_participant_registration_save(*, was_existing: bool) -> None:
         "Aanmelding gewijzigd" if was_existing else "Aanmelding opgeslagen"
     )
     st.session_state.pop("signup_return_context", None)
-    st.session_state["navigation_page"] = MY_TOS_PAGE
+    _set_navigation_page(MY_TOS_PAGE)
     _replace_query_params({})
     st.rerun()
 
@@ -3123,9 +3163,8 @@ def _render_participant_signup_page(
     if st.button("← Terug", key="leave_signup_route", type="tertiary"):
         st.session_state.pop("signup_return_context", None)
         st.session_state.pop(PARTICIPANT_OTP_EMAIL_STATE, None)
-        st.session_state["navigation_page"] = (
-            default_page_for_role(session.user.role) if session else PUBLIC_PAGE
-        )
+        destination = default_page_for_role(session.user.role) if session else PUBLIC_PAGE
+        _set_navigation_page(destination)
         _clear_oauth_pending_cookies(cookies)
         _replace_query_params({})
         st.rerun()
@@ -3556,24 +3595,17 @@ def _render_participant_home_page(
     events_to_join = unregistered_open_events(open_events, registrations)
     st.subheader("Nog aanmelden")
     if events_to_join:
-        for event in events_to_join[:3]:
+        for event in events_to_join:
             _render_open_event_card(
                 repository,
                 event,
                 {},
                 key_prefix="home_open_event",
             )
-        if len(events_to_join) > 3 and st.button(
-            "Bekijk alle open TOS-avonden",
-            key="home_all_open_events",
-            width="stretch",
-        ):
-            st.session_state["navigation_page"] = OPEN_TOS_PAGE
-            st.rerun()
     else:
         st.caption("Geen andere open TOS-avonden.")
 
-    st.subheader("Openbaar schema")
+    st.subheader("Live TOS-schema")
     try:
         schedule = schedule_repository.latest_published_schedule()
     except Exception:
@@ -3587,7 +3619,7 @@ def _render_participant_home_page(
                 key="home_public_schedule",
                 width="stretch",
             ):
-                st.session_state["navigation_page"] = PUBLIC_PAGE
+                _set_navigation_page(PUBLIC_PAGE)
                 st.rerun()
         else:
             st.caption("Er is nog geen gepubliceerd schema.")
@@ -4734,7 +4766,7 @@ def _render_event_registration_import(
         )
     else:
         st.session_state.pop("planner_import_warning", None)
-    st.session_state["navigation_page"] = PLANNER_PAGE
+    _set_navigation_page(PLANNER_PAGE, section=TOS_MANAGEMENT_PLANNER)
     st.rerun()
 
 
@@ -5152,16 +5184,11 @@ def _render_member_management_page(
                 )
                 with st.form(f"member_sport_{member_id}_{sport}"):
                     st.markdown(f"**{sport_labels[sport]}**")
-                    clear_ranking = st.checkbox(
-                        "Geen ranking / ranking expliciet wissen",
-                        value=current_ranking is None,
-                        key=f"clear_ranking_{member_id}_{sport}",
-                    )
                     selected_ranking = st.selectbox(
-                        "Ranking",
-                        RANKING_VALUES,
-                        index=(current_ranking - 1 if current_ranking else 2),
-                        disabled=clear_ranking,
+                        f"{sport_labels[sport]}ranking",
+                        RANKING_OPTIONS,
+                        index=ranking_option_index(current_ranking),
+                        format_func=ranking_option_label,
                         key=f"ranking_{member_id}_{sport}",
                     )
                     sport_active = st.checkbox(
@@ -5177,7 +5204,7 @@ def _render_member_management_page(
                         store.upsert_member_sport_profile(
                             member_id,
                             sport,
-                            None if clear_ranking else selected_ranking,
+                            selected_ranking,
                             sport_active,
                         )
                         st.success(f"Het {sport_labels[sport].lower()}profiel is opgeslagen.")
@@ -5394,6 +5421,116 @@ def _render_user_management(
                 st.error("De accountstatus kon niet worden aangepast.")
 
 
+def _render_tos_management_hub(
+    store: AdminSupabaseStore,
+    user: AuthenticatedUser,
+) -> None:
+    """Groepeer bestaande stafftaken zonder hun eigen guards te vervangen."""
+    try:
+        require_planner_role(user.role)
+    except AuthorizationError as exc:
+        st.error(str(exc))
+        return
+
+    sections = (
+        TOS_MANAGEMENT_EVENTS,
+        TOS_MANAGEMENT_PLANNER,
+        TOS_MANAGEMENT_SAVED,
+    )
+    if st.session_state.get(TOS_MANAGEMENT_SECTION_STATE) not in sections:
+        st.session_state[TOS_MANAGEMENT_SECTION_STATE] = TOS_MANAGEMENT_PLANNER
+    section = st.radio(
+        "TOS-beheer",
+        sections,
+        key=TOS_MANAGEMENT_SECTION_STATE,
+        horizontal=True,
+        label_visibility="collapsed",
+    )
+
+    if section == TOS_MANAGEMENT_EVENTS:
+        try:
+            public_base_url = public_base_url_from_secrets(st.secrets)
+        except EventManagementError as exc:
+            st.error(str(exc))
+            return
+        _render_event_management_page(store, user, public_base_url)
+    elif section == TOS_MANAGEMENT_PLANNER:
+        _render_planner_page(store, user)
+    else:
+        _render_saved_page(store, user)
+
+
+def _render_member_management_hub(
+    store: AdminSupabaseStore,
+    user: AuthenticatedUser,
+) -> None:
+    """Toon ledenbeheer en uitsluitend voor admins het accountbeheer."""
+    try:
+        require_planner_role(user.role)
+    except AuthorizationError as exc:
+        st.error(str(exc))
+        return
+
+    sections = [MEMBER_MANAGEMENT_MEMBERS]
+    if user.is_admin:
+        sections.append(MEMBER_MANAGEMENT_ACCOUNTS)
+    if st.session_state.get(MEMBER_MANAGEMENT_SECTION_STATE) not in sections:
+        st.session_state[MEMBER_MANAGEMENT_SECTION_STATE] = (
+            MEMBER_MANAGEMENT_MEMBERS
+        )
+    section = st.radio(
+        "Ledenbeheer",
+        sections,
+        key=MEMBER_MANAGEMENT_SECTION_STATE,
+        horizontal=True,
+        label_visibility="collapsed",
+    )
+    if section == MEMBER_MANAGEMENT_MEMBERS:
+        _render_member_management_page(store, user)
+    else:
+        # Deze renderer heeft daarnaast zelf een directe admin-guard.
+        _render_user_management(store, user)
+
+
+def _render_sidebar_navigation(user: AuthenticatedUser) -> str:
+    """Compacte taaknavigatie; zichtbaarheid vervangt nooit routeguards."""
+    options = navigation_pages_for_capabilities(
+        user.role,
+        participant_area=True,
+    )
+    current_page = _normalize_navigation_state(user)
+    participant_pages = tuple(
+        page
+        for page in options
+        if page in {PUBLIC_PAGE, MY_TOS_PAGE, MY_PROFILE_PAGE}
+    )
+    management_pages = tuple(page for page in options if page not in participant_pages)
+
+    st.markdown("**TOS**")
+    for index, option in enumerate(participant_pages):
+        if st.button(
+            option,
+            key=f"participant_navigation_{index}",
+            type="primary" if option == current_page else "secondary",
+            width="stretch",
+        ):
+            _set_navigation_page(option)
+            st.rerun()
+
+    if management_pages:
+        st.caption("BEHEER")
+        for index, option in enumerate(management_pages):
+            if st.button(
+                option,
+                key=f"management_navigation_{index}",
+                type="primary" if option == current_page else "secondary",
+                width="stretch",
+            ):
+                _set_navigation_page(option)
+                st.rerun()
+    return current_page
+
+
 def main() -> None:
     _inject_app_styles()
 
@@ -5451,19 +5588,7 @@ def main() -> None:
 
     with st.sidebar:
         if user:
-            options = list(
-                navigation_pages_for_capabilities(
-                    user.role,
-                    participant_area=True,
-                )
-            )
-            current_page = st.session_state.get("navigation_page")
-            if current_page not in options:
-                st.session_state["navigation_page"] = default_page_for_role(
-                    user.role
-                )
-            navigation_label = "TOS & beheer" if user.can_plan else "Navigatie"
-            page = st.radio(navigation_label, options, key="navigation_page")
+            page = _render_sidebar_navigation(user)
         else:
             page = PUBLIC_PAGE
             st.info("Bezoekers zien alleen deelnemers en het gepubliceerde schema.")
@@ -5473,7 +5598,7 @@ def main() -> None:
         unsafe_allow_html=True,
     )
 
-    if page in {MY_TOS_PAGE, OPEN_TOS_PAGE, MY_PROFILE_PAGE}:
+    if page in {MY_TOS_PAGE, MY_PROFILE_PAGE}:
         session = _current_auth_session()
         if user is None or session is None:
             st.error("Log opnieuw in om je TOS-overzicht te bekijken.")
@@ -5485,36 +5610,23 @@ def main() -> None:
                 public_schedule_repository,
                 user,
             )
-        elif page == OPEN_TOS_PAGE:
-            _render_open_tos_page(repository, user)
         else:
             _render_participant_profile_page(repository, user)
     elif page == PUBLIC_PAGE:
         if user is None:
             _render_participant_root_login_cta()
         _render_public_page(public_schedule_repository, cookies)
-    elif user and user.can_plan:
+    elif user and page in {TOS_MANAGEMENT_PAGE, MEMBER_MANAGEMENT_PAGE}:
         try:
             admin_config = config_from_secrets(st.secrets)
         except ConfigurationError as exc:
             st.error(str(exc))
             return
         store = _get_admin_store(admin_config)
-        if page == "Planner":
-            _render_planner_page(store, user)
-        elif page == EVENT_MANAGEMENT_PAGE:
-            try:
-                public_base_url = public_base_url_from_secrets(st.secrets)
-            except EventManagementError as exc:
-                st.error(str(exc))
-                return
-            _render_event_management_page(store, user, public_base_url)
+        if page == TOS_MANAGEMENT_PAGE:
+            _render_tos_management_hub(store, user)
         elif page == MEMBER_MANAGEMENT_PAGE:
-            _render_member_management_page(store, user)
-        elif page == "Opgeslagen schema's":
-            _render_saved_page(store, user)
-        elif page == "Gebruikersbeheer":
-            _render_user_management(store, user)
+            _render_member_management_hub(store, user)
 
 
 
