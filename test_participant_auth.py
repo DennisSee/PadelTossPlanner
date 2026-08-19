@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from authorization import ParticipantReturnContext
 from participant_auth import (
     PARTICIPANT_STATUS_INACTIVE,
     PARTICIPANT_STATUS_NEEDS_ONBOARDING,
@@ -146,7 +147,9 @@ def test_pending_pkce_state_can_return_safely_to_participant_home() -> None:
     )
 
     assert restored.event_slug is None
-    assert restored.return_context is None
+    assert restored.return_context.destination == "home"
+    assert restored.return_context.event_slug is None
+    assert restored.return_context.query_params == {}
     assert VERIFIER not in repr(restored)
     assert "sensitive-state" not in repr(restored)
 
@@ -180,7 +183,7 @@ def test_pkce_cookie_must_be_confirmed_by_browser_before_oauth_redirect() -> Non
         confirmed_oauth_pending_cookie(
             cookies,
             "google",
-            "vrijdag-tos",
+            ParticipantReturnContext.signup("vrijdag-tos"),
             now=1_100,
         )
 
@@ -188,7 +191,7 @@ def test_pkce_cookie_must_be_confirmed_by_browser_before_oauth_redirect() -> Non
     confirmed = confirmed_oauth_pending_cookie(
         cookies,
         "google",
-        "vrijdag-tos",
+        ParticipantReturnContext.signup("vrijdag-tos"),
         now=1_100,
     )
     assert confirmed.authorization_url == AUTHORIZE_URL
@@ -199,6 +202,13 @@ def test_pkce_cookie_must_be_confirmed_by_browser_before_oauth_redirect() -> Non
         None,
         now=1_100,
     ).return_context.event_slug == "vrijdag-tos"
+    with pytest.raises(ParticipantAuthFlowError, match="komt niet overeen"):
+        confirmed_oauth_pending_cookie(
+            cookies,
+            "google",
+            ParticipantReturnContext.home(),
+            now=1_100,
+        )
 
 
 def test_provider_cookies_are_separate_and_malformed_or_expired_state_fails() -> None:
@@ -229,16 +239,25 @@ def test_provider_cookies_are_separate_and_malformed_or_expired_state_fails() ->
     )
 
     assert confirmed_oauth_pending_cookie(
-        cookies, "google", "vrijdag-tos", now=1_100
+        cookies,
+        "google",
+        ParticipantReturnContext.signup("vrijdag-tos"),
+        now=1_100,
     ).provider == "google"
     assert confirmed_oauth_pending_cookie(
-        cookies, "apple", "vrijdag-tos", now=1_100
+        cookies,
+        "apple",
+        ParticipantReturnContext.signup("vrijdag-tos"),
+        now=1_100,
     ).provider == "apple"
 
     cookies[oauth_pending_cookie_name("google")] = "malformed"
     with pytest.raises(ParticipantAuthFlowError):
         confirmed_oauth_pending_cookie(
-            cookies, "google", "vrijdag-tos", now=1_100
+            cookies,
+            "google",
+            ParticipantReturnContext.signup("vrijdag-tos"),
+            now=1_100,
         )
     with pytest.raises(ParticipantAuthFlowError, match="verlopen"):
         confirmed_oauth_pending_cookie(
@@ -246,7 +265,7 @@ def test_provider_cookies_are_separate_and_malformed_or_expired_state_fails() ->
                 {oauth_pending_cookie_name("apple"): apple.to_cookie_value()}
             ),
             "apple",
-            "vrijdag-tos",
+            ParticipantReturnContext.signup("vrijdag-tos"),
             now=2_000,
         )
 

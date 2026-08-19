@@ -110,8 +110,11 @@ def test_root_login_reuses_participant_auth_and_keeps_deeplink_path_separate() -
     assert '"Inloggen / aanmelden"' in root_cta
     assert 'type="primary"' in root_cta
     assert "PARTICIPANT_ROOT_LOGIN_STATE" in root_cta
-    assert "_render_participant_auth_options(auth_service, cookies, None)" in root_login
+    assert "ParticipantReturnContext.home()" in root_login
+    assert "_render_participant_auth_options(auth_service, cookies, context)" in root_login
+    assert "cookies, None" not in root_login
     assert "_render_participant_root_login_page" in main_source
     assert "_render_participant_root_login_cta" in main_source
     assert "PARTICIPANT_ROOT_LOGIN_STATE" in finish_source
+    assert "_replace_query_params(context.query_params)" in finish_source
     assert "_render_participant_auth_options(auth_service, cookies, context)" in signup_source

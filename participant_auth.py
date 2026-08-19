@@ -9,7 +9,7 @@ from time import time
 from typing import Mapping
 from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
 
-from authorization import SignupReturnContext, is_valid_event_slug
+from authorization import ParticipantReturnContext, is_valid_event_slug
 
 
 SUPPORTED_OAUTH_PROVIDERS = ("google", "apple")
@@ -147,12 +147,10 @@ class OAuthPendingState:
         )
 
     @property
-    def return_context(self) -> SignupReturnContext | None:
-        return (
-            SignupReturnContext(event_slug=self.event_slug)
-            if self.event_slug is not None
-            else None
-        )
+    def return_context(self) -> ParticipantReturnContext:
+        if self.event_slug is None:
+            return ParticipantReturnContext.home()
+        return ParticipantReturnContext.signup(self.event_slug)
 
 
 def _query_value(value: object) -> str:
@@ -327,7 +325,7 @@ def oauth_provider_unavailable_message(provider: object | None = None) -> str:
 def confirmed_oauth_pending_cookie(
     cookies: object,
     provider: object,
-    event_slug: object | None,
+    expected_context: ParticipantReturnContext | None,
     *,
     now: int | None = None,
 ) -> OAuthPendingState:
@@ -339,9 +337,6 @@ def confirmed_oauth_pending_cookie(
     adapter is bewust fail-closed voor een afwijkende library-implementatie.
     """
     normalized_provider = normalize_oauth_provider(provider)
-    normalized_slug = None if event_slug is None else str(event_slug or "")
-    if normalized_slug is not None and not is_valid_event_slug(normalized_slug):
-        raise ParticipantAuthFlowError("De OAuth-returnroute is ongeldig.")
 
     cookie_name = oauth_pending_cookie_name(normalized_provider)
     try:
@@ -360,9 +355,9 @@ def confirmed_oauth_pending_cookie(
         ) from None
 
     pending = OAuthPendingState.from_cookie_value(raw_value, now=now)
-    if pending.provider != normalized_provider or (
-        normalized_slug is not None and pending.event_slug != normalized_slug
-    ):
+    if pending.provider != normalized_provider:
+        raise ParticipantAuthFlowError("De OAuth-aanvraag komt niet overeen.")
+    if expected_context is not None and pending.return_context != expected_context:
         raise ParticipantAuthFlowError("De OAuth-aanvraag komt niet overeen.")
     return pending
 

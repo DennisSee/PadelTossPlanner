@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Mapping
+from typing import Literal, Mapping
 
 
 PUBLIC_PAGE = "Openbaar schema"
@@ -28,13 +28,39 @@ class AuthorizationError(PermissionError):
 
 
 @dataclass(frozen=True)
-class SignupReturnContext:
-    """Veilige context waarmee een signup-link na authenticatie behouden blijft."""
+class ParticipantReturnContext:
+    """Gevalideerde interne bestemming na participant-authenticatie."""
 
-    event_slug: str
+    destination: Literal["home", "signup"]
+    event_slug: str | None = None
+
+    def __post_init__(self) -> None:
+        valid_home = self.destination == "home" and self.event_slug is None
+        valid_signup = (
+            self.destination == "signup"
+            and self.event_slug is not None
+            and is_valid_event_slug(self.event_slug)
+        )
+        if not (valid_home or valid_signup):
+            raise ValueError("De participant-returnroute is ongeldig.")
+
+    @classmethod
+    def home(cls) -> "ParticipantReturnContext":
+        return cls(destination="home")
+
+    @classmethod
+    def signup(cls, event_slug: str) -> "ParticipantReturnContext":
+        return cls(destination="signup", event_slug=event_slug)
+
+    @property
+    def is_signup(self) -> bool:
+        return self.destination == "signup"
 
     @property
     def query_params(self) -> dict[str, str]:
+        if not self.is_signup:
+            return {}
+        assert self.event_slug is not None
         return {"page": "signup", "event": self.event_slug}
 
 
@@ -46,7 +72,7 @@ def _query_value(value: object) -> str:
 
 def signup_context_from_query_params(
     query_params: Mapping[str, object],
-) -> SignupReturnContext | None:
+) -> ParticipantReturnContext | None:
     """Accepteer uitsluitend de bekende openbare signup-route en een geldige slug."""
     if _query_value(query_params.get("page")) != "signup":
         return None
@@ -54,7 +80,7 @@ def signup_context_from_query_params(
     event_slug = _query_value(query_params.get("event"))
     if not is_valid_event_slug(event_slug):
         return None
-    return SignupReturnContext(event_slug=event_slug)
+    return ParticipantReturnContext.signup(event_slug)
 
 
 def is_valid_event_slug(event_slug: str) -> bool:

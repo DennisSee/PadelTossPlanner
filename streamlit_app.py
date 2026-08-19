@@ -26,7 +26,7 @@ from authorization import (
     OPEN_TOS_PAGE,
     PLANNER_PAGE,
     PUBLIC_PAGE,
-    SignupReturnContext,
+    ParticipantReturnContext,
     default_page_for_role,
     navigation_pages_for_role,
     require_admin_role,
@@ -2394,17 +2394,23 @@ def _queue_oauth_pending_cookie(
 def _finish_participant_login(
     session: PersistentAuthSession,
     cookies: EncryptedCookieManager,
+    context: ParticipantReturnContext,
     *,
     save_cookie: bool = True,
 ) -> None:
-    """Bewaar OAuth/OTP als dezelfde geroteerde, persistente B1-sessie."""
+    """Bewaar de sessie en rond één gevalideerde interne returnroute af."""
     _save_persistent_cookie(cookies, session, save=save_cookie)
     _set_auth_session(session, persisted=True)
     st.session_state.pop(PARTICIPANT_OTP_EMAIL_STATE, None)
     st.session_state.pop(PARTICIPANT_ROOT_LOGIN_STATE, None)
     st.session_state.pop("planner_result", None)
+    if context.is_signup:
+        st.session_state["signup_return_context"] = context
+    else:
+        st.session_state.pop("signup_return_context", None)
     st.session_state["navigation_page"] = _post_login_page(session.user)
     st.session_state["login_success"] = True
+    _replace_query_params(context.query_params)
 
 
 def _handle_oauth_callback(
@@ -2441,23 +2447,21 @@ def _handle_oauth_callback(
             pending.provider,
         )
         return_context = pending.return_context
-        if return_context is None:
-            st.session_state.pop("signup_return_context", None)
-        else:
-            st.session_state["signup_return_context"] = return_context
         # Queue refresh-token en verwijder PKCE-state met één gezamenlijke
         # CookieManager-save; twee saves in één Streamlit-run delen anders
         # dezelfde component-key.
-        _finish_participant_login(session, cookies, save_cookie=False)
-        _clear_oauth_pending_cookies(cookies)
-        _replace_query_params(
-            return_context.query_params if return_context is not None else {}
+        _finish_participant_login(
+            session,
+            cookies,
+            return_context,
+            save_cookie=False,
         )
+        _clear_oauth_pending_cookies(cookies)
         st.rerun()
     except (AuthenticationError, ParticipantAuthFlowError):
         _clear_oauth_pending_cookies(cookies)
         safe_context = pending.return_context if pending is not None else None
-        if pending is not None and safe_context is None:
+        if safe_context is not None and not safe_context.is_signup:
             st.session_state[PARTICIPANT_ROOT_LOGIN_STATE] = True
         _replace_query_params(safe_context.query_params if safe_context else {})
         st.session_state[PARTICIPANT_AUTH_ERROR_STATE] = oauth_storage_user_error(
@@ -2737,14 +2741,14 @@ def _prepare_oauth_authorization(
     auth_service: SupabaseAuthService,
     cookies: EncryptedCookieManager,
     redirect_base: str,
-    context: SignupReturnContext | None,
+    context: ParticipantReturnContext,
     provider: str,
 ) -> None:
     callback_url = oauth_callback_url(redirect_base, provider)
     authorization = auth_service.start_oauth(provider, callback_url)
     pending = OAuthPendingState(
         provider=authorization.provider,
-        event_slug=context.event_slug if context is not None else None,
+        event_slug=context.event_slug,
         redirect_to=authorization.redirect_to,
         created_at=int(datetime.now(tz=timezone.utc).timestamp()),
         code_verifier=authorization.code_verifier,
@@ -2760,7 +2764,7 @@ def _prepare_oauth_authorization(
 
 def _render_confirmed_oauth_link(
     cookies: EncryptedCookieManager,
-    context: SignupReturnContext | None,
+    context: ParticipantReturnContext,
     provider: str,
 ) -> None:
     """Toon de externe link pas na een bewezen browsercookie-roundtrip."""
@@ -2768,7 +2772,7 @@ def _render_confirmed_oauth_link(
         pending = confirmed_oauth_pending_cookie(
             cookies,
             provider,
-            context.event_slug if context is not None else None,
+            context,
         )
     except ParticipantAuthFlowError:
         sync_runs = int(
@@ -2810,7 +2814,7 @@ def _render_confirmed_oauth_link(
 def _render_participant_auth_options(
     auth_service: SupabaseAuthService,
     cookies: EncryptedCookieManager,
-    context: SignupReturnContext | None,
+    context: ParticipantReturnContext,
 ) -> None:
     auth_error = st.session_state.pop(PARTICIPANT_AUTH_ERROR_STATE, None)
     auth_notice = st.session_state.pop(PARTICIPANT_AUTH_NOTICE_STATE, None)
@@ -2872,7 +2876,7 @@ def _render_participant_auth_options(
     pending_email = str(
         st.session_state.get(PARTICIPANT_OTP_EMAIL_STATE) or ""
     )
-    context_key = context.event_slug if context is not None else "home"
+    context_key = context.event_slug or "home"
     if not pending_email:
         with st.form(f"participant_otp_request_{context_key}"):
             email = st.text_input("E-mailadres", key="participant_otp_request_email")
@@ -2911,8 +2915,7 @@ def _render_participant_auth_options(
     if verified:
         try:
             session = auth_service.verify_email_otp(pending_email, otp_code)
-            _finish_participant_login(session, cookies)
-            _replace_query_params(context.query_params)
+            _finish_participant_login(session, cookies, context)
             st.rerun()
         except AuthenticationError:
             st.session_state[PARTICIPANT_AUTH_ERROR_STATE] = OTP_CODE_USER_ERROR
@@ -2931,7 +2934,7 @@ def _render_participant_root_login_page(
     auth_service: SupabaseAuthService,
     cookies: EncryptedCookieManager,
 ) -> None:
-    """Hergebruik participant-auth zonder een verplichte eventdeeplink."""
+    """Hergebruik participant-auth met een expliciete veilige homeroute."""
     st.markdown(
         _public_brand_header_html("Inloggen / aanmelden"),
         unsafe_allow_html=True,
@@ -2941,7 +2944,8 @@ def _render_participant_root_login_page(
         st.session_state.pop(PARTICIPANT_OTP_EMAIL_STATE, None)
         _clear_oauth_pending_cookies(cookies)
         st.rerun()
-    _render_participant_auth_options(auth_service, cookies, None)
+    context = ParticipantReturnContext.home()
+    _render_participant_auth_options(auth_service, cookies, context)
 
 
 def _render_participant_root_login_cta() -> None:
@@ -3000,7 +3004,7 @@ def _render_participant_signup_page(
     auth_service: SupabaseAuthService,
     public_config: PublicSupabaseConfig,
     cookies: EncryptedCookieManager,
-    context: SignupReturnContext,
+    context: ParticipantReturnContext,
 ) -> None:
     """Mobiele participantflow voor onboarding en de eigen TOS-aanmelding."""
     st.markdown(
@@ -5357,7 +5361,10 @@ def main() -> None:
         st.toast(f"Sessie hersteld voor {user.display_name}", icon="🔐")
 
     signup_context = st.session_state.get("signup_return_context")
-    if isinstance(signup_context, SignupReturnContext):
+    if (
+        isinstance(signup_context, ParticipantReturnContext)
+        and signup_context.is_signup
+    ):
         _render_participant_signup_page(
             auth_service,
             public_config,

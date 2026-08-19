@@ -9,6 +9,7 @@ from authorization import (
     MY_PROFILE_PAGE,
     MY_TOS_PAGE,
     OPEN_TOS_PAGE,
+    ParticipantReturnContext,
     PLANNER_PAGE,
     PUBLIC_PAGE,
     SAVED_SCHEDULES_PAGE,
@@ -94,3 +95,22 @@ def test_signup_return_context_accepts_only_known_safe_route() -> None:
     assert signup_context_from_query_params(
         {"page": "planner", "event": "vrijdag-tos"}
     ) is None
+
+
+def test_participant_return_context_has_explicit_safe_home_and_signup_routes() -> None:
+    home = ParticipantReturnContext.home()
+    signup = ParticipantReturnContext.signup("vrijdag-tos")
+
+    assert home.destination == "home"
+    assert home.event_slug is None
+    assert home.query_params == {}
+    assert not home.is_signup
+    assert signup.destination == "signup"
+    assert signup.event_slug == "vrijdag-tos"
+    assert signup.query_params == {"page": "signup", "event": "vrijdag-tos"}
+    assert signup.is_signup
+
+    with pytest.raises(ValueError):
+        ParticipantReturnContext(destination="home", event_slug="vrijdag-tos")
+    with pytest.raises(ValueError):
+        ParticipantReturnContext(destination="signup", event_slug="../../planner")
