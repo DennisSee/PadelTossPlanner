@@ -9,6 +9,8 @@ export type PublicSupabaseConfig = {
 
 type EnvironmentSource = Readonly<Record<string, string | undefined>>;
 
+const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]"]);
+
 export class PublicConfigurationError extends Error {
   constructor() {
     super("De publieke schemaconfiguratie is niet beschikbaar.");
@@ -39,7 +41,9 @@ export function readPublicSupabaseConfig(
     throw new PublicConfigurationError();
   }
 
-  const isSafeProtocol = parsedUrl.protocol === "https:";
+  const isLoopbackHttp =
+    parsedUrl.protocol === "http:" && LOOPBACK_HOSTS.has(parsedUrl.hostname);
+  const isSafeProtocol = parsedUrl.protocol === "https:" || isLoopbackHttp;
   const isPublishable = publishableKey.startsWith("sb_publishable_");
   if (!isSafeProtocol || !parsedUrl.hostname || !isPublishable) {
     throw new PublicConfigurationError();

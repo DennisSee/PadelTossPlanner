@@ -52,11 +52,15 @@ De bestaande Streamlit-app blijft volledig zelfstandig deploybaar. Nieuwe functi
 3. Controleer vóór de rollout de bestaande listeners en stacks met `sudo ss -ltnup`, `sudo docker compose ls` en `sudo docker ps`. Poorten 80/443 zijn momenteel nog in gebruik door de tijdelijke statische Caddy-stack onder `/opt/tos-staging-stack`.
 4. Ga naar `/opt/tos-staging-stack`, controleer eerst het bijbehorende Composebestand en stop daarna uitsluitend die tijdelijke stack met `docker compose down`. Gebruik geen `--volumes`.
 5. Clone de goedgekeurde commit of haal die op in een schone deploymentdirectory. De nieuwe configuratie gebruikt de vaste Compose-projectnaam `tc-zuid-tos-staging`; controleer met `docker compose ls` dat die naam nog niet door een andere stack wordt gebruikt.
-6. Open `deploy/staging/` en valideer met `docker compose config`.
+6. Open `deploy/staging/` en voer `./preflight.sh` uit. Dit read-only script
+   valideert onder meer de env-aanwezigheid en `docker compose config` zonder
+   waarden te printen of services te wijzigen.
 7. Controleer capaciteit met `free -h`, `swapon --show` en `df -h /`. Op de V2-VPS met circa 1,8 GiB RAM is 2 GiB swap sterk aanbevolen voordat lokaal images worden gebouwd.
 8. Bouw nooit gelijktijdig: voer eerst `docker compose build --pull planner-api` uit en daarna `docker compose build --pull web`.
 9. Start de stack met `docker compose up -d`.
-10. Controleer `docker compose ps`, `https://test-tos.oddbounce.nl/api/health` en `https://test-tos.oddbounce.nl/api/planner/health`.
+10. Controleer `docker compose ps` en voer daarna de read-only controle
+    `./smoke-test.sh https://test-tos.oddbounce.nl` uit. Deze valideert ook `/`,
+    `/live`, TLS en beide healthcontracten zonder volledige responses te printen.
 11. Bekijk bij problemen alleen de relevante logs met `docker compose logs web planner-api caddy`.
 
 Een normale `docker compose down` behoudt de named volumes `caddy_data` en `caddy_config`. `docker compose down --volumes` verwijdert ook Caddy's ACME- en certificaatdata en mag daarom geen standaardonderdeel van deployments zijn. Vanaf WEB-Auth of zodra frontenddependencies merkbaar groeien, bouwen we de images bij voorkeur in CI en trekt de VPS alleen de goedgekeurde images binnen.

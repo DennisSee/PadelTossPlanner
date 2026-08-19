@@ -17,6 +17,14 @@ node_modules/
 .eslintcache
 coverage/
 htmlcov/
+playwright-report/
+test-results/
+blob-report/
+.playwright/
+**/playwright-report/
+**/test-results/
+**/blob-report/
+**/.playwright/
 *.tsbuildinfo
 
 .streamlit/secrets.toml

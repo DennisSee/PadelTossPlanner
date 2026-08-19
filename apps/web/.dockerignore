@@ -39,6 +39,14 @@ node_modules
 **/.next
 coverage
 **/coverage
+playwright-report
+**/playwright-report
+test-results
+**/test-results
+blob-report
+**/blob-report
+.playwright
+**/.playwright
 .turbo
 **/.turbo
 .cache
@@ -59,3 +67,7 @@ Thumbs.db
 *.swo
 
 Dockerfile
+
+e2e
+test-support
+playwright.config.ts

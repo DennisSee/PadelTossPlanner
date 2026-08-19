@@ -17,6 +17,21 @@ describe("public runtime configuration", () => {
     });
   });
 
+  it("accepts plain HTTP only for a local test server", () => {
+    expect(readPublicSupabaseConfig({
+      SUPABASE_URL: "http://127.0.0.1:54391",
+      SUPABASE_PUBLISHABLE_KEY: "sb_publishable_e2e_only",
+    })).toEqual({
+      url: "http://127.0.0.1:54391",
+      publishableKey: "sb_publishable_e2e_only",
+    });
+
+    expect(() => readPublicSupabaseConfig({
+      SUPABASE_URL: "http://supabase.invalid",
+      SUPABASE_PUBLISHABLE_KEY: "sb_publishable_e2e_only",
+    })).toThrow(PublicConfigurationError);
+  });
+
   it("fails safely without echoing missing or secret configuration", () => {
     expect(() => readPublicSupabaseConfig({})).toThrow(PublicConfigurationError);
     expect(() => readPublicSupabaseConfig({

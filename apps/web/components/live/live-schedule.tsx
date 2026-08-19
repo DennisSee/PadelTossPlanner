@@ -360,7 +360,10 @@ function LiveContent({
       ) : null}
       <div className={styles.liveGrid}>
         {current ? (
-          <section className={`${styles.livePanel} ${styles.currentPanel}`}>
+          <section
+            aria-label="Huidige ronde"
+            className={`${styles.livePanel} ${styles.currentPanel}`}
+          >
             <div className={styles.panelHeading}>
               <span>Nu bezig</span>
               <span>Nog {state.kind === "current" ? state.remainingMinutes : 0} min</span>
@@ -370,6 +373,7 @@ function LiveContent({
         ) : null}
         {next ? (
           <section
+            aria-label="Volgende ronde"
             className={`${styles.livePanel} ${styles.nextPanel} ${
               state.nextIsUrgent ? styles.urgentPanel : ""
             }`.trim()}

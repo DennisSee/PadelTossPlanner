@@ -63,3 +63,56 @@ Er is lokaal bewust geen verbinding met Supabase gemaakt. De eerste echte end-to
 De lokale omgeving voor deze review had geen beschikbare Docker CLI. Daarom is `gw_priority` niet op aanname toegevoegd. Vóór deployment moet `docker compose config` op de doelomgeving bevestigen dat Caddy zijn default egress via `edge` en web via `web-egress` krijgt, terwijl `application` intern en de planner zonder externe egress blijft.
 
 WEB-2 bevat nog geen login, OTP, OAuth, deelnemerregistratie, profiel, staffbeheer of plannerintegratie.
+
+## Lokale browser-quality-gate
+
+WEB-2B voegt onder `apps/web/e2e/` een Playwright Test-suite toe. De suite bouwt de
+Next.js-productionapp, start een test-only PostgREST-server uit `apps/web/test-support/`
+en laat de echte server-only repository via de echte `@supabase/supabase-js`-querycode
+lezen. Alleen de fictieve publishable key `sb_publishable_e2e_only` wordt gebruikt.
+De mock accepteert uitsluitend de tien publieke kolommen, de gepubliceerde filter,
+de twee aflopende sorteringen en `limit 1`; ieder afwijkend contract laat de suite
+falen zonder headers of keys te loggen.
+
+Installeer en voer lokaal uit vanuit `apps/web/`:
+
+```sh
+pnpm install --frozen-lockfile
+pnpm test:e2e:install
+pnpm test:e2e
+```
+
+Alleen Chromium wordt geïnstalleerd. De browsermatrix is 360×800, 390×844,
+430×932, 768×1024 en 1440×900. De suite controleert homepage en livepagina,
+persoonlijke selectie, statusweergave, opslagfalen, escaping, toetsenbordbediening,
+responsive overflow en reduced motion. Screenshots, trace en video worden alleen
+bij een fout of retry bewaard en zijn Git- en Docker-buildcontext-ignored.
+
+Dit bewijst de lokale browserketen en het publieke querycontract. Het bewijst niet
+dat URL, publishable key, RLS, kolomgrants, DNS, TLS of gepubliceerde data van het
+echte test-Supabase-project juist zijn; die punten worden afzonderlijk op staging
+gevalideerd.
+
+## Read-only stagingverificatie
+
+Voer vóór een handmatige rollout in `deploy/staging/` uit:
+
+```sh
+./preflight.sh
+```
+
+Dit script controleert zonder wijzigingen de vereiste tools en env-aanwezigheid,
+`APP_ENV=staging`, de gerenderde Compose-topologie, resources, swap, vrije disk,
+listeners en Git-commit. Het print geen env-waarden en start, stopt of bouwt niets.
+
+Voer na een expliciet uitgevoerde deployment uit:
+
+```sh
+./smoke-test.sh https://test-tos.oddbounce.nl
+```
+
+De smoke-test gebruikt normale TLS- en hostnameverificatie (nooit insecure mode),
+controleert `/`, `/live` en beide exacte healthcontracten, en weigert raw
+stacktraces of private schedulemarkers. Ook dit script is read-only en print geen
+volledige HTML of configuratie. Beide scripts vervangen geen handmatige controle
+van de actuele stagingdata en voeren zelf geen deployment uit.
