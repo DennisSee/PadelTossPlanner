@@ -85,6 +85,67 @@ def test_global_styles_cover_navigation_focus_cards_buttons_and_badges() -> None
     assert ".tos-participant-event--cancelled" in stylesheet
 
 
+def test_form_controls_have_specific_surface_interaction_and_disabled_states() -> None:
+    stylesheet = design_system_stylesheet()
+    for test_id in (
+        "stTextInput",
+        "stNumberInput",
+        "stDateInput",
+        "stTimeInput",
+        "stSelectbox",
+        "stMultiSelect",
+        "stTextArea",
+    ):
+        assert f'[data-testid="{test_id}"]' in stylesheet
+    assert '[data-testid="stTextInputRootElement"]:focus-within' in stylesheet
+    assert '[data-testid="stNumberInputContainer"]:focus-within' in stylesheet
+    assert '.react-aria-ComboBox > [role="group"]:focus-within' in stylesheet
+    assert '[data-baseweb="select"]:focus-within > div' in stylesheet
+    assert ':has(input:disabled)' in stylesheet
+    assert ':has(input[readonly])' in stylesheet
+    assert ':has([aria-disabled="true"]) > div' in stylesheet
+    assert "border: 1px solid var(--tc-border)" in stylesheet
+    assert "border-color: var(--tc-green)" in stylesheet
+    assert "background: var(--tc-surface-subtle)" in stylesheet
+    assert "min-height: 2.9rem" in stylesheet
+
+
+def test_form_control_rules_do_not_target_editor_or_choice_components() -> None:
+    stylesheet = design_system_stylesheet()
+    controls_start = stylesheet.index(
+        "/* Alleen normale BaseWeb-formcontrols"
+    )
+    controls_end = stylesheet.index("input:focus-visible", controls_start)
+    controls = stylesheet[controls_start:controls_end]
+    for excluded in (
+        "stDataEditor",
+        "stBaseButton",
+        "stPills",
+        "stRadio",
+        "stCheckbox",
+    ):
+        assert excluded not in controls
+
+
+def test_participant_event_datetime_is_stronger_than_deadline_but_wraps() -> None:
+    stylesheet = design_system_stylesheet()
+    metadata_start = stylesheet.index(".tos-participant-event-meta {")
+    metadata_end = stylesheet.index("}", metadata_start)
+    metadata = stylesheet[metadata_start:metadata_end]
+    assert "font-size: 0.88rem" in metadata
+    assert "font-weight: 650" in metadata
+    assert "font-variant-numeric: tabular-nums" in metadata
+    assert "white-space: normal" in metadata
+    assert "overflow-wrap: anywhere" in metadata
+    assert "var(--tc-text) 82%" in metadata
+
+    secondary_start = stylesheet.index(".tos-participant-deadline,")
+    secondary_end = stylesheet.index("}", secondary_start)
+    secondary = stylesheet[secondary_start:secondary_end]
+    assert "font-size: 0.82rem" in secondary
+    assert "font-weight: 650" not in secondary
+
+
 def test_header_badges_and_sidebar_account_escape_visible_text() -> None:
     header = app_header_html(
         "data:image/png;base64,abc",

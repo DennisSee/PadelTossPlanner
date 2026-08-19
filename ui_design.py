@@ -258,16 +258,92 @@ def design_system_stylesheet() -> str:
             gap: 0.7rem;
         }
 
+        /* Alleen normale BaseWeb-formcontrols; editors en keuze-buttons vallen erbuiten. */
+        [data-testid="stTextInput"] [data-testid="stTextInputRootElement"],
+        [data-testid="stNumberInput"] [data-testid="stNumberInputContainer"],
+        [data-testid="stDateInput"] [data-baseweb="input"],
+        [data-testid="stTimeInput"] [data-baseweb="select"] > div,
+        [data-testid="stSelectbox"] .react-aria-ComboBox > [role="group"],
+        [data-testid="stMultiSelect"] [data-baseweb="select"] > div,
+        [data-testid="stTextArea"] textarea {
+            box-sizing: border-box;
+            max-width: 100%;
+            min-height: 2.7rem;
+            color: var(--tc-text) !important;
+            border: 1px solid var(--tc-border) !important;
+            border-radius: var(--tc-radius-sm) !important;
+            background: var(--tc-surface) !important;
+            box-shadow: none !important;
+            transition: border-color 120ms ease, box-shadow 120ms ease,
+                background-color 120ms ease;
+        }
+
         [data-testid="stTextInput"] input,
         [data-testid="stNumberInput"] input,
         [data-testid="stDateInput"] input,
         [data-testid="stTimeInput"] input,
-        [data-testid="stSelectbox"] > div > div,
-        [data-testid="stMultiSelect"] > div > div {
-            min-height: 2.65rem;
-            border-color: var(--tc-border) !important;
-            border-radius: var(--tc-radius-sm) !important;
-            background: var(--tc-surface) !important;
+        [data-testid="stTextArea"] textarea {
+            color: var(--tc-text) !important;
+            padding-block: 0.58rem !important;
+        }
+
+        [data-testid="stTextInput"] [data-testid="stTextInputRootElement"]:hover,
+        [data-testid="stNumberInput"] [data-testid="stNumberInputContainer"]:hover,
+        [data-testid="stDateInput"] [data-baseweb="input"]:hover,
+        [data-testid="stTimeInput"] [data-baseweb="select"] > div:hover,
+        [data-testid="stSelectbox"] .react-aria-ComboBox > [role="group"]:hover,
+        [data-testid="stMultiSelect"] [data-baseweb="select"] > div:hover,
+        [data-testid="stTextArea"] textarea:hover {
+            border-color: color-mix(in srgb, var(--tc-green) 58%, var(--tc-border)) !important;
+        }
+
+        [data-testid="stTextInput"] [data-testid="stTextInputRootElement"]:focus-within,
+        [data-testid="stNumberInput"] [data-testid="stNumberInputContainer"]:focus-within,
+        [data-testid="stDateInput"] [data-baseweb="input"]:focus-within,
+        [data-testid="stTimeInput"] [data-baseweb="select"]:focus-within > div,
+        [data-testid="stSelectbox"] .react-aria-ComboBox > [role="group"]:focus-within,
+        [data-testid="stMultiSelect"] [data-baseweb="select"]:focus-within > div,
+        [data-testid="stTextArea"] textarea:focus {
+            border-color: var(--tc-green) !important;
+            box-shadow: 0 0 0 2px color-mix(in srgb, var(--tc-green) 18%, transparent) !important;
+            outline: none !important;
+        }
+
+        [data-testid="stTextInput"] input:focus-visible,
+        [data-testid="stNumberInput"] input:focus-visible,
+        [data-testid="stDateInput"] input:focus-visible,
+        [data-testid="stTimeInput"] input:focus-visible,
+        [data-testid="stTextArea"] textarea:focus-visible {
+            outline: none !important;
+        }
+
+        [data-testid="stTextInput"] [data-testid="stTextInputRootElement"]:has(input:disabled),
+        [data-testid="stTextInput"] [data-testid="stTextInputRootElement"]:has(input[readonly]),
+        [data-testid="stNumberInput"] [data-testid="stNumberInputContainer"]:has(input:disabled),
+        [data-testid="stNumberInput"] [data-testid="stNumberInputContainer"]:has(input[readonly]),
+        [data-testid="stDateInput"] [data-baseweb="input"]:has(input:disabled),
+        [data-testid="stDateInput"] [data-baseweb="input"]:has(input[readonly]),
+        [data-testid="stTimeInput"] [data-baseweb="select"]:has(input:disabled) > div,
+        [data-testid="stTimeInput"] [data-baseweb="select"]:has(input[readonly]) > div,
+        [data-testid="stSelectbox"] .react-aria-ComboBox > [role="group"]:has(input:disabled),
+        [data-testid="stSelectbox"] .react-aria-ComboBox > [role="group"][aria-disabled="true"],
+        [data-testid="stMultiSelect"] [data-baseweb="select"]:has([aria-disabled="true"]) > div,
+        [data-testid="stTextArea"] textarea:disabled,
+        [data-testid="stTextArea"] textarea[readonly] {
+            color: var(--tc-muted) !important;
+            border-color: color-mix(in srgb, var(--tc-border) 78%, white) !important;
+            background: var(--tc-surface-subtle) !important;
+            cursor: not-allowed;
+            opacity: 0.88;
+        }
+
+        [data-testid="stTextInput"] [data-testid="stTextInputRootElement"] svg,
+        [data-testid="stNumberInput"] [data-testid="stNumberInputContainer"] svg,
+        [data-testid="stDateInput"] [data-baseweb="input"] svg,
+        [data-testid="stTimeInput"] [data-baseweb="select"] svg,
+        [data-testid="stSelectbox"] .react-aria-ComboBox > [role="group"] svg,
+        [data-testid="stMultiSelect"] [data-baseweb="select"] svg {
+            color: var(--tc-green-dark);
         }
 
         input:focus-visible,
@@ -425,11 +501,22 @@ def design_system_stylesheet() -> str:
             overflow-wrap: anywhere;
         }
 
-        .tos-participant-event-meta,
+        .tos-participant-event-meta {
+            max-width: 100%;
+            margin-top: 0.08rem;
+            color: color-mix(in srgb, var(--tc-text) 82%, var(--tc-muted));
+            font-size: 0.88rem;
+            line-height: 1.38;
+            font-weight: 650;
+            font-variant-numeric: tabular-nums;
+            white-space: normal;
+            overflow-wrap: anywhere;
+        }
+
         .tos-participant-deadline,
         .tos-participant-attendees {
             color: var(--tc-muted);
-            font-size: 0.84rem;
+            font-size: 0.82rem;
             line-height: 1.4;
         }
 
@@ -615,6 +702,16 @@ def design_system_stylesheet() -> str:
 
             [data-testid^="stBaseButton-"] {
                 min-height: 2.85rem;
+            }
+
+            [data-testid="stTextInput"] [data-testid="stTextInputRootElement"],
+            [data-testid="stNumberInput"] [data-testid="stNumberInputContainer"],
+            [data-testid="stDateInput"] [data-baseweb="input"],
+            [data-testid="stTimeInput"] [data-baseweb="select"] > div,
+            [data-testid="stSelectbox"] .react-aria-ComboBox > [role="group"],
+            [data-testid="stMultiSelect"] [data-baseweb="select"] > div {
+                min-height: 2.9rem;
+                max-width: 100%;
             }
 
             .tos-participant-event {
