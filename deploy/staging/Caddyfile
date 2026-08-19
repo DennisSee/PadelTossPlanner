@@ -1,0 +1,11 @@
+{$SITE_ADDRESS:test-tos.oddbounce.nl} {
+	encode zstd gzip
+
+	handle_path /api/planner/* {
+		reverse_proxy planner-api:8000
+	}
+
+	handle {
+		reverse_proxy web:3000
+	}
+}

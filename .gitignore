@@ -5,10 +5,56 @@ __pycache__/
 
 .venv/
 venv/
+.tox/
+.nox/
+.mypy_cache/
+.ruff_cache/
+
+node_modules/
+.pnpm-store/
+.next/
+.turbo/
+.eslintcache
+coverage/
+htmlcov/
+*.tsbuildinfo
 
 .streamlit/secrets.toml
 
 .env
+.env.*
+**/.env
+**/.env.*
+!.env.example
+!.env.*.example
+!**/.env.example
+!**/.env.*.example
+
+.npmrc
+.npmrc.*
+**/.npmrc
+**/.npmrc.*
+!.npmrc.example
+!.npmrc.*.example
+!**/.npmrc.example
+!**/.npmrc.*.example
+
+*.pem
+*.key
+*.p12
+*.pfx
+*.ppk
+id_rsa*
+id_ed25519*
+*credentials*.json
+**/*credentials*.json
+*service-account*.json
+**/*service-account*.json
+!*credentials*.example.json
+!**/*credentials*.example.json
+!*service-account*.example.json
+!**/*service-account*.example.json
+
 .DS_Store
 Thumbs.db
 
