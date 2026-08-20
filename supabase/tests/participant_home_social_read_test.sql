@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(24);
+select plan(46);
 
 select has_function(
     'public',
@@ -48,6 +48,72 @@ select ok(
     ),
     'anon heeft geen execute-recht op de namen-RPC'
 );
+select is(
+    (
+        select language.lanname::text
+        from pg_proc as procedure
+        join pg_language as language on language.oid = procedure.prolang
+        where procedure.oid =
+            'public.participant_event_attendee_names(uuid)'::regprocedure
+    ),
+    'sql',
+    'namen-RPC blijft een SQL-functie'
+);
+select is(
+    (
+        select procedure.provolatile::text
+        from pg_proc as procedure
+        where procedure.oid =
+            'public.participant_event_attendee_names(uuid)'::regprocedure
+    ),
+    's',
+    'namen-RPC blijft STABLE'
+);
+select ok(
+    (
+        select procedure.prosecdef
+        from pg_proc as procedure
+        where procedure.oid =
+            'public.participant_event_attendee_names(uuid)'::regprocedure
+    ),
+    'namen-RPC blijft SECURITY DEFINER'
+);
+select is(
+    (
+        select procedure.proconfig
+        from pg_proc as procedure
+        where procedure.oid =
+            'public.participant_event_attendee_names(uuid)'::regprocedure
+    ),
+    array['search_path=""']::text[],
+    'namen-RPC gebruikt een lege search_path'
+);
+select ok(
+    not exists (
+        select 1
+        from pg_proc as procedure
+        cross join lateral aclexplode(procedure.proacl) as privilege
+        where procedure.oid =
+                'public.participant_event_attendee_names(uuid)'::regprocedure
+          and privilege.grantee = 0
+          and privilege.privilege_type = 'EXECUTE'
+    ),
+    'PUBLIC heeft geen execute-recht op de namen-RPC'
+);
+select ok(
+    (
+        select count(*) = 1
+           and bool_and(role.rolname = 'authenticated')
+        from pg_proc as procedure
+        cross join lateral aclexplode(procedure.proacl) as privilege
+        join pg_roles as role on role.oid = privilege.grantee
+        where procedure.oid =
+                'public.participant_event_attendee_names(uuid)'::regprocedure
+          and privilege.privilege_type = 'EXECUTE'
+          and privilege.grantee <> procedure.proowner
+    ),
+    'alleen authenticated heeft naast de functie-eigenaar execute'
+);
 
 insert into auth.users (
     id, aud, role, email, raw_app_meta_data, raw_user_meta_data, created_at, updated_at
@@ -87,11 +153,28 @@ values
         'e1000000-0000-4000-8000-000000000007',
         'authenticated', 'authenticated', 'planner-social@example.test', '{}',
         '{"display_name":"Planner Social"}', now(), now()
+    ),
+    (
+        'e1000000-0000-4000-8000-000000000008',
+        'authenticated', 'authenticated', 'admin-social@example.test', '{}',
+        '{"display_name":"Admin Social"}', now(), now()
+    ),
+    (
+        'e1000000-0000-4000-8000-000000000009',
+        'authenticated', 'authenticated', 'no-member-social@example.test', '{}',
+        '{"display_name":"No Member Social"}', now(), now()
     );
 
 update public.profiles
-set role = 'planner'
-where id = 'e1000000-0000-4000-8000-000000000007';
+set role = case id
+    when 'e1000000-0000-4000-8000-000000000007'::uuid then 'planner'
+    when 'e1000000-0000-4000-8000-000000000008'::uuid then 'admin'
+    else role
+end
+where id in (
+    'e1000000-0000-4000-8000-000000000007',
+    'e1000000-0000-4000-8000-000000000008'
+);
 
 insert into public.club_members (id, display_name, approval_status, active)
 values
@@ -100,7 +183,9 @@ values
     ('e2000000-0000-4000-8000-000000000003', 'Declined Name', 'approved', true),
     ('e2000000-0000-4000-8000-000000000004', 'Pending Name', 'pending', true),
     ('e2000000-0000-4000-8000-000000000005', 'Inactive Name', 'approved', false),
-    ('e2000000-0000-4000-8000-000000000006', 'Rejected Name', 'rejected', true);
+    ('e2000000-0000-4000-8000-000000000006', 'Rejected Name', 'rejected', true),
+    ('e2000000-0000-4000-8000-000000000007', 'Planner Viewer', 'approved', true),
+    ('e2000000-0000-4000-8000-000000000008', 'Admin Viewer', 'approved', true);
 
 update public.profiles as profile
 set member_id = mapping.member_id
@@ -111,7 +196,9 @@ from (
         ('e1000000-0000-4000-8000-000000000003'::uuid, 'e2000000-0000-4000-8000-000000000003'::uuid),
         ('e1000000-0000-4000-8000-000000000004'::uuid, 'e2000000-0000-4000-8000-000000000004'::uuid),
         ('e1000000-0000-4000-8000-000000000005'::uuid, 'e2000000-0000-4000-8000-000000000005'::uuid),
-        ('e1000000-0000-4000-8000-000000000006'::uuid, 'e2000000-0000-4000-8000-000000000006'::uuid)
+        ('e1000000-0000-4000-8000-000000000006'::uuid, 'e2000000-0000-4000-8000-000000000006'::uuid),
+        ('e1000000-0000-4000-8000-000000000007'::uuid, 'e2000000-0000-4000-8000-000000000007'::uuid),
+        ('e1000000-0000-4000-8000-000000000008'::uuid, 'e2000000-0000-4000-8000-000000000008'::uuid)
 ) as mapping(user_id, member_id)
 where profile.id = mapping.user_id;
 
@@ -135,6 +222,18 @@ values
         'e3000000-0000-4000-8000-000000000003', 'other-closed', 'Other Closed',
         'padel', now() + interval '30 days', now() + interval '30 days 2 hours',
         now() + interval '29 days', 'closed',
+        'e1000000-0000-4000-8000-000000000007'
+    ),
+    (
+        'e3000000-0000-4000-8000-000000000004', 'social-cancelled', 'Social Cancelled',
+        'padel', now() + interval '40 days', now() + interval '40 days 2 hours',
+        now() + interval '39 days', 'cancelled',
+        'e1000000-0000-4000-8000-000000000007'
+    ),
+    (
+        'e3000000-0000-4000-8000-000000000005', 'social-expired', 'Social Expired',
+        'padel', now() - interval '2 days', now() - interval '46 hours',
+        now() - interval '3 days', 'open',
         'e1000000-0000-4000-8000-000000000007'
     );
 
@@ -183,6 +282,18 @@ values
         'e1000000-0000-4000-8000-000000000001',
         'e2000000-0000-4000-8000-000000000001',
         'attending', now() + interval '20 days', now() + interval '20 days 2 hours', 'admin'
+    ),
+    (
+        'e3000000-0000-4000-8000-000000000004',
+        'e1000000-0000-4000-8000-000000000001',
+        'e2000000-0000-4000-8000-000000000001',
+        'attending', now() + interval '40 days', now() + interval '40 days 2 hours', 'admin'
+    ),
+    (
+        'e3000000-0000-4000-8000-000000000005',
+        'e1000000-0000-4000-8000-000000000001',
+        'e2000000-0000-4000-8000-000000000001',
+        'attending', now() - interval '2 days', now() - interval '46 hours', 'admin'
     );
 
 set local role authenticated;
@@ -200,6 +311,59 @@ select results_eq(
 );
 select is(
     (
+        select role
+        from public.profiles
+        where id = 'e1000000-0000-4000-8000-000000000001'
+    ),
+    'participant',
+    'participantrol blijft ongewijzigd door de namen-RPC'
+);
+
+select set_config('request.jwt.claim.sub', 'e1000000-0000-4000-8000-000000000007', true);
+select results_eq(
+    $sql$
+        select display_name
+        from public.participant_event_attendee_names(
+            'e3000000-0000-4000-8000-000000000001'
+        )
+    $sql$,
+    $sql$ values ('Marieke'::text), ('Viewer'::text) $sql$,
+    'planner met actieve approved membership ziet veilige namen'
+);
+select is(
+    (
+        select role
+        from public.profiles
+        where id = 'e1000000-0000-4000-8000-000000000007'
+    ),
+    'planner',
+    'plannerrol blijft ongewijzigd door de namen-RPC'
+);
+
+select set_config('request.jwt.claim.sub', 'e1000000-0000-4000-8000-000000000008', true);
+select results_eq(
+    $sql$
+        select display_name
+        from public.participant_event_attendee_names(
+            'e3000000-0000-4000-8000-000000000001'
+        )
+    $sql$,
+    $sql$ values ('Marieke'::text), ('Viewer'::text) $sql$,
+    'admin met actieve approved membership ziet veilige namen'
+);
+select is(
+    (
+        select role
+        from public.profiles
+        where id = 'e1000000-0000-4000-8000-000000000008'
+    ),
+    'admin',
+    'adminrol blijft ongewijzigd door de namen-RPC'
+);
+
+select set_config('request.jwt.claim.sub', 'e1000000-0000-4000-8000-000000000001', true);
+select is(
+    (
         select count(*)
         from public.participant_event_attendee_names(
             'e3000000-0000-4000-8000-000000000002'
@@ -207,6 +371,26 @@ select is(
     ),
     0::bigint,
     'gesloten event geeft geen sociale namen vrij'
+);
+select is(
+    (
+        select count(*)
+        from public.participant_event_attendee_names(
+            'e3000000-0000-4000-8000-000000000004'
+        )
+    ),
+    0::bigint,
+    'geannuleerd event geeft geen sociale namen vrij'
+);
+select is(
+    (
+        select count(*)
+        from public.participant_event_attendee_names(
+            'e3000000-0000-4000-8000-000000000005'
+        )
+    ),
+    0::bigint,
+    'verlopen event geeft geen sociale namen vrij'
 );
 select is(
     (
@@ -234,6 +418,36 @@ select ok(
 select ok(
     not has_column_privilege('authenticated', 'public.member_sport_profiles', 'ranking', 'SELECT'),
     'authenticated kan ranking niet selecteren'
+);
+select ok(
+    not has_table_privilege('authenticated', 'public.profiles', 'UPDATE'),
+    'namen-RPC voegt geen brede profielupdates toe'
+);
+select ok(
+    not has_table_privilege('authenticated', 'public.club_members', 'UPDATE'),
+    'namen-RPC voegt geen brede memberupdates toe'
+);
+select is(
+    (
+        select count(*)
+        from public.participant_event_attendee_names(
+            'e3000000-0000-4000-8000-000000000001'
+        )
+        where display_name = 'Declined Name'
+    ),
+    0::bigint,
+    'declined deelnemer verschijnt niet in de namenlijst'
+);
+select is(
+    (
+        select count(*)
+        from public.participant_event_attendee_names(
+            'e3000000-0000-4000-8000-000000000001'
+        )
+        where display_name = 'Rejected Name'
+    ),
+    0::bigint,
+    'rejected deelnemer verschijnt niet in de namenlijst'
 );
 
 select set_config('request.jwt.claim.sub', '', true);
@@ -275,6 +489,54 @@ select is(
 select set_config('request.jwt.claim.sub', '', true);
 reset role;
 
+set local role authenticated;
+select set_config('request.jwt.claim.sub', 'e1000000-0000-4000-8000-000000000009', true);
+select is(
+    (
+        select count(*)
+        from public.participant_event_attendee_names(
+            'e3000000-0000-4000-8000-000000000001'
+        )
+    ),
+    0::bigint,
+    'actief profiel zonder member_id krijgt geen namen terug'
+);
+select set_config('request.jwt.claim.sub', 'e1000000-0000-4000-8000-000000000004', true);
+select is(
+    (
+        select count(*)
+        from public.participant_event_attendee_names(
+            'e3000000-0000-4000-8000-000000000001'
+        )
+    ),
+    0::bigint,
+    'viewer met pending membership krijgt geen namen terug'
+);
+select set_config('request.jwt.claim.sub', 'e1000000-0000-4000-8000-000000000006', true);
+select is(
+    (
+        select count(*)
+        from public.participant_event_attendee_names(
+            'e3000000-0000-4000-8000-000000000001'
+        )
+    ),
+    0::bigint,
+    'viewer met rejected membership krijgt geen namen terug'
+);
+select set_config('request.jwt.claim.sub', 'e1000000-0000-4000-8000-000000000005', true);
+select is(
+    (
+        select count(*)
+        from public.participant_event_attendee_names(
+            'e3000000-0000-4000-8000-000000000001'
+        )
+    ),
+    0::bigint,
+    'viewer met inactieve approved membership krijgt geen namen terug'
+);
+select set_config('request.jwt.claim.sub', '', true);
+reset role;
+
 update public.profiles
 set active = false
 where id = 'e1000000-0000-4000-8000-000000000001';
@@ -312,7 +574,13 @@ select is(
         'public.participant_event_attendee_names(uuid)'::regprocedure
     ),
     'TABLE(display_name text)',
-    'RPC-resultaat bevat exact één tekstkolom display_name'
+    'RPC-resultaat bevat alleen display_name en geen user_id/member_id of andere metadata'
+);
+select ok(
+    position('.role' in lower(pg_get_functiondef(
+        'public.participant_event_attendee_names(uuid)'::regprocedure
+    ))) = 0,
+    'viewer-authorisatie bevat nadrukkelijk geen role-predicate'
 );
 select ok(
     position('email' in lower(pg_get_functiondef(
