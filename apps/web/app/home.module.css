@@ -17,6 +17,10 @@
   border-bottom: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
 }
 
+.topbar > :last-child {
+  flex: 0 0 auto;
+}
+
 .hero {
   display: grid;
   grid-template-columns: minmax(0, 1.25fr) minmax(16rem, 0.75fr);
@@ -83,6 +87,10 @@
   margin: 0.65rem 0 0;
   color: #d8ebe4;
   line-height: 1.55;
+}
+
+.side a {
+  margin-top: var(--space-4);
 }
 
 @media (max-width: 46rem) {

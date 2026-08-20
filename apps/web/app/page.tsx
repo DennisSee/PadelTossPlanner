@@ -1,18 +1,29 @@
-import { Badge, AppHeader, Card, LinkButton } from "../components/ui";
+import {
+  Badge,
+  AppHeader,
+  Card,
+  LinkButton,
+  navigationModelFromAccount,
+  SecondaryLinkButton,
+  SiteNavigation,
+} from "../components/ui";
+import { loadOptionalAccountContext } from "../lib/auth/session";
 import { readAppEnvironment } from "../lib/config/public-supabase";
 
 import styles from "./home.module.css";
 
 export const dynamic = "force-dynamic";
 
-export default function Home() {
+export default async function Home() {
   const isStaging = readAppEnvironment() === "staging";
+  const navigation = navigationModelFromAccount(await loadOptionalAccountContext());
 
   return (
     <main className={styles.page}>
       <div className={styles.shell}>
         <div className={styles.topbar}>
           <AppHeader subtitle="Padelavonden voor iedereen" />
+          <SiteNavigation model={navigation} />
           {isStaging ? <Badge tone="warning">Staging</Badge> : null}
         </div>
 
@@ -29,10 +40,13 @@ export default function Home() {
 
           <Card className={styles.side}>
             <div className={styles.sideMark} aria-hidden="true" />
-            <h2 className={styles.sideTitle}>Online aanmelden volgt later</h2>
+            <h2 className={styles.sideTitle}>Doe mee met de volgende TOS</h2>
             <p className={styles.sideText}>
-              WEB-2 brengt eerst het publieke live schema naar de nieuwe website.
+              Log in met je e-mailadres en bekijk je account en TOS-status.
             </p>
+            <SecondaryLinkButton href="/login?next=%2Ftos">
+              Inloggen / aanmelden
+            </SecondaryLinkButton>
           </Card>
         </div>
       </div>

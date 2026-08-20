@@ -39,7 +39,7 @@ Na een wijziging aan een `.in`-bestand moeten beide lockfiles bewust opnieuw wor
 
 ## Netwerkgrens vanaf WEB-2
 
-`application` blijft een intern Docker-netwerk. Next.js is vanaf WEB-2 daarnaast aan het niet-interne `web-egress` gekoppeld voor uitsluitend server-side HTTPS-verkeer naar de bestaande publieke Supabase-projectie. Dit geeft de webcontainer geen hostpoort. `planner-api` blijft alleen op `application` en krijgt geen internet- of Supabasetoegang. Vóór WEB-Auth wordt deze netwerkgrens opnieuw beoordeeld voor Auth, SSR-cookieverversing en user-scoped databaseverzoeken.
+`application` blijft een intern Docker-netwerk. Next.js is vanaf WEB-2 daarnaast aan het niet-interne `web-egress` gekoppeld voor uitsluitend server-side HTTPS-verkeer naar de bestaande publieke Supabase-projectie. Dit geeft de webcontainer geen hostpoort. `planner-api` blijft alleen op `application` en krijgt geen internet- of Supabasetoegang. WEB-3A gebruikt hetzelfde web-egress-netwerk voor Auth, SSR-cookieverversing en user-scoped databaseverzoeken.
 
 ## Parallelle migratie
 

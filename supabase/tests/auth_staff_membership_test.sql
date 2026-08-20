@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(36);
+select plan(42);
 
 select ok(
     not has_function_privilege('anon', 'public.self_onboard_member(text)', 'EXECUTE'),
@@ -161,6 +161,25 @@ select is(
     3::bigint,
     'approval-default blijft voor alle rollen gelijk toegepast'
 );
+
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '21000000-0000-4000-8000-000000000001', true);
+select is((select count(*) from public.profiles), 1::bigint,
+    'participant-JWT leest uitsluitend het eigen profiel');
+select is((select count(*) from public.club_members), 1::bigint,
+    'participant-JWT leest uitsluitend het eigen gekoppelde clublid');
+select set_config('request.jwt.claim.sub', '21000000-0000-4000-8000-000000000002', true);
+select is((select count(*) from public.profiles), 1::bigint,
+    'planner-JWT leest uitsluitend het eigen profiel');
+select is((select count(*) from public.club_members), 1::bigint,
+    'planner-member leest uitsluitend het eigen gekoppelde clublid');
+select set_config('request.jwt.claim.sub', '21000000-0000-4000-8000-000000000003', true);
+select is((select count(*) from public.profiles), 1::bigint,
+    'admin-JWT leest uitsluitend het eigen profiel');
+select is((select count(*) from public.club_members), 1::bigint,
+    'admin-member leest uitsluitend het eigen gekoppelde clublid');
+select set_config('request.jwt.claim.sub', '', true);
+reset role;
 
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '21000000-0000-4000-8000-000000000003', true);

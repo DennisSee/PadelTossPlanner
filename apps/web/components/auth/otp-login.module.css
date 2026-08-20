@@ -1,0 +1,100 @@
+.form {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.form label {
+  color: var(--club-green-dark);
+  font-size: 0.9rem;
+  font-weight: 750;
+}
+
+.form input {
+  width: 100%;
+  min-height: 3.1rem;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  background: var(--surface);
+}
+
+.form input:hover {
+  border-color: #9bbcaf;
+}
+
+.form input:focus {
+  border-color: var(--club-green);
+  outline: 3px solid rgb(10 105 81 / 16%);
+}
+
+.form input:disabled {
+  color: var(--text-muted);
+  background: var(--surface-subtle);
+}
+
+.primaryButton {
+  min-height: 3rem;
+  padding: 0.75rem 1rem;
+  border: 2px solid var(--club-green);
+  border-radius: var(--radius-md);
+  color: var(--surface);
+  background: var(--club-green);
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.primaryButton:hover:not(:disabled) {
+  border-color: var(--club-green-dark);
+  background: var(--club-green-dark);
+}
+
+.primaryButton:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.error {
+  margin: 0;
+  padding: 0.65rem 0.75rem;
+  border-left: 0.25rem solid var(--danger);
+  color: var(--danger);
+  background: var(--danger-soft);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.sentMessage {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  color: var(--club-green-dark);
+  background: var(--success-soft);
+  line-height: 1.45;
+}
+
+.secondaryActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-2);
+  color: var(--text-muted);
+  font-size: 0.84rem;
+}
+
+.secondaryActions button {
+  min-height: 2.5rem;
+  padding: 0.35rem 0;
+  border: 0;
+  color: var(--club-green);
+  background: transparent;
+  cursor: pointer;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 0.18rem;
+}
+
+.secondaryActions span {
+  align-self: center;
+}

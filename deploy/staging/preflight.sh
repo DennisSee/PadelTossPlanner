@@ -86,18 +86,22 @@ docker compose version >/dev/null 2>&1 || fail "Docker Compose-plugin ontbreekt.
 ok "Vereiste lokale commando's zijn beschikbaar."
 
 [[ -f "$env_file" ]] || fail "Staging .env ontbreekt."
-for variable_name in APP_ENV SUPABASE_URL SUPABASE_PUBLISHABLE_KEY; do
+for variable_name in APP_ENV APP_BASE_URL SUPABASE_URL SUPABASE_PUBLISHABLE_KEY; do
   read_env_value "$variable_name" >/dev/null || fail "Vereiste variabele ontbreekt of is leeg: $variable_name"
 done
 app_environment=$(read_env_value APP_ENV)
 [[ "$app_environment" == "staging" ]] || fail "APP_ENV moet staging zijn."
+app_base_url=$(read_env_value APP_BASE_URL)
+if [[ ! "$app_base_url" =~ ^https://test-tos\.oddbounce\.nl/?$ ]]; then
+  fail "APP_BASE_URL moet de HTTPS-URL van test-tos.oddbounce.nl zijn."
+fi
 if grep -Eqi '^[[:space:]]*(export[[:space:]]+)?SUPABASE_(SERVICE_ROLE|SECRET)_KEY[[:space:]]*=' "$env_file"; then
   fail "Een verboden Supabase service-/secret-keyvariabele staat in de staging-env."
 fi
 if [[ -n "${SUPABASE_SERVICE_ROLE_KEY+x}" || -n "${SUPABASE_SECRET_KEY+x}" ]]; then
   fail "Een verboden Supabase service-/secret-keyvariabele staat in het proces."
 fi
-ok "Stagingvariabelen zijn aanwezig; waarden zijn niet getoond."
+ok "Stagingvariabelen en veilige app-origin zijn aanwezig; waarden zijn niet getoond."
 
 [[ -f "$compose_file" ]] || fail "Composebestand ontbreekt."
 if ! compose_config=$(docker compose --env-file "$env_file" -f "$compose_file" config 2>/dev/null); then

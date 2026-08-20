@@ -18,7 +18,7 @@ fi
 host=${BASH_REMATCH[1]}
 port=${BASH_REMATCH[3]:-443}
 
-for command_name in curl openssl grep tr; do
+for command_name in curl openssl grep tr awk sed tail; do
   command -v "$command_name" >/dev/null 2>&1 || fail "Vereist commando ontbreekt: $command_name"
 done
 
@@ -71,6 +71,37 @@ if printf '%s' "$response_body" | grep -Eqi \
   fail "Livepagina bevat een raw fout- of stacktracemarker."
 fi
 ok "Livepagina rendert veilig; een lege gepubliceerde toestand is toegestaan."
+
+request_path "/login"
+assert_no_sensitive_output "/login"
+printf '%s' "$response_body" | grep -Fq "Inloggen / aanmelden" || fail "Loginpagina mist de veilige OTP-ingang."
+ok "Loginpagina retourneert veilig HTTP 200."
+
+request_protected_redirect() {
+  local path=$1
+  local expected_next=$2
+  local headers
+  local status
+  local location
+  if ! headers=$(curl --silent --show-error --max-time 20 --dump-header - --output /dev/null "$base_url$path"); then
+    fail "Protected-routecontrole is mislukt voor $path."
+  fi
+  status=$(printf '%s\n' "$headers" | awk 'toupper($1) ~ /^HTTP\// { value=$2 } END { print value }')
+  location=$(printf '%s\n' "$headers" | sed -nE 's/^[Ll]ocation:[[:space:]]*(.*)\r?$/\1/p' | tail -n 1)
+  expected_location="/login?next=%2F$expected_next"
+  [[ "$status" =~ ^30[2378]$ ]] || fail "$path gaf geen veilige redirect."
+  if [[ "$location" != "$expected_location" && "$location" != "$base_url$expected_location" ]]; then
+    fail "$path redirect niet naar de verwachte interne loginroute."
+  fi
+  if printf '%s' "$location" | grep -Eqi 'access[_-]?token|refresh[_-]?token|code='; then
+    fail "De redirect voor $path bevat een verboden token- of codemarker."
+  fi
+}
+
+request_protected_redirect "/account" "account"
+request_protected_redirect "/tos" "tos"
+request_protected_redirect "/beheer" "beheer"
+ok "Protected routes verwijzen zonder tokenlek naar de interne loginpagina."
 
 request_path "/api/health"
 assert_no_sensitive_output "/api/health"

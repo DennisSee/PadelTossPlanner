@@ -4,7 +4,7 @@ const PLAYER_PREFERENCE_KEY = "tc-zuid-tos/preferred-player";
 const XSS_NAME = "<img src=x onerror=alert(1)>";
 const LONG_PLAYER_NAME = "Alexandria van den Berg-van der Meer met een bijzonder lange testnaam";
 const LONG_COURT_NAME = "Seppworks/Bax Baan met een bijzonder lange sponsornaam";
-const MOCK_URL = "http://127.0.0.1:54391";
+const MOCK_URL = "http://127.0.0.1:45391";
 
 async function openLive(page: Page) {
   const response = await page.goto("/live");
@@ -30,9 +30,14 @@ test("homepage toont de publieke stagingingang en navigeert met toetsenbord", as
     "Jouw TOS-avond in één oogopslag",
   );
   await expect(page.getByRole("heading", { level: 2 })).toHaveText(
-    "Online aanmelden volgt later",
+    "Doe mee met de volgende TOS",
   );
-  await expect(page.getByRole("button", { name: /inloggen/i })).toHaveCount(0);
+  await expect(
+    page
+      .getByRole("heading", { name: "Doe mee met de volgende TOS" })
+      .locator("..")
+      .getByRole("link", { name: "Inloggen / aanmelden" }),
+  ).toBeVisible();
 
   const liveLink = page.getByRole("link", { name: "Bekijk live TOS-schema" });
   await liveLink.focus();

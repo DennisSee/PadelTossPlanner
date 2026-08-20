@@ -7,24 +7,30 @@ import { describe, expect, it, vi } from "vitest";
 import Home from "./page";
 import { GET } from "./api/health/route";
 
+vi.mock("../lib/auth/session", () => ({
+  loadOptionalAccountContext: vi.fn().mockResolvedValue(null),
+}));
+
 describe("WEB-2 routes", () => {
-  it("links the public homepage to the live schedule", () => {
-    render(<Home />);
+  it("links the public homepage to live schedule and the shared login", async () => {
+    render(await Home());
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
       "Jouw TOS-avond in één oogopslag",
     );
     expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
-      "Online aanmelden volgt later",
+      "Doe mee met de volgende TOS",
     );
     expect(screen.getByRole("link", { name: "Bekijk live TOS-schema" })).toHaveAttribute(
       "href",
       "/live",
     );
+    expect(screen.getAllByRole("link", { name: "Inloggen / aanmelden" })[0])
+      .toHaveAttribute("href", "/login?next=%2Ftos");
   });
 
-  it("shows the staging badge from runtime APP_ENV", () => {
+  it("shows the staging badge from runtime APP_ENV", async () => {
     vi.stubEnv("APP_ENV", "staging");
-    render(<Home />);
+    render(await Home());
     expect(screen.getByText("Staging")).toBeInTheDocument();
     vi.unstubAllEnvs();
   });

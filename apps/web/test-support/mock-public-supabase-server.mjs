@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { createHmac, randomBytes, randomInt, randomUUID } from "node:crypto";
 
 const PUBLIC_COLUMNS = [
   "id",
@@ -17,6 +18,97 @@ const XSS_NAME = "<img src=x onerror=alert(1)>";
 const LONG_PLAYER_NAME = "Alexandria van den Berg-van der Meer met een bijzonder lange testnaam";
 const LONG_COURT_NAME = "Seppworks/Bax Baan met een bijzonder lange sponsornaam";
 const TIME_ZONE = "Europe/Amsterdam";
+const jwtSecret = randomBytes(32);
+const authUsers = new Map();
+const sessions = new Map();
+const otpCodes = new Map();
+
+function base64url(value) {
+  return Buffer.from(value).toString("base64url");
+}
+
+function jwtFor(user) {
+  const now = Math.floor(Date.now() / 1_000);
+  const header = base64url(JSON.stringify({ alg: "HS256", typ: "JWT" }));
+  const payload = base64url(JSON.stringify({
+    aud: "authenticated",
+    exp: now + 3_600,
+    iat: now,
+    iss: "http://127.0.0.1/auth/v1",
+    role: "authenticated",
+    sub: user.id,
+    email: user.email,
+  }));
+  const signature = createHmac("sha256", jwtSecret)
+    .update(`${header}.${payload}`)
+    .digest("base64url");
+  return `${header}.${payload}.${signature}`;
+}
+
+function roleForEmail(email) {
+  if (email.startsWith("admin-member")) return "admin";
+  if (email.startsWith("admin-no-member")) return "admin";
+  if (email.startsWith("planner-no-member")) return "planner";
+  return "participant";
+}
+
+function membershipForEmail(email) {
+  if (email.includes("no-member")) return null;
+  const status = email.startsWith("pending") ? "pending" :
+    email.startsWith("rejected") ? "rejected" : "approved";
+  return {
+    id: randomUUID(),
+    display_name: "Testlid",
+    approval_status: status,
+    active: !email.startsWith("inactive-member"),
+  };
+}
+
+function authUser(email) {
+  let user = authUsers.get(email);
+  if (!user) {
+    const membership = membershipForEmail(email);
+    user = {
+      id: randomUUID(),
+      email,
+      role: roleForEmail(email),
+      active: !email.startsWith("inactive-profile"),
+      membership,
+    };
+    authUsers.set(email, user);
+  }
+  return user;
+}
+
+async function requestJson(request) {
+  const chunks = [];
+  for await (const chunk of request) chunks.push(chunk);
+  try {
+    return JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function bearerUser(request) {
+  const authorization = request.headers.authorization ?? "";
+  if (!authorization.startsWith("Bearer ")) return null;
+  return sessions.get(authorization.slice(7)) ?? null;
+}
+
+function publicAuthUser(user) {
+  return {
+    id: user.id,
+    aud: "authenticated",
+    role: "authenticated",
+    email: user.email,
+    email_confirmed_at: new Date().toISOString(),
+    app_metadata: { provider: "email", providers: ["email"] },
+    user_metadata: {},
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+}
 
 function readPort() {
   const index = process.argv.indexOf("--port");
@@ -159,6 +251,9 @@ function json(response, status, body) {
   response.writeHead(status, {
     "content-type": "application/json; charset=utf-8",
     "content-length": Buffer.byteLength(payload),
+    "access-control-allow-origin": "http://127.0.0.1:31000",
+    "access-control-allow-headers": "authorization, apikey, content-type, x-client-info, x-supabase-api-version",
+    "access-control-allow-methods": "GET, POST, OPTIONS",
   });
   response.end(payload);
 }
@@ -167,6 +262,16 @@ const port = readPort();
 let nextDelayMilliseconds = 0;
 const server = createServer(async (request, response) => {
   const requestUrl = new URL(request.url ?? "/", `http://127.0.0.1:${port}`);
+
+  if (request.method === "OPTIONS") {
+    response.writeHead(204, {
+      "access-control-allow-origin": "http://127.0.0.1:31000",
+      "access-control-allow-headers": "authorization, apikey, content-type, x-client-info, x-supabase-api-version",
+      "access-control-allow-methods": "GET, POST, OPTIONS",
+    });
+    response.end();
+    return;
+  }
 
   if (request.method === "GET" && requestUrl.pathname === "/__health") {
     json(response, 200, { status: "ok" });
@@ -178,6 +283,92 @@ const server = createServer(async (request, response) => {
       ? Math.max(0, Math.min(2_000, Math.trunc(requestedDelay)))
       : 0;
     json(response, 200, { status: "ok" });
+    return;
+  }
+  if (request.method === "POST" && requestUrl.pathname === "/auth/v1/otp") {
+    const body = await requestJson(request);
+    const email = String(body.email ?? "").trim().toLowerCase();
+    if (!email || !body.create_user) {
+      json(response, 400, { code: "validation_failed", msg: "invalid request" });
+      return;
+    }
+    authUser(email);
+    otpCodes.set(email, String(randomInt(10_000_000, 100_000_000)));
+    json(response, 200, {});
+    return;
+  }
+  if (request.method === "POST" && requestUrl.pathname === "/__test/latest-otp") {
+    const body = await requestJson(request);
+    const email = String(body.email ?? "").trim().toLowerCase();
+    const token = otpCodes.get(email);
+    if (!token) {
+      json(response, 404, { error: "not found" });
+      return;
+    }
+    json(response, 200, { token });
+    return;
+  }
+  if (request.method === "POST" && requestUrl.pathname === "/auth/v1/verify") {
+    const body = await requestJson(request);
+    const email = String(body.email ?? "").trim().toLowerCase();
+    const token = String(body.token ?? "");
+    if (body.type !== "email" || !email || otpCodes.get(email) !== token) {
+      json(response, 403, { code: "otp_expired", msg: "Token has expired or is invalid" });
+      return;
+    }
+    otpCodes.delete(email);
+    const user = authUser(email);
+    const accessToken = jwtFor(user);
+    const refreshToken = randomBytes(32).toString("base64url");
+    sessions.set(accessToken, user);
+    json(response, 200, {
+      access_token: accessToken,
+      token_type: "bearer",
+      expires_in: 3_600,
+      expires_at: Math.floor(Date.now() / 1_000) + 3_600,
+      refresh_token: refreshToken,
+      user: publicAuthUser(user),
+    });
+    return;
+  }
+  if (request.method === "GET" && requestUrl.pathname === "/auth/v1/user") {
+    const user = bearerUser(request);
+    if (!user) {
+      json(response, 401, { code: "bad_jwt", msg: "invalid JWT" });
+      return;
+    }
+    json(response, 200, publicAuthUser(user));
+    return;
+  }
+  if (request.method === "POST" && requestUrl.pathname === "/auth/v1/logout") {
+    const authorization = request.headers.authorization ?? "";
+    if (authorization.startsWith("Bearer ")) sessions.delete(authorization.slice(7));
+    response.writeHead(204);
+    response.end();
+    return;
+  }
+  if (request.method === "GET" && requestUrl.pathname === "/rest/v1/profiles") {
+    const user = bearerUser(request);
+    if (!user) {
+      json(response, 401, { code: "PGRST301", message: "invalid JWT" });
+      return;
+    }
+    json(response, 200, [{
+      id: user.id,
+      display_name: "Testlid",
+      role: user.role,
+      active: user.active,
+      member_id: user.membership?.id ?? null,
+    }]);
+    return;
+  }
+  if (request.method === "GET" && requestUrl.pathname === "/rest/v1/club_members") {
+    const user = bearerUser(request);
+    if (!user) {
+      json(response, 401, { code: "PGRST301", message: "invalid JWT" });
+      return;
+    }
+    json(response, 200, user.membership && user.active ? [user.membership] : []);
     return;
   }
   if (request.method !== "GET") {

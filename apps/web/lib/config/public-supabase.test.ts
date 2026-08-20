@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   PublicConfigurationError,
+  readAppBaseUrl,
   readAppEnvironment,
+  readAppRuntimeConfig,
   readPublicSupabaseConfig,
 } from "./public-supabase";
 
@@ -43,5 +45,33 @@ describe("public runtime configuration", () => {
   it("shows the staging badge only for the explicit staging environment", () => {
     expect(readAppEnvironment({ APP_ENV: "staging" })).toBe("staging");
     expect(readAppEnvironment({ APP_ENV: "unknown" })).toBe("production");
+  });
+
+  it("validates the server-runtime application origin without build-time variables", () => {
+    expect(readAppBaseUrl({
+      APP_ENV: "staging",
+      APP_BASE_URL: "https://test-tos.oddbounce.nl/",
+    })).toBe("https://test-tos.oddbounce.nl");
+    expect(readAppBaseUrl({ APP_ENV: "test", APP_BASE_URL: "http://127.0.0.1:31000" }))
+      .toBe("http://127.0.0.1:31000");
+    expect(readAppBaseUrl({ APP_ENV: "staging", APP_BASE_URL: "http://localhost:31000" }))
+      .toBe("http://localhost:31000");
+    expect(() => readAppBaseUrl({ APP_ENV: "staging", APP_BASE_URL: "http://test-tos.oddbounce.nl" }))
+      .toThrow(PublicConfigurationError);
+    expect(() => readAppBaseUrl({ APP_ENV: "staging", APP_BASE_URL: "https://evil.test/path" }))
+      .toThrow(PublicConfigurationError);
+  });
+
+  it("combines only the three approved runtime values", () => {
+    expect(readAppRuntimeConfig({
+      APP_ENV: "staging",
+      APP_BASE_URL: "https://test-tos.oddbounce.nl",
+      SUPABASE_URL: "https://test.example.test",
+      SUPABASE_PUBLISHABLE_KEY: "sb_publishable_example",
+    })).toEqual({
+      appBaseUrl: "https://test-tos.oddbounce.nl",
+      url: "https://test.example.test",
+      publishableKey: "sb_publishable_example",
+    });
   });
 });

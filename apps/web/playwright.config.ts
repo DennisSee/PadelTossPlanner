@@ -1,6 +1,6 @@
 import { defineConfig } from "@playwright/test";
 
-const MOCK_PORT = 54_391;
+const MOCK_PORT = 45_391;
 const WEB_PORT = 31_000;
 const BASE_URL = `http://127.0.0.1:${WEB_PORT}`;
 
@@ -46,6 +46,7 @@ export default defineConfig({
       env: {
         ...process.env,
         APP_ENV: "staging",
+        APP_BASE_URL: BASE_URL,
         SUPABASE_URL: `http://127.0.0.1:${MOCK_PORT}`,
         SUPABASE_PUBLISHABLE_KEY: "sb_publishable_e2e_only",
         HOSTNAME: "127.0.0.1",

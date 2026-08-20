@@ -5,9 +5,12 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 
 import {
   Badge,
+  ANONYMOUS_NAVIGATION,
   AppHeader,
   Card,
+  SiteNavigation,
   StateMessage,
+  type NavigationModel,
 } from "../ui";
 import {
   formatCreatedAt,
@@ -443,9 +446,11 @@ function eventStatus(state: LiveRoundState): { label: string; tone: "neutral" | 
 export function LiveSchedule({
   schedule,
   initialNowIso,
+  navigation = ANONYMOUS_NAVIGATION,
 }: {
   schedule: PublicSchedule;
   initialNowIso: string;
+  navigation?: NavigationModel;
 }) {
   const participants = useMemo(() => sortedParticipants(schedule.participants), [schedule.participants]);
   const [selectedPlayer, setSelectedPlayer] = usePlayerPreference(participants);
@@ -464,6 +469,7 @@ export function LiveSchedule({
       <div className={styles.shell}>
         <div className={styles.topbar}>
           <AppHeader subtitle="Live TOS-schema" />
+          <SiteNavigation model={navigation} />
           <Link className={styles.backLink} href="/">← Terug</Link>
         </div>
 
