@@ -51,11 +51,30 @@ describe("WEB-3A route guards and cache boundaries", () => {
     expect(nextConfig.match(/private, no-store, max-age=0/g)).toHaveLength(4);
   });
 
-  it("accepts only relative or same-origin protected-route redirects in staging smoke", () => {
+  it("parses protected-route redirects structurally in staging smoke", () => {
     const smoke = source("../../deploy/staging/smoke-test.sh");
-    expect(smoke).toContain('expected_location="/login?next=%2F$expected_next"');
-    expect(smoke).toContain('"$location" != "$expected_location"');
-    expect(smoke).toContain('"$location" != "$base_url$expected_location"');
-    expect(smoke).toMatch(/access\[_-\]\?token\|refresh\[_-\]\?token\|code=/u);
+    const validator = source("../../deploy/staging/validate-smoke-redirect.py");
+    const fixtures = source("../../deploy/staging/test-smoke-redirects.sh");
+
+    expect(smoke).toContain('python3 "$redirect_validator" "$base_url" "$path"');
+    expect(validator).toContain("urlsplit(location)");
+    expect(validator).toContain('parsed.path != "/login"');
+    expect(validator).toContain('query == [("next", expected_path)]');
+    expect(validator).toContain("normalized_origin(location) != base_origin");
+    expect(fixtures).toContain('"ongecodeerd relatief" "accept"');
+    expect(fixtures).toContain('"gecodeerd relatief" "accept"');
+    expect(fixtures).toContain('"gecodeerd TOS-pad" "accept"');
+    expect(fixtures).toContain('"gecodeerd beheerpad" "accept"');
+    expect(fixtures).toContain('"absoluut same-origin" "accept"');
+    expect(fixtures).toContain('"externe origin" "reject"');
+    expect(fixtures).toContain('"protocol-relative origin" "reject"');
+    expect(fixtures).toContain('"absolute externe next" "reject"');
+    expect(fixtures).toContain('"gecodeerde externe bypass" "reject"');
+    expect(fixtures).toContain('"verkeerde protected bestemming" "reject"');
+    expect(fixtures).toContain('"token in Location" "reject"');
+    expect(fixtures).toContain('"refresh-token in Location" "reject"');
+    expect(fixtures).toContain('"OTP in Location" "reject"');
+    expect(fixtures).toContain('"credentials in absolute URL" "reject"');
+    expect(fixtures).toContain('[[ -n "$validator_output" ]]');
   });
 });
