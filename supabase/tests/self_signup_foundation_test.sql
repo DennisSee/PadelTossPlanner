@@ -543,15 +543,15 @@ select throws_ok(
     'permission denied for table tos_events',
     'participant kan geen event aanmaken'
 );
-select throws_ok(
+select results_eq(
     $sql$
         update public.tos_events
         set title = 'Onbevoegd gewijzigd'
         where id = '10000000-0000-4000-8000-000000000001'
+        returning title
     $sql$,
-    '42501',
-    'permission denied for table tos_events',
-    'participant kan geen event wijzigen'
+    $sql$select null::text where false$sql$,
+    'participant-UPDATE bereikt door de kolomgrant geen rij onder staff-RLS'
 );
 select throws_ok(
     $sql$
