@@ -23,8 +23,10 @@ export async function requireAccount(
   return account;
 }
 
-export async function requirePlannerAccount(): Promise<AccountContext> {
-  const account = await requireAccount("/beheer");
+export async function requirePlannerAccount(
+  client?: SupabaseClient,
+): Promise<AccountContext> {
+  const account = await requireAccount("/beheer", client);
   if (!account.capabilities.canPlan) redirect("/account");
   return account;
 }

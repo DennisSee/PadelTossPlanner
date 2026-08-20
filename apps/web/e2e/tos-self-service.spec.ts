@@ -125,13 +125,12 @@ test("dashboard houdt attending, declined, closed en cancelled eigen rijen buite
 
 test("een geïsoleerde namen-RPC-fout breekt de overige open events niet", async ({ page, request }) => {
   await page.goto("/login?next=/tos");
-  await signIn(page, request, testEmail("attendee-failure"));
-  await expect(page).toHaveURL(/\/tos$/u);
   const fixture = await request.post(`${MOCK_URL}/__test/attendee-failure`, {
     data: { slug: "tennis-avond-2026" },
   });
   expect(fixture.ok()).toBe(true);
-  await page.reload();
+  await signIn(page, request, testEmail("attendee-failure"));
+  await expect(page).toHaveURL(/\/tos$/u);
   const available = page.getByRole("region", { name: "Nog aanmelden" });
   await expect(available.getByText("Padel TOS vrijdagavond")).toBeVisible();
   await expect(available.getByText("Tennis TOS voor alle clubleden")).toBeVisible();

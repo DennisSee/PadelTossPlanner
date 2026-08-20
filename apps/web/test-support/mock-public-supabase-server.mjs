@@ -59,6 +59,16 @@ function relativeIso(hours) {
 
 const tosEvents = [
   {
+    id: "10000000-0000-4000-8000-000000000007",
+    slug: "concept-padel-tos",
+    title: "Concept TOS",
+    sport: "padel",
+    starts_at: relativeIso(60),
+    ends_at: relativeIso(62),
+    signup_deadline: relativeIso(36),
+    status: "draft",
+  },
+  {
     id: "10000000-0000-4000-8000-000000000001",
     slug: "vrijdag-padel",
     title: "Padel TOS vrijdagavond",
@@ -119,6 +129,7 @@ const tosEvents = [
     status: "open",
   },
 ];
+const initialTosEvents = tosEvents.map((event) => ({ ...event }));
 
 const attendeeFixtures = [
   { display_name: "Dennis", response: "attending", active: true, approval: "approved" },
@@ -169,10 +180,10 @@ function seedRegistration(user, eventId, response) {
 
 function seedUserRegistrations(user) {
   if (!user.email.includes("dashboard")) return;
-  seedRegistration(user, tosEvents[0].id, "attending");
-  seedRegistration(user, tosEvents[1].id, "declined");
-  seedRegistration(user, tosEvents[3].id, "attending");
-  seedRegistration(user, tosEvents[4].id, "attending");
+  seedRegistration(user, tosEvents.find(({ slug }) => slug === "vrijdag-padel").id, "attending");
+  seedRegistration(user, tosEvents.find(({ slug }) => slug === "tennis-avond-2026").id, "declined");
+  seedRegistration(user, tosEvents.find(({ slug }) => slug === "eigen-gesloten-tos").id, "attending");
+  seedRegistration(user, tosEvents.find(({ slug }) => slug === "eigen-geannuleerde-tos").id, "attending");
 }
 
 function base64url(value) {
@@ -451,8 +462,27 @@ function validParticipant(user) {
   );
 }
 
+function validStaff(user) {
+  return Boolean(user?.active && (user.role === "planner" || user.role === "admin"));
+}
+
 function visibleEventForUser(event, user) {
-  return event.status === "open" || Boolean(user && registrationFor(user.id, event.id));
+  return validStaff(user) || event.status === "open" || Boolean(user && registrationFor(user.id, event.id));
+}
+
+function validEventPayload(body) {
+  const startsAt = new Date(body.starts_at);
+  const endsAt = new Date(body.ends_at);
+  const deadline = body.signup_deadline === null ? null : new Date(body.signup_deadline);
+  return (
+    typeof body.slug === "string" && /^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(body.slug) &&
+    !tosEvents.some(({ slug }) => slug === body.slug) &&
+    typeof body.title === "string" && body.title.trim().length >= 1 && body.title.trim().length <= 160 &&
+    new Set(["padel", "tennis"]).has(body.sport) &&
+    new Set(["draft", "open", "closed", "cancelled"]).has(body.status) &&
+    !Number.isNaN(startsAt.getTime()) && !Number.isNaN(endsAt.getTime()) && endsAt > startsAt &&
+    (deadline === null || (!Number.isNaN(deadline.getTime()) && deadline <= startsAt))
+  );
 }
 
 function registrationAvailability(event, response, from, until) {
@@ -541,6 +571,19 @@ const server = createServer(async (request, response) => {
     }
     attendeeFailureEventId = event.id;
     json(response, 200, { status: "ok" });
+    return;
+  }
+  if (request.method === "POST" && requestUrl.pathname === "/__test/reset-state") {
+    tosEvents.splice(0, tosEvents.length, ...initialTosEvents.map((event) => ({ ...event })));
+    authUsers.clear();
+    sessions.clear();
+    otpCodes.clear();
+    oauthCodes.clear();
+    registrations.clear();
+    nextOAuthAttempt = null;
+    attendeeFailureEventId = null;
+    response.writeHead(204);
+    response.end();
     return;
   }
   if (request.method === "GET" && requestUrl.pathname === "/auth/v1/authorize") {
@@ -809,6 +852,15 @@ const server = createServer(async (request, response) => {
       );
       return;
     }
+    if (
+      validStaff(user) &&
+      hasOnlyQueryKeys(requestUrl, new Set(["select", "order"])) &&
+      singleQueryValue(requestUrl, "order") === "starts_at.desc"
+    ) {
+      json(response, 200, [...tosEvents].sort((left, right) =>
+        new Date(right.starts_at) - new Date(left.starts_at)));
+      return;
+    }
     const allowed = new Set(["select", "status", "ends_at", "or", "order"]);
     if (
       !user ||
@@ -831,6 +883,75 @@ const server = createServer(async (request, response) => {
           (!event.signup_deadline || new Date(event.signup_deadline) >= new Date()))
         .sort((left, right) => new Date(left.starts_at) - new Date(right.starts_at)),
     );
+    return;
+  }
+  if (request.method === "POST" && requestUrl.pathname === "/rest/v1/tos_events") {
+    const user = bearerUser(request);
+    const body = await requestJson(request);
+    if (!user) {
+      json(response, 401, { code: "PGRST301", message: "invalid JWT" });
+      return;
+    }
+    if (
+      !validStaff(user) ||
+      !hasOnlyQueryKeys(requestUrl, new Set()) ||
+      !exactKeys(body, ["slug", "title", "sport", "starts_at", "ends_at", "signup_deadline", "status"])
+    ) {
+      json(response, 403, { code: "42501", message: "event insert rejected" });
+      return;
+    }
+    if (!validEventPayload(body)) {
+      const conflict = tosEvents.some(({ slug }) => slug === body.slug);
+      json(response, conflict ? 409 : 400, { code: conflict ? "23505" : "23514", message: "event constraint rejected" });
+      return;
+    }
+    tosEvents.push({
+      id: randomUUID(),
+      slug: body.slug,
+      title: body.title.trim(),
+      sport: body.sport,
+      starts_at: new Date(body.starts_at).toISOString(),
+      ends_at: new Date(body.ends_at).toISOString(),
+      signup_deadline: body.signup_deadline === null ? null : new Date(body.signup_deadline).toISOString(),
+      status: body.status,
+    });
+    json(response, 201, []);
+    return;
+  }
+  if (request.method === "PATCH" && requestUrl.pathname === "/rest/v1/tos_events") {
+    const user = bearerUser(request);
+    const body = await requestJson(request);
+    const id = eqValue(requestUrl, "id");
+    const slug = eqValue(requestUrl, "slug");
+    const event = tosEvents.find((candidate) => candidate.id === id && candidate.slug === slug) ?? null;
+    if (!user) {
+      json(response, 401, { code: "PGRST301", message: "invalid JWT" });
+      return;
+    }
+    if (
+      !validStaff(user) ||
+      !hasOnlyQueryKeys(requestUrl, new Set(["id", "slug"])) ||
+      !event ||
+      !exactKeys(body, ["title", "signup_deadline", "status"])
+    ) {
+      json(response, 403, { code: "42501", message: "event update rejected" });
+      return;
+    }
+    const deadline = body.signup_deadline === null ? null : new Date(body.signup_deadline);
+    if (
+      typeof body.title !== "string" || !body.title.trim() || body.title.trim().length > 160 ||
+      !new Set(["draft", "open", "closed", "cancelled"]).has(body.status) ||
+      (deadline !== null && (Number.isNaN(deadline.getTime()) || deadline > new Date(event.starts_at)))
+    ) {
+      json(response, 400, { code: "23514", message: "event constraint rejected" });
+      return;
+    }
+    Object.assign(event, {
+      title: body.title.trim(),
+      signup_deadline: deadline?.toISOString() ?? null,
+      status: body.status,
+    });
+    json(response, 200, []);
     return;
   }
   if (request.method === "GET" && requestUrl.pathname === "/rest/v1/registrations") {

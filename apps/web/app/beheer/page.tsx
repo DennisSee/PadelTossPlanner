@@ -1,25 +1,57 @@
 import { AccountShell } from "../../components/account/account-shell";
-import { Card } from "../../components/ui";
+import {
+  CreateTosEventForm,
+  TosEventList,
+} from "../../components/management/tos-event-management";
+import { StateMessage } from "../../components/ui";
 import { requirePlannerAccount } from "../../lib/auth/route-guard";
+import { createServerSupabaseClient } from "../../lib/supabase/server";
+import { managementMessage } from "../../lib/tos/management-request";
+import { StaffTosEventRepository } from "../../lib/tos/staff-repository";
 
-import styles from "../../components/account/account-shell.module.css";
+import styles from "../../components/management/tos-event-management.module.css";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export default async function ManagementPage() {
-  const account = await requirePlannerAccount();
+type PageProps = {
+  searchParams: Promise<{ notice?: string | string[]; error?: string | string[] }>;
+};
+
+function last(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value.at(-1) : value;
+}
+
+export default async function ManagementPage({ searchParams }: PageProps) {
+  const client = await createServerSupabaseClient();
+  const account = await requirePlannerAccount(client);
+  let events;
+  try {
+    events = await new StaffTosEventRepository(client).listEvents();
+  } catch {
+    return (
+      <AccountShell account={account} title="Beheeromgeving" intro="Beheer TOS-avonden. Deelnemers en schema's worden in volgende stappen toegevoegd.">
+        <StateMessage title="TOS-avonden tijdelijk niet beschikbaar"><p>Probeer het later opnieuw.</p></StateMessage>
+      </AccountShell>
+    );
+  }
+  const query = await searchParams;
+  const message = managementMessage(last(query.notice), last(query.error));
   return (
     <AccountShell
       account={account}
       title="Beheeromgeving"
-      intro="Planner- en beheerfuncties worden hier stapsgewijs vanuit Streamlit gemigreerd."
+      intro="Beheer TOS-avonden. Deelnemers en schema's worden in volgende stappen toegevoegd."
     >
-      <Card className={styles.contentCard}>
-        <h2>Beheer</h2>
-        <p>Je staffrechten zijn veilig geladen via je eigen Supabase-sessie.</p>
-        {account.capabilities.canAdminister ? <p>Dit account heeft ook adminrechten.</p> : null}
-      </Card>
+      {message ? (
+        <p className={`${styles.message} ${message.tone === "success" ? styles.messageSuccess : styles.messageDanger}`} role={message.tone === "danger" ? "alert" : "status"}>
+          {message.text}
+        </p>
+      ) : null}
+      <div className={styles.layout}>
+        <CreateTosEventForm />
+        <TosEventList events={events} />
+      </div>
     </AccountShell>
   );
 }

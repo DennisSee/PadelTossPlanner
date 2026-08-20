@@ -36,6 +36,10 @@ export function formatEventDateTime(value: string): string {
   return `${formatEventDate(value)} · ${formatEventClock(value)}`;
 }
 
+export function formatEventDateTimeInput(value: string): string {
+  return formatInTimeZone(date(value), TOS_TIME_ZONE, "yyyy-MM-dd'T'HH:mm");
+}
+
 export function eventAllowsSelfService(
   event: TosEvent,
   now = new Date(),
@@ -69,7 +73,7 @@ function localDate(value: string): string {
   return formatInTimeZone(date(value), TOS_TIME_ZONE, "yyyy-MM-dd");
 }
 
-function localTimestamp(datePart: string, clock: string): Date {
+export function strictAmsterdamDateTime(datePart: string, clock: string): Date {
   if (!CLOCK_PATTERN.test(clock)) throw new InvalidAvailabilityError();
   const localValue = `${datePart} ${clock}`;
   const candidate = fromZonedTime(`${datePart}T${clock}:00`, TOS_TIME_ZONE);
@@ -102,8 +106,8 @@ export function normalizeAvailability(
       availableUntil: null,
     });
   }
-  const from = localTimestamp(localDate(event.startsAt), availableFrom);
-  const until = localTimestamp(localDate(event.endsAt), availableUntil);
+  const from = strictAmsterdamDateTime(localDate(event.startsAt), availableFrom);
+  const until = strictAmsterdamDateTime(localDate(event.endsAt), availableUntil);
   if (from < date(event.startsAt) || until > date(event.endsAt) || until <= from) {
     throw new InvalidAvailabilityError();
   }

@@ -11,7 +11,7 @@ describe("WEB-3A route guards and cache boundaries", () => {
   it.each([
     ["app/account/page.tsx", 'requireAccount("/account")'],
     ["app/tos/page.tsx", 'requireAccount("/tos", client)'],
-    ["app/beheer/page.tsx", "requirePlannerAccount()"],
+    ["app/beheer/page.tsx", "requirePlannerAccount(client)"],
   ])("protects %s in server code", (path, guard) => {
     const page = source(path);
     expect(page).toContain(guard);
