@@ -4,7 +4,8 @@ import { createServerClient } from "@supabase/ssr";
 import type { CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
-import { readPublicSupabaseConfig } from "../config/public-supabase";
+import { readAppRuntimeConfig } from "../config/public-supabase";
+import { authCookieOptionsForOrigin } from "./cookie-options";
 
 export type ServerCookie = Readonly<{ name: string; value: string }>;
 export type ServerCookieStore = {
@@ -35,9 +36,10 @@ export function serverCookieAdapter(cookieStore: ServerCookieStore) {
 }
 
 export async function createServerSupabaseClient() {
-  const config = readPublicSupabaseConfig();
+  const config = readAppRuntimeConfig();
   const cookieStore = await cookies();
   return createServerClient(config.url, config.publishableKey, {
+    cookieOptions: authCookieOptionsForOrigin(config.appBaseUrl),
     cookies: serverCookieAdapter(cookieStore),
     global: {
       fetch: (input, init) => fetch(input, { ...init, cache: "no-store" }),

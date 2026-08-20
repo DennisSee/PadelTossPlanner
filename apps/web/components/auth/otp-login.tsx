@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import type { SafeReturnPath } from "../../lib/auth/return-path";
 import { authErrorCategory, safeAuthMessage } from "../../lib/auth/safe-error";
@@ -49,7 +49,6 @@ export function OtpLogin({
   next: SafeReturnPath;
   navigate?: (path: string) => void;
 }) {
-  const supabase = useMemo(() => createBrowserSupabaseClient(config), [config]);
   const [emailInput, setEmailInput] = useState("");
   const [requestedEmail, setRequestedEmail] = useState<string | null>(null);
   const [code, setCode] = useState("");
@@ -70,6 +69,7 @@ export function OtpLogin({
       setBusy(true);
       setMessage(null);
       try {
+        const supabase = createBrowserSupabaseClient(config);
         const { error } = await supabase.auth.signInWithOtp({
           email,
           options: { shouldCreateUser: true },
@@ -88,7 +88,7 @@ export function OtpLogin({
         setBusy(false);
       }
     },
-    [supabase],
+    [config],
   );
 
   async function submitEmail(event: React.FormEvent<HTMLFormElement>) {
@@ -110,6 +110,7 @@ export function OtpLogin({
     setBusy(true);
     setMessage(null);
     try {
+      const supabase = createBrowserSupabaseClient(config);
       const { error } = await supabase.auth.verifyOtp({
         email: requestedEmail,
         token: code,

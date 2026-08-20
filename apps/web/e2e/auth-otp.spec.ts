@@ -35,6 +35,12 @@ async function openNavigationIfCollapsed(page: Page) {
   }
 }
 
+async function authCookies(page: Page) {
+  return (await page.context().cookies()).filter(
+    ({ name }) => name.startsWith("sb-") && name.includes("-auth-token"),
+  );
+}
+
 test("participant doorloopt OTP, persistente sessie, guard en logout", async ({ page, request }) => {
   const email = testEmail("participant");
   await page.goto("/");
@@ -48,17 +54,49 @@ test("participant doorloopt OTP, persistente sessie, guard en logout", async ({ 
   await expect(page).toHaveURL(/\/tos$/u);
   await expect(page.getByRole("heading", { name: "TOS-avonden" })).toBeVisible();
 
+  const cookiesAfterLogin = await authCookies(page);
+  expect(cookiesAfterLogin.length).toBeGreaterThan(0);
+  for (const cookie of cookiesAfterLogin) {
+    expect(cookie.domain).toBe("127.0.0.1");
+    expect(cookie.path).toBe("/");
+    expect(cookie.sameSite).toBe("Lax");
+    expect(cookie.secure).toBe(false);
+  }
+
   await page.reload();
   await expect(page).toHaveURL(/\/tos$/u);
+  expect((await authCookies(page)).length).toBeGreaterThan(0);
   await page.goto("/account");
   await expect(page.getByText(email)).toBeVisible();
   await page.goto("/beheer");
   await expect(page).toHaveURL(/\/account$/u);
 
+  const otherTab = await page.context().newPage();
+  await otherTab.goto("/account");
+  await expect(otherTab.getByText(email)).toBeVisible();
+
   await page.getByRole("button", { name: "Uitloggen" }).click();
   await expect(page).toHaveURL(/\/$/u);
-  await page.goto("/account");
-  await expect(page).toHaveURL(/\/login\?next=%2Faccount$/u);
+  expect(await authCookies(page)).toHaveLength(0);
+
+  await page.goBack();
+  await expect(page.getByText(email)).not.toBeVisible();
+  await page.reload();
+  await expect(page.getByText(email)).not.toBeVisible();
+
+  await otherTab.reload();
+  await expect(otherTab).toHaveURL(/\/login\?next=%2Faccount$/u);
+  await expect(otherTab.getByText(email)).not.toBeVisible();
+  await otherTab.close();
+
+  for (const [path, next] of [
+    ["/account", "%2Faccount"],
+    ["/tos", "%2Ftos"],
+    ["/beheer", "%2Fbeheer"],
+  ]) {
+    await page.goto(path);
+    await expect(page).toHaveURL(new RegExp(`/login\\?next=${next}$`, "u"));
+  }
 });
 
 test("veilige accountreturn werkt en kwaadaardige return valt terug op TOS", async ({ page, request }) => {

@@ -29,6 +29,26 @@ Server-side routebescherming vertrouwt op `getClaims()`, niet op de ongeverifiee
 user uit `getSession()`. Proxy vernieuwt cookies; Server Components mogen
 cookiewrites rustig overslaan omdat Proxy die taak uitvoert.
 
+Browser-, server- en Proxy-clients gebruiken één centraal cookiecontract:
+
+- `Path=/`, zodat OTP, toekomstige OAuth-callbacks en alle beschermde routes
+  dezelfde sessie gebruiken;
+- `SameSite=Lax`, passend bij normale top-level Auth-navigaties;
+- `Secure=true` zodra de werkelijke applicatie-origin HTTPS gebruikt;
+- `Secure=false` uitsluitend voor lokale HTTP-development op `localhost` of
+  een loopbackadres;
+- geen `Domain`, waardoor de cookies host-only blijven en niet automatisch met
+  andere OddBounce-subdomeinen worden gedeeld.
+
+Server en Proxy leiden dit af uit de reeds gevalideerde `APP_BASE_URL`; de
+browserclient gebruikt de werkelijke runtime-origin. Een niet-lokale HTTP-origin
+faalt gesloten. De applicatie forceert `HttpOnly` bewust niet: de officiële
+browserclient moet de SSR-sessie tijdens OTP en toekomstige OAuth/PKCE-flows
+kunnen beheren. Daarom staan service-role keys en andere secrets nooit in deze
+cookies en blijft XSS-preventie extra belangrijk. `@supabase/ssr` blijft eigenaar
+van cookienamen, waarden, maximale levensduur, chunking, refreshrotatie en
+verwijdering; de applicatie bouwt geen eigen Auth-cookieprotocol.
+
 Authenticated pagina's (`/account`, `/tos`, `/beheer` en `/auth/*`) zijn
 dynamisch en krijgen `private, no-store`. `/api/health` valt buiten Proxy en
 blijft volledig onafhankelijk van Supabase.
@@ -74,7 +94,12 @@ Membership bepaalt `canParticipate`; `profiles.role` bepaalt staffrechten:
 `/account` is beschikbaar voor iedere geauthenticeerde identity. `/tos` toont in
 WEB-3A alleen de capabilitystatus. `/beheer` vereist `canPlan` in servercode.
 Verborgen navigatielinks zijn nooit de authorizationlaag. Eén POST naar
-`/auth/logout` beëindigt de lokale Supabase-sessie en verwijdert de cookies.
+`/auth/logout` beëindigt de lokale Supabase-sessie. De officiële SDK-cleanup
+verwijdert de hoofdsessie, alle bijbehorende cookiechunks en de geïndexeerde plus
+legacy PKCE-verifiers uit dezelfde Supabase Auth-namespace. Er is geen eigen
+prefix-sweeper nodig: andere applicatiecookies blijven ongemoeid. Na logout zijn
+browser- en serversessie weg, blijven beschermde routes achter hun loginredirect
+en kan refresh de sessie niet herstellen.
 
 ## Test- en stagingcontract
 
@@ -96,6 +121,17 @@ APP_BASE_URL=https://test-tos.oddbounce.nl
 
 Preflight valideert deze origin zonder waarden te tonen. Smoke-tests controleren
 `/login` en de drie protected redirects read-only.
+
+Voor iedere HTTPS-stagingrelease blijft een korte browsercontrole verplicht:
+open in Chrome DevTools onder **Application → Cookies** uitsluitend de host
+`test-tos.oddbounce.nl` en controleer zonder waarden te kopiëren of loggen dat de
+Supabase Auth-cookie(chunks) host-only zijn, `Path=/`, `SameSite=Lax` en
+`Secure=true`. Log daarna via de echte UI uit en bevestig dat alle sessiechunks
+en tijdelijke PKCE-flowcookies verdwenen zijn, dat refresh uitgelogd blijft en
+dat `/account`, `/tos` en `/beheer` weer naar hun eigen login-returnroute gaan.
+Lokale HTTP-browsertests bewijzen bewust alleen `Secure=false` op loopback; zij
+kunnen de HTTPS-browseropslag op staging niet bewijzen. Google OAuth moet later
+dezelfde centrale cookieopties en dezelfde ondersteunde SDK-cleanup gebruiken.
 
 ## Buiten WEB-3A
 
