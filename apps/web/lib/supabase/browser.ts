@@ -15,5 +15,8 @@ export function createBrowserSupabaseClient(
 ) {
   return createBrowserClient(config.url, config.publishableKey, {
     cookieOptions: browserAuthCookieOptions(runtimeOrigin),
+    auth: {
+      experimental: { appendPkceFlowIdToRedirects: true },
+    },
   });
 }

@@ -4,6 +4,7 @@ import {
   ALLOWED_RETURN_PATHS,
   DEFAULT_RETURN_PATH,
   loginPathFor,
+  oauthErrorLoginPath,
   sanitizeReturnPath,
 } from "./return-path";
 
@@ -31,5 +32,8 @@ describe("safe Auth return paths", () => {
 
   it("builds one encoded internal login target", () => {
     expect(loginPathFor("/account")).toBe("/login?next=%2Faccount");
+    expect(oauthErrorLoginPath("/account")).toBe(
+      "/login?error=oauth&next=%2Faccount",
+    );
   });
 });

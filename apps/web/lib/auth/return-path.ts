@@ -15,3 +15,7 @@ export function sanitizeReturnPath(value: string | null | undefined): SafeReturn
 export function loginPathFor(next: SafeReturnPath): string {
   return `/login?next=${encodeURIComponent(next)}`;
 }
+
+export function oauthErrorLoginPath(next: SafeReturnPath): string {
+  return `/login?error=oauth&next=${encodeURIComponent(next)}`;
+}

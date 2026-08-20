@@ -2,16 +2,24 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import Home from "./page";
 import { GET } from "./api/health/route";
+import { deriveAccountContext } from "../lib/auth/account-context";
+
+const loadOptionalAccountContext = vi.hoisted(() => vi.fn());
 
 vi.mock("../lib/auth/session", () => ({
-  loadOptionalAccountContext: vi.fn().mockResolvedValue(null),
+  loadOptionalAccountContext,
 }));
 
 describe("WEB-2 routes", () => {
+  beforeEach(() => {
+    loadOptionalAccountContext.mockReset();
+    loadOptionalAccountContext.mockResolvedValue(null);
+  });
+
   it("links the public homepage to live schedule and the shared login", async () => {
     render(await Home());
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
@@ -26,6 +34,34 @@ describe("WEB-2 routes", () => {
     );
     expect(screen.getAllByRole("link", { name: "Inloggen / aanmelden" })[0])
       .toHaveAttribute("href", "/login?next=%2Ftos");
+    expect(screen.getByText(/Google of een e-mailcode/i)).toBeVisible();
+  });
+
+  it("replaces the anonymous login card with the authenticated TOS entry", async () => {
+    loadOptionalAccountContext.mockResolvedValueOnce(deriveAccountContext(
+      { userId: "user-1", email: "member@example.test" },
+      {
+        id: "user-1",
+        display_name: "Member",
+        role: "participant",
+        active: true,
+        member_id: "member-1",
+      },
+      {
+        id: "member-1",
+        display_name: "Member",
+        approval_status: "approved",
+        active: true,
+      },
+    ));
+    render(await Home());
+    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
+      "Bekijk je TOS-avonden",
+    );
+    expect(screen.getByRole("link", { name: "Naar TOS-avonden" }))
+      .toHaveAttribute("href", "/tos");
+    expect(screen.queryByRole("link", { name: "Inloggen / aanmelden" }))
+      .not.toBeInTheDocument();
   });
 
   it("shows the staging badge from runtime APP_ENV", async () => {

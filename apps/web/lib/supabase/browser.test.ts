@@ -40,6 +40,9 @@ describe("Supabase SSR browser client", () => {
       config.publishableKey,
       {
         cookieOptions: { path: "/", sameSite: "lax", secure: true },
+        auth: {
+          experimental: { appendPkceFlowIdToRedirects: true },
+        },
       },
     );
     const options = createBrowserClient.mock.calls[0]?.[2]?.cookieOptions;

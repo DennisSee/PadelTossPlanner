@@ -1,4 +1,8 @@
-import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import {
+  createBrowserClient,
+  createServerClient,
+  type CookieOptions,
+} from "@supabase/ssr";
 import { describe, expect, it, vi } from "vitest";
 
 import { authCookieOptionsForOrigin } from "./cookie-options";
@@ -116,6 +120,66 @@ function expectSecureDeletion(write: CookieWrite | undefined) {
 }
 
 describe("official Supabase SSR Auth cookie lifecycle", () => {
+  it("lets the official Google PKCE flow create and clean its own verifier cookies", async () => {
+    const harness = cookieHarness([
+      { name: "tc-zuid-preference", value: "compact" },
+    ]);
+    const client = createBrowserClient(SUPABASE_URL, PUBLISHABLE_KEY, {
+      isSingleton: false,
+      cookieOptions: authCookieOptionsForOrigin(
+        "https://test-tos.oddbounce.nl",
+      ),
+      auth: {
+        experimental: { appendPkceFlowIdToRedirects: true },
+      },
+      cookies: harness.cookies,
+    });
+
+    const { data, error } = await client.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo:
+          "https://test-tos.oddbounce.nl/auth/callback?next=%2Ftos",
+        skipBrowserRedirect: true,
+      },
+    });
+
+    expect(error).toBeNull();
+    expect(data.provider).toBe("google");
+    if (!data.url) throw new Error("OAuth fixture URL ontbreekt.");
+    const authorize = new URL(data.url);
+    expect(authorize.pathname).toBe("/auth/v1/authorize");
+    expect(authorize.searchParams.get("provider")).toBe("google");
+    const redirectTo = new URL(authorize.searchParams.get("redirect_to") ?? "");
+    expect(redirectTo.origin).toBe("https://test-tos.oddbounce.nl");
+    expect(redirectTo.pathname).toBe("/auth/callback");
+    expect(redirectTo.searchParams.get("next")).toBe("/tos");
+    expect(redirectTo.searchParams.get("sb_flow_id")).toMatch(
+      /^[A-Za-z0-9_-]{8,64}$/u,
+    );
+    expect(authorize.searchParams.has("scopes")).toBe(false);
+    const verifierNames = Array.from(harness.values.keys()).filter((name) =>
+      name.startsWith(STORAGE_KEY) && name.endsWith("code-verifier"),
+    );
+    expect(verifierNames).toHaveLength(3);
+    for (const name of verifierNames) {
+      const write = harness.writes.find(
+        (candidate) => candidate.name === name && candidate.options.maxAge !== 0,
+      );
+      expect(write?.options).toMatchObject({
+        path: "/",
+        sameSite: "lax",
+        secure: true,
+      });
+      expect(write?.options).not.toHaveProperty("domain");
+    }
+
+    const signOut = await client.auth.signOut({ scope: "local" });
+    expect(signOut.error).toBeNull();
+    verifierNames.forEach((name) => expect(harness.values.has(name)).toBe(false));
+    expect(harness.values.get("tc-zuid-preference")).toBe("compact");
+  });
+
   it.each([1, 3])(
     "signOut(local) removes a session stored in %i cookie chunk(s) and all PKCE flow cookies",
     async (parts) => {

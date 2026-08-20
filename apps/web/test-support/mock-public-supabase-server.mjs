@@ -1,5 +1,5 @@
 import { createServer } from "node:http";
-import { createHmac, randomBytes, randomInt, randomUUID } from "node:crypto";
+import { createHash, createHmac, randomBytes, randomInt, randomUUID } from "node:crypto";
 
 const PUBLIC_COLUMNS = [
   "id",
@@ -22,6 +22,8 @@ const jwtSecret = randomBytes(32);
 const authUsers = new Map();
 const sessions = new Map();
 const otpCodes = new Map();
+const oauthCodes = new Map();
+let nextOAuthAttempt = null;
 
 function base64url(value) {
   return Buffer.from(value).toString("base64url");
@@ -108,6 +110,22 @@ function publicAuthUser(user) {
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
+}
+
+function oauthAuthUser(user) {
+  return {
+    ...publicAuthUser(user),
+    app_metadata: { provider: "google", providers: ["email", "google"] },
+    user_metadata: { full_name: "Niet gebruiken voor profiel of rollen" },
+  };
+}
+
+function redirect(response, location) {
+  response.writeHead(302, {
+    location,
+    "cache-control": "private, no-store, max-age=0",
+  });
+  response.end();
 }
 
 function readPort() {
@@ -285,6 +303,70 @@ const server = createServer(async (request, response) => {
     json(response, 200, { status: "ok" });
     return;
   }
+  if (request.method === "POST" && requestUrl.pathname === "/__test/oauth") {
+    const body = await requestJson(request);
+    const email = String(body.email ?? "").trim().toLowerCase();
+    const outcome = String(body.outcome ?? "success");
+    if (
+      !email ||
+      !email.includes("@") ||
+      !new Set(["success", "cancel", "exchange-error"]).has(outcome)
+    ) {
+      json(response, 400, { error: "invalid OAuth test setup" });
+      return;
+    }
+    nextOAuthAttempt = { email, outcome };
+    json(response, 200, { status: "ok" });
+    return;
+  }
+  if (request.method === "GET" && requestUrl.pathname === "/auth/v1/authorize") {
+    const attempt = nextOAuthAttempt ?? {
+      email: `google-${randomUUID()}@example.test`,
+      outcome: "success",
+    };
+    nextOAuthAttempt = null;
+    const redirectTo = requestUrl.searchParams.get("redirect_to") ?? "";
+    const provider = requestUrl.searchParams.get("provider");
+    const codeChallenge = requestUrl.searchParams.get("code_challenge") ?? "";
+    const codeChallengeMethod = requestUrl.searchParams.get("code_challenge_method");
+    let callback;
+    try {
+      callback = new URL(redirectTo);
+    } catch {
+      json(response, 400, { error: "invalid OAuth redirect" });
+      return;
+    }
+    if (
+      provider !== "google" ||
+      callback.origin !== "http://127.0.0.1:31000" ||
+      callback.pathname !== "/auth/callback" ||
+      !codeChallenge ||
+      codeChallengeMethod !== "s256" ||
+      requestUrl.searchParams.has("scopes") ||
+      requestUrl.searchParams.has("access_type")
+    ) {
+      json(response, 400, { error: "OAuth contract rejected" });
+      return;
+    }
+    if (attempt.outcome === "cancel") {
+      callback.searchParams.set("error", "access_denied");
+      callback.searchParams.set(
+        "error_description",
+        "private provider fixture detail",
+      );
+      redirect(response, callback.toString());
+      return;
+    }
+    const code = randomUUID();
+    oauthCodes.set(code, {
+      user: authUser(attempt.email),
+      codeChallenge,
+      exchangeError: attempt.outcome === "exchange-error",
+    });
+    callback.searchParams.set("code", code);
+    redirect(response, callback.toString());
+    return;
+  }
   if (request.method === "POST" && requestUrl.pathname === "/auth/v1/otp") {
     const body = await requestJson(request);
     const email = String(body.email ?? "").trim().toLowerCase();
@@ -328,6 +410,41 @@ const server = createServer(async (request, response) => {
       expires_at: Math.floor(Date.now() / 1_000) + 3_600,
       refresh_token: refreshToken,
       user: publicAuthUser(user),
+    });
+    return;
+  }
+  if (
+    request.method === "POST" &&
+    requestUrl.pathname === "/auth/v1/token" &&
+    requestUrl.searchParams.get("grant_type") === "pkce"
+  ) {
+    const body = await requestJson(request);
+    const code = String(body.auth_code ?? "");
+    const verifier = String(body.code_verifier ?? "");
+    const exchange = oauthCodes.get(code);
+    oauthCodes.delete(code);
+    const actualChallenge = createHash("sha256")
+      .update(verifier)
+      .digest("base64url");
+    if (
+      !exchange ||
+      exchange.exchangeError ||
+      !verifier ||
+      actualChallenge !== exchange.codeChallenge
+    ) {
+      json(response, 400, { code: "bad_code_verifier", msg: "invalid grant" });
+      return;
+    }
+    const accessToken = jwtFor(exchange.user);
+    const refreshToken = randomBytes(32).toString("base64url");
+    sessions.set(accessToken, exchange.user);
+    json(response, 200, {
+      access_token: accessToken,
+      token_type: "bearer",
+      expires_in: 3_600,
+      expires_at: Math.floor(Date.now() / 1_000) + 3_600,
+      refresh_token: refreshToken,
+      user: oauthAuthUser(exchange.user),
     });
     return;
   }

@@ -16,7 +16,8 @@ export const dynamic = "force-dynamic";
 
 export default async function Home() {
   const isStaging = readAppEnvironment() === "staging";
-  const navigation = navigationModelFromAccount(await loadOptionalAccountContext());
+  const account = await loadOptionalAccountContext();
+  const navigation = navigationModelFromAccount(account);
 
   return (
     <main className={styles.page}>
@@ -40,13 +41,27 @@ export default async function Home() {
 
           <Card className={styles.side}>
             <div className={styles.sideMark} aria-hidden="true" />
-            <h2 className={styles.sideTitle}>Doe mee met de volgende TOS</h2>
-            <p className={styles.sideText}>
-              Log in met je e-mailadres en bekijk je account en TOS-status.
-            </p>
-            <SecondaryLinkButton href="/login?next=%2Ftos">
-              Inloggen / aanmelden
-            </SecondaryLinkButton>
+            {account ? (
+              <>
+                <h2 className={styles.sideTitle}>Bekijk je TOS-avonden</h2>
+                <p className={styles.sideText}>
+                  Bekijk je komende en open TOS-avonden.
+                </p>
+                <SecondaryLinkButton href="/tos">
+                  Naar TOS-avonden
+                </SecondaryLinkButton>
+              </>
+            ) : (
+              <>
+                <h2 className={styles.sideTitle}>Doe mee met de volgende TOS</h2>
+                <p className={styles.sideText}>
+                  Log in met Google of een e-mailcode en bekijk je account en TOS-status.
+                </p>
+                <SecondaryLinkButton href="/login?next=%2Ftos">
+                  Inloggen / aanmelden
+                </SecondaryLinkButton>
+              </>
+            )}
           </Card>
         </div>
       </div>

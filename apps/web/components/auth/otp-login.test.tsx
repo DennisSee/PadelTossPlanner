@@ -59,6 +59,21 @@ describe("e-mail OTP login", () => {
     expect(document.body.textContent).not.toMatch(/bestaand account|nieuw account/i);
   });
 
+  it("exposes the native mobile e-mail autofill contract without readonly tricks", () => {
+    render(<OtpLogin config={config} next="/tos" />);
+    const input = screen.getByLabelText("E-mailadres");
+    expect(input).toHaveAttribute("id", "email");
+    expect(input).toHaveAttribute("name", "email");
+    expect(input).toHaveAttribute("type", "email");
+    expect(input).toHaveAttribute("autocomplete", "email");
+    expect(input).toHaveAttribute("inputmode", "email");
+    expect(input).toHaveAttribute("autocapitalize", "none");
+    expect(input).toHaveAttribute("spellcheck", "false");
+    expect(input).toHaveAttribute("enterkeyhint", "send");
+    expect(input).not.toHaveAttribute("readonly");
+    expect(input.closest("form")).not.toBeNull();
+  });
+
   it("rejects an implausible email before contacting Supabase", async () => {
     render(<OtpLogin config={config} next="/tos" />);
     await requestCode("geen-geldig-adres");

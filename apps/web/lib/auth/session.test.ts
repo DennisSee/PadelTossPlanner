@@ -18,6 +18,29 @@ describe("verified SSR identity and destination", () => {
     expect(getClaims).toHaveBeenCalledTimes(1);
   });
 
+  it("ignores provider metadata when deriving the verified app identity", async () => {
+    const getClaims = vi.fn().mockResolvedValue({
+      data: {
+        claims: {
+          sub: "user-1",
+          email: "member@example.test",
+          user_metadata: {
+            full_name: "Niet gebruiken",
+            role: "admin",
+            member_id: "member-from-google",
+          },
+        },
+      },
+      error: null,
+    });
+    const client = { auth: { getClaims } } as unknown as SupabaseClient;
+
+    await expect(verifiedIdentity(client)).resolves.toEqual({
+      userId: "user-1",
+      email: "member@example.test",
+    });
+  });
+
   it("fails closed for missing or invalid claims", async () => {
     const client = {
       auth: { getClaims: vi.fn().mockResolvedValue({ data: { claims: {} }, error: null }) },

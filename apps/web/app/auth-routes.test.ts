@@ -21,13 +21,27 @@ describe("WEB-3A route guards and cache boundaries", () => {
 
   it("finalizes Auth server-side with a re-sanitized internal destination", () => {
     const completion = source("app/auth/complete/route.ts");
+    const finalization = source("lib/auth/finalize.ts");
     expect(completion).toContain("sanitizeReturnPath");
-    expect(completion).toContain("loadCurrentAccountContext");
-    expect(completion).toContain("destinationForAccount");
-    expect(completion).toContain("private, no-store");
-    expect(completion).toContain("configurationUnavailable");
-    expect(completion).toContain("status: 503");
+    expect(completion).toContain("finalizeAuthenticatedRequest");
+    expect(finalization).toContain("loadCurrentAccountContext");
+    expect(finalization).toContain("destinationForAccount");
+    expect(finalization).toContain("private, no-store");
+    expect(finalization).toContain("authConfigurationUnavailable");
+    expect(finalization).toContain("status: 503");
     expect(completion).not.toMatch(/access_token|refresh_token|service_role/i);
+  });
+
+  it("exchanges Google PKCE codes without logging provider data or duplicating capabilities", () => {
+    const callback = source("app/auth/callback/route.ts");
+    expect(callback).toContain("exchangeCodeForSession(code, {");
+    expect(callback).toContain("flowId,");
+    expect(callback).toContain("isPlausiblePkceFlowId(flowId)");
+    expect(callback).toContain("sanitizeReturnPath");
+    expect(callback).toContain("finalizeAuthenticatedRequest");
+    expect(callback).toContain("oauthFailurePath");
+    expect(callback).not.toMatch(/console\.|provider_token|provider_refresh_token|service_role/i);
+    expect(callback).not.toMatch(/profiles|club_members|member_id|\brole\b/i);
   });
 
   it("logout is POST-only, origin-bound and clears the local session", () => {

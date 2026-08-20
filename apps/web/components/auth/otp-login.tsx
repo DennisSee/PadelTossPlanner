@@ -43,10 +43,12 @@ export function completionPath(next: SafeReturnPath): string {
 export function OtpLogin({
   config,
   next,
+  disabled = false,
   navigate = (path) => window.location.assign(path),
 }: {
   config: BrowserSupabaseConfig;
   next: SafeReturnPath;
+  disabled?: boolean;
   navigate?: (path: string) => void;
 }) {
   const [emailInput, setEmailInput] = useState("");
@@ -55,6 +57,7 @@ export function OtpLogin({
   const [secondsLeft, setSecondsLeft] = useState(0);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const interactionDisabled = busy || disabled;
 
   useEffect(() => {
     if (secondsLeft <= 0) return;
@@ -131,21 +134,24 @@ export function OtpLogin({
   if (!requestedEmail) {
     return (
       <form className={styles.form} onSubmit={submitEmail} noValidate>
-        <label htmlFor="otp-email">E-mailadres</label>
+        <label htmlFor="email">E-mailadres</label>
         <input
-          id="otp-email"
+          id="email"
           name="email"
           type="email"
           autoComplete="email"
           inputMode="email"
+          autoCapitalize="none"
+          spellCheck={false}
+          enterKeyHint="send"
           maxLength={MAX_EMAIL_LENGTH}
           value={emailInput}
           onChange={(event) => setEmailInput(event.target.value)}
-          disabled={busy}
+          disabled={interactionDisabled}
           required
         />
         {message ? <p className={styles.error} role="alert">{message}</p> : null}
-        <button className={styles.primaryButton} disabled={busy} type="submit">
+        <button className={styles.primaryButton} disabled={interactionDisabled} type="submit">
           {busy ? "Code aanvragen…" : "Stuur mij een inlogcode"}
         </button>
       </form>
@@ -169,11 +175,11 @@ export function OtpLogin({
         maxLength={MAX_OTP_LENGTH}
         value={code}
         onChange={(event) => setCode(event.target.value.replace(/\D/gu, ""))}
-        disabled={busy}
+        disabled={interactionDisabled}
         required
       />
       {message ? <p className={styles.error} role="alert">{message}</p> : null}
-      <button className={styles.primaryButton} disabled={busy} type="submit">
+      <button className={styles.primaryButton} disabled={interactionDisabled} type="submit">
         {busy ? "Inloggen…" : "Inloggen"}
       </button>
       <div className={styles.secondaryActions}>
@@ -185,14 +191,14 @@ export function OtpLogin({
             setSecondsLeft(0);
             setMessage(null);
           }}
-          disabled={busy}
+          disabled={interactionDisabled}
         >
           Ander e-mailadres gebruiken
         </button>
         {secondsLeft > 0 ? (
           <span>Nieuwe code sturen over 00:{String(secondsLeft).padStart(2, "0")}</span>
         ) : (
-          <button type="button" disabled={busy} onClick={() => void requestCode(requestedEmail)}>
+          <button type="button" disabled={interactionDisabled} onClick={() => void requestCode(requestedEmail)}>
             Nieuwe code sturen
           </button>
         )}
