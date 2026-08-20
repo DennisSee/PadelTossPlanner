@@ -59,5 +59,8 @@ describe("verified SSR identity and destination", () => {
     expect(destinationForAccount("/beheer", participant)).toBe("/tos");
     expect(destinationForAccount("/beheer", planner)).toBe("/beheer");
     expect(destinationForAccount("/account", participant)).toBe("/account");
+    expect(destinationForAccount("/tos/vrijdag-padel", participant)).toBe(
+      "/tos/vrijdag-padel",
+    );
   });
 });

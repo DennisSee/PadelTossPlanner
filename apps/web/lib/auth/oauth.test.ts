@@ -15,6 +15,7 @@ describe("Google OAuth boundary helpers", () => {
     ["/account", "/account"],
     ["/beheer", "/beheer"],
     ["/live", "/live"],
+    ["/tos/vrijdag-padel", "/tos/vrijdag-padel"],
     ["https://evil.example/steal", "/tos"],
     ["//evil.example/steal", "/tos"],
     ["%2F%2Fevil.example", "/tos"],
@@ -37,11 +38,16 @@ describe("Google OAuth boundary helpers", () => {
       "https://test-tos.oddbounce.nl/auth/callback?next=%2Faccount",
       "https://test-tos.oddbounce.nl",
     )).toBe(true);
+    expect(isSameOriginOAuthCallback(
+      "https://test-tos.oddbounce.nl/auth/callback?next=%2Ftos%2Fvrijdag-padel",
+      "https://test-tos.oddbounce.nl",
+    )).toBe(true);
     for (const callback of [
       "https://evil.example/auth/callback?next=%2Faccount",
       "//evil.example/auth/callback?next=%2Faccount",
       "https://test-tos.oddbounce.nl/auth/callback?next=https%3A%2F%2Fevil.example",
       "https://test-tos.oddbounce.nl/auth/callback?next=%2Faccount&extra=1",
+      "https://test-tos.oddbounce.nl/auth/callback?next=%2Ftos%2Fvrijdag-padel&next=%2Ftos",
       "https://user:pass@test-tos.oddbounce.nl/auth/callback?next=%2Faccount",
       "https://test-tos.oddbounce.nl/other?next=%2Faccount",
     ]) {

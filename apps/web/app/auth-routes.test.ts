@@ -10,7 +10,7 @@ function source(path: string) {
 describe("WEB-3A route guards and cache boundaries", () => {
   it.each([
     ["app/account/page.tsx", 'requireAccount("/account")'],
-    ["app/tos/page.tsx", 'requireAccount("/tos")'],
+    ["app/tos/page.tsx", 'requireAccount("/tos", client)'],
     ["app/beheer/page.tsx", "requirePlannerAccount()"],
   ])("protects %s in server code", (path, guard) => {
     const page = source(path);

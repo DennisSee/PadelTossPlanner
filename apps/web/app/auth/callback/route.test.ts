@@ -78,6 +78,15 @@ describe("Google OAuth callback", () => {
     expect(planner.headers.get("Location")).toBe(`${APP_BASE_URL}/beheer`);
   });
 
+  it("preserves one validated dynamic TOS event return", async () => {
+    const response = await GET(
+      request(`code=fixture-code&sb_flow_id=${FLOW}&next=%2Ftos%2Fvrijdag-padel`),
+    );
+    expect(response.headers.get("Location")).toBe(
+      `${APP_BASE_URL}/tos/vrijdag-padel`,
+    );
+  });
+
   it.each([
     `code=fixture-code&sb_flow_id=${FLOW}&next=https%3A%2F%2Fevil.example`,
     `code=fixture-code&sb_flow_id=${FLOW}&next=%2F%2Fevil.example`,

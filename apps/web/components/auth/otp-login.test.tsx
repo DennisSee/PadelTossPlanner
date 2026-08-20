@@ -175,6 +175,9 @@ describe("e-mail OTP login", () => {
 
   it("uses a completion URL without OTP or token data", () => {
     expect(completionPath("/beheer")).toBe("/auth/complete?next=%2Fbeheer");
+    expect(completionPath("/tos/vrijdag-padel")).toBe(
+      "/auth/complete?next=%2Ftos%2Fvrijdag-padel",
+    );
     expect(completionPath("/beheer")).not.toMatch(/otp|token|code=/i);
   });
 });

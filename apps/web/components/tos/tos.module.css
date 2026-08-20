@@ -1,0 +1,254 @@
+.stack {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.section {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.sectionHeader h2,
+.eventTitle,
+.formTitle {
+  margin: 0;
+  color: var(--club-green-dark);
+}
+
+.sectionHeader p,
+.muted,
+.metadata,
+.deadline,
+.attendeePreview {
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.sectionHeader p {
+  margin: var(--space-1) 0 0;
+}
+
+.eventGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.eventCard,
+.formCard,
+.membershipCard,
+.attendeeCard {
+  min-width: 0;
+  padding: clamp(1rem, 3vw, 1.45rem);
+}
+
+.eventCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  border-top: 0.25rem solid var(--border);
+}
+
+.eventCardOpen {
+  border-top-color: var(--club-yellow);
+}
+
+.eventCardRegistered {
+  border-top-color: var(--club-green);
+}
+
+.eventCardClosed {
+  border-top-color: var(--text-muted);
+}
+
+.eventCardCancelled {
+  border-top-color: var(--danger);
+}
+
+.badges,
+.actions,
+.choiceRow,
+.attendeeHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.eventTitle {
+  overflow-wrap: anywhere;
+  font-size: clamp(1.1rem, 3vw, 1.3rem);
+}
+
+.metadata {
+  margin: 0;
+  color: var(--text);
+  font-weight: 700;
+}
+
+.deadline,
+.attendeePreview,
+.muted {
+  margin: 0;
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
+.personalStatus {
+  margin: 0;
+  color: var(--club-green-dark);
+  font-weight: 800;
+}
+
+.actions {
+  margin-top: auto;
+  padding-top: var(--space-1);
+}
+
+.message {
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  font-weight: 700;
+}
+
+.messageSuccess {
+  color: var(--club-green-dark);
+  border-color: #b9decf;
+  background: var(--success-soft);
+}
+
+.messageDanger {
+  color: var(--danger);
+  border-color: #efc3bd;
+  background: var(--danger-soft);
+}
+
+.form {
+  display: grid;
+  gap: var(--space-4);
+  margin-top: var(--space-4);
+}
+
+.field {
+  display: grid;
+  gap: var(--space-2);
+  color: var(--club-green-dark);
+  font-weight: 750;
+}
+
+.input {
+  width: 100%;
+  min-height: 3rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  background: var(--surface);
+  font: inherit;
+}
+
+.input:hover {
+  border-color: var(--club-green);
+}
+
+.input:focus-visible,
+.choice:focus-within,
+.primaryButton:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--club-green) 32%, transparent);
+  outline-offset: 2px;
+}
+
+.choice {
+  display: inline-flex;
+  min-height: 2.9rem;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-subtle);
+  cursor: pointer;
+  font-weight: 750;
+}
+
+.timeGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.primaryButton {
+  min-height: 3rem;
+  padding: 0.75rem 1.15rem;
+  border: 2px solid var(--club-green);
+  border-radius: var(--radius-md);
+  color: var(--surface);
+  background: var(--club-green);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+}
+
+.primaryButton:hover {
+  border-color: var(--club-green-dark);
+  background: var(--club-green-dark);
+}
+
+.publicPage {
+  min-height: 100vh;
+  padding: clamp(0.7rem, 2.2vw, 1.5rem);
+}
+
+.publicShell {
+  width: min(100%, 72rem);
+  margin: 0 auto;
+}
+
+.publicTopbar {
+  display: flex;
+  min-height: 3.5rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--border);
+}
+
+.publicContent {
+  display: grid;
+  max-width: 48rem;
+  gap: var(--space-4);
+  margin: clamp(1.3rem, 4vw, 2.5rem) auto 0;
+}
+
+.eventHero {
+  display: grid;
+  gap: var(--space-3);
+  padding: clamp(1rem, 4vw, 1.75rem);
+}
+
+.attendeeNames {
+  margin: var(--space-3) 0 0;
+  color: var(--text);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 48rem) {
+  .eventGrid,
+  .timeGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .publicTopbar {
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 30rem) {
+  .primaryButton,
+  .actions > a {
+    width: 100%;
+  }
+}

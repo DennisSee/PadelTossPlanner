@@ -20,6 +20,12 @@ export async function verifiedIdentity(
 
 export async function loadCurrentAccountContext(): Promise<AccountContext | null> {
   const client = await createServerSupabaseClient();
+  return loadAccountContextWithClient(client);
+}
+
+export async function loadAccountContextWithClient(
+  client: SupabaseClient,
+): Promise<AccountContext | null> {
   const identity = await verifiedIdentity(client);
   if (!identity) return null;
   return new AccountContextRepository(client).loadOwn(identity);

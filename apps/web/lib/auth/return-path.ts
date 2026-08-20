@@ -1,7 +1,15 @@
+import { isTosEventSlug, type TosDetailPath } from "../tos/slug";
+
 export const DEFAULT_RETURN_PATH = "/tos" as const;
 export const ALLOWED_RETURN_PATHS = ["/tos", "/account", "/beheer", "/live"] as const;
 
-export type SafeReturnPath = (typeof ALLOWED_RETURN_PATHS)[number];
+export type SafeReturnPath = (typeof ALLOWED_RETURN_PATHS)[number] | TosDetailPath;
+
+function dynamicTosPath(value: string): value is TosDetailPath {
+  if (!value.startsWith("/tos/")) return false;
+  const slug = value.slice("/tos/".length);
+  return isTosEventSlug(slug);
+}
 
 export function sanitizeReturnPath(value: string | null | undefined): SafeReturnPath {
   if (!value || /[\\\r\n\u0000-\u001f\u007f]/u.test(value)) {
@@ -9,7 +17,9 @@ export function sanitizeReturnPath(value: string | null | undefined): SafeReturn
   }
   return (ALLOWED_RETURN_PATHS as readonly string[]).includes(value)
     ? (value as SafeReturnPath)
-    : DEFAULT_RETURN_PATH;
+    : dynamicTosPath(value)
+      ? value
+      : DEFAULT_RETURN_PATH;
 }
 
 export function loginPathFor(next: SafeReturnPath): string {

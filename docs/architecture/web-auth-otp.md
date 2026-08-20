@@ -65,8 +65,10 @@ korte categorieën zonder accountstatus, e-mail, OTP, token of raw providerfout.
 
 Na een geldige code navigeert de browser volledig naar `/auth/complete`. Deze
 serverroute valideert opnieuw claims, accountcontext en de returnroute. Alleen
-`/tos`, `/account`, `/beheer` en `/live` zijn toegestaan; alle absolute,
-protocol-relative, encoded of onbekende doelen vallen terug op `/tos`.
+`/tos`, `/account`, `/beheer`, `/live` en exact `/tos/<geldige-eventslug>` zijn
+toegestaan; alle absolute, protocol-relative, encoded of onbekende doelen vallen
+terug op `/tos`. De slugvorm is gelijk aan de databasegrens: 3–80 kleine
+letters/cijfers, eventueel gescheiden door enkele koppeltekens.
 `/beheer` valt voor een niet-staffaccount eveneens terug op `/tos`.
 
 ## AUTH-2 accountcontext

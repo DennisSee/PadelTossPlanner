@@ -1,15 +1,21 @@
 import "server-only";
 
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
 
 import type { AccountContext } from "./account-context";
 import { loginPathFor, type SafeReturnPath } from "./return-path";
-import { loadCurrentAccountContext } from "./session";
+import { loadAccountContextWithClient, loadCurrentAccountContext } from "./session";
 
-export async function requireAccount(next: SafeReturnPath): Promise<AccountContext> {
+export async function requireAccount(
+  next: SafeReturnPath,
+  client?: SupabaseClient,
+): Promise<AccountContext> {
   let account: AccountContext | null = null;
   try {
-    account = await loadCurrentAccountContext();
+    account = client
+      ? await loadAccountContextWithClient(client)
+      : await loadCurrentAccountContext();
   } catch {
     account = null;
   }

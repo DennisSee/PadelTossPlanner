@@ -33,6 +33,7 @@ export function isSameOriginOAuthCallback(
       callback.pathname === "/auth/callback" &&
       sanitizeReturnPath(callback.searchParams.get("next")) ===
         callback.searchParams.get("next") &&
+      callback.searchParams.getAll("next").length === 1 &&
       [...callback.searchParams.keys()].every((key) => key === "next") &&
       !callback.username &&
       !callback.password &&

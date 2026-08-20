@@ -16,7 +16,7 @@ browser /login
   -> APP_BASE_URL/auth/callback?code=...&next=...
   -> exchangeCodeForSession(code)
   -> bestaande accountcontext en AUTH-2-capabilityfinalisatie
-  -> /tos, /account, /beheer of /live
+  -> /tos, /tos/<geldige-eventslug>, /account, /beheer of /live
 ```
 
 De browser vertrouwt geen `Host`- of `X-Forwarded-Host`-header. Hij accepteert
@@ -26,10 +26,12 @@ providerfouten en `next` als onbetrouwbare invoer. Hij wacht de officiële SDK-
 exchange volledig af en hergebruikt daarna dezelfde provider-onafhankelijke
 finalisatiehelper als `/auth/complete` voor OTP.
 
-De returnallowlist blijft `/tos`, `/account`, `/beheer` en `/live`, met `/tos`
-als default. Absolute, protocol-relative, encoded externe, onbekende en control-
-characterpaden vallen terug op `/tos`. De bestaande capabilityloader bepaalt of
-`/beheer` werkelijk is toegestaan; een participant krijgt de veilige fallback.
+De returnallowlist bestaat uit `/tos`, `/account`, `/beheer`, `/live` en exact
+`/tos/<geldige-eventslug>`, met `/tos` als default. De slug gebruikt dezelfde
+begrensde 3–80-tekenvorm als de database. Absolute, protocol-relative, encoded
+externe, onbekende en control-characterpaden vallen terug op `/tos`. De bestaande
+capabilityloader bepaalt of `/beheer` werkelijk is toegestaan; een participant
+krijgt de veilige fallback.
 
 ## Providerconfiguratie en scopes
 

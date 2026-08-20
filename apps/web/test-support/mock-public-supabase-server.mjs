@@ -24,6 +24,156 @@ const sessions = new Map();
 const otpCodes = new Map();
 const oauthCodes = new Map();
 let nextOAuthAttempt = null;
+let attendeeFailureEventId = null;
+
+const TOS_EVENT_COLUMNS = [
+  "id",
+  "slug",
+  "title",
+  "sport",
+  "starts_at",
+  "ends_at",
+  "signup_deadline",
+  "status",
+];
+const OWN_REGISTRATION_COLUMNS = [
+  "id",
+  "event_id",
+  "response",
+  "available_from",
+  "available_until",
+  "created_at",
+  "updated_at",
+];
+const OWN_REGISTRATION_SELECT = OWN_REGISTRATION_COLUMNS.join(",");
+const OWN_REGISTRATION_WITH_EVENT_SELECT =
+  `${OWN_REGISTRATION_SELECT},tos_events!inner(${TOS_EVENT_COLUMNS.join(",")})`;
+const registrations = new Map();
+
+function relativeIso(hours) {
+  const value = new Date();
+  value.setSeconds(0, 0);
+  value.setTime(value.getTime() + hours * 60 * 60_000);
+  return value.toISOString();
+}
+
+const tosEvents = [
+  {
+    id: "10000000-0000-4000-8000-000000000001",
+    slug: "vrijdag-padel",
+    title: "Padel TOS vrijdagavond",
+    sport: "padel",
+    starts_at: relativeIso(72),
+    ends_at: relativeIso(74),
+    signup_deadline: relativeIso(48),
+    status: "open",
+  },
+  {
+    id: "10000000-0000-4000-8000-000000000002",
+    slug: "tennis-avond-2026",
+    title: "Tennis TOS voor alle clubleden",
+    sport: "tennis",
+    starts_at: relativeIso(96),
+    ends_at: relativeIso(98),
+    signup_deadline: null,
+    status: "open",
+  },
+  {
+    id: "10000000-0000-4000-8000-000000000003",
+    slug: "deadline-verstreken",
+    title: "TOS met gesloten inschrijving",
+    sport: "padel",
+    starts_at: relativeIso(120),
+    ends_at: relativeIso(122),
+    signup_deadline: relativeIso(-1),
+    status: "open",
+  },
+  {
+    id: "10000000-0000-4000-8000-000000000004",
+    slug: "eigen-gesloten-tos",
+    title: "Eigen gesloten TOS",
+    sport: "padel",
+    starts_at: relativeIso(144),
+    ends_at: relativeIso(146),
+    signup_deadline: relativeIso(100),
+    status: "closed",
+  },
+  {
+    id: "10000000-0000-4000-8000-000000000005",
+    slug: "eigen-geannuleerde-tos",
+    title: "Eigen geannuleerde TOS",
+    sport: "padel",
+    starts_at: relativeIso(168),
+    ends_at: relativeIso(170),
+    signup_deadline: relativeIso(140),
+    status: "cancelled",
+  },
+  {
+    id: "10000000-0000-4000-8000-000000000006",
+    slug: "nacht-tos",
+    title: "TOS over middernacht met een extra lange titel die veilig moet afbreken op mobiel",
+    sport: "padel",
+    starts_at: relativeIso(192),
+    ends_at: relativeIso(194),
+    signup_deadline: relativeIso(180),
+    status: "open",
+  },
+];
+
+const attendeeFixtures = [
+  { display_name: "Dennis", response: "attending", active: true, approval: "approved" },
+  { display_name: "Marieke", response: "attending", active: true, approval: "approved" },
+  { display_name: "<b>Veilige testnaam</b>", response: "attending", active: true, approval: "approved" },
+  { display_name: "Afgezegd", response: "declined", active: true, approval: "approved" },
+  { display_name: "Pending lid", response: "attending", active: true, approval: "pending" },
+  { display_name: "Inactief lid", response: "attending", active: false, approval: "approved" },
+];
+
+function registrationKey(userId, eventId) {
+  return `${userId}:${eventId}`;
+}
+
+function eventById(eventId) {
+  return tosEvents.find(({ id }) => id === eventId) ?? null;
+}
+
+function registrationFor(userId, eventId) {
+  return registrations.get(registrationKey(userId, eventId)) ?? null;
+}
+
+function registrationRow(registration, nestedEvent = false) {
+  const row = Object.fromEntries(
+    OWN_REGISTRATION_COLUMNS.map((column) => [column, registration[column]]),
+  );
+  if (nestedEvent) row.tos_events = eventById(registration.event_id);
+  return row;
+}
+
+function seedRegistration(user, eventId, response) {
+  const event = eventById(eventId);
+  if (!event || registrationFor(user.id, eventId)) return;
+  const now = new Date().toISOString();
+  registrations.set(registrationKey(user.id, eventId), {
+    id: randomUUID(),
+    event_id: eventId,
+    user_id: user.id,
+    member_id: user.membership?.id ?? randomUUID(),
+    response,
+    available_from: response === "attending" ? event.starts_at : null,
+    available_until: response === "attending" ? event.ends_at : null,
+    source: "self",
+    created_at: now,
+    updated_at: now,
+  });
+}
+
+function seedUserRegistrations(user) {
+  if (!user.email.includes("dashboard")) return;
+  seedRegistration(user, tosEvents[0].id, "attending");
+  seedRegistration(user, tosEvents[1].id, "declined");
+  seedRegistration(user, tosEvents[3].id, "attending");
+  seedRegistration(user, tosEvents[4].id, "attending");
+}
 
 function base64url(value) {
   return Buffer.from(value).toString("base64url");
@@ -48,9 +198,8 @@ function jwtFor(user) {
 }
 
 function roleForEmail(email) {
-  if (email.startsWith("admin-member")) return "admin";
-  if (email.startsWith("admin-no-member")) return "admin";
-  if (email.startsWith("planner-no-member")) return "planner";
+  if (email.startsWith("admin")) return "admin";
+  if (email.startsWith("planner")) return "planner";
   return "participant";
 }
 
@@ -78,6 +227,7 @@ function authUser(email) {
       membership,
     };
     authUsers.set(email, user);
+    seedUserRegistrations(user);
   }
   return user;
 }
@@ -264,6 +414,69 @@ function validateScheduleRequest(requestUrl) {
   return null;
 }
 
+function exactKeys(value, expected) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const keys = Object.keys(value).sort();
+  return keys.length === expected.length &&
+    keys.every((key, index) => key === [...expected].sort()[index]);
+}
+
+function singleQueryValue(requestUrl, key) {
+  const values = requestUrl.searchParams.getAll(key);
+  return values.length === 1 ? values[0] : null;
+}
+
+function eqValue(requestUrl, key) {
+  const value = singleQueryValue(requestUrl, key);
+  return value?.startsWith("eq.") ? value.slice(3) : null;
+}
+
+function hasOnlyQueryKeys(requestUrl, allowed) {
+  return [...requestUrl.searchParams.keys()].every((key) => allowed.has(key)) &&
+    [...new Set(requestUrl.searchParams.keys())].every(
+      (key) => requestUrl.searchParams.getAll(key).length === 1,
+    );
+}
+
+function selfServiceOpen(event) {
+  return event.status === "open" &&
+    (!event.signup_deadline || new Date() <= new Date(event.signup_deadline));
+}
+
+function validParticipant(user) {
+  return Boolean(
+    user?.active &&
+    user.membership?.active &&
+    user.membership.approval_status === "approved",
+  );
+}
+
+function visibleEventForUser(event, user) {
+  return event.status === "open" || Boolean(user && registrationFor(user.id, event.id));
+}
+
+function registrationAvailability(event, response, from, until) {
+  if (response === "declined") return { from: null, until: null };
+  const availableFrom = from ?? event.starts_at;
+  const availableUntil = until ?? event.ends_at;
+  if (
+    response !== "attending" ||
+    typeof availableFrom !== "string" ||
+    typeof availableUntil !== "string" ||
+    new Date(availableFrom) < new Date(event.starts_at) ||
+    new Date(availableUntil) > new Date(event.ends_at) ||
+    new Date(availableUntil) <= new Date(availableFrom)
+  ) {
+    return null;
+  }
+  return { from: availableFrom, until: availableUntil };
+}
+
+function rejectMockContract(response, detail) {
+  console.error(`TOS mock weigerde request: ${detail}.`);
+  json(response, 422, { error: "TOS query contract rejected" });
+}
+
 function json(response, status, body) {
   const payload = JSON.stringify(body);
   response.writeHead(status, {
@@ -271,7 +484,7 @@ function json(response, status, body) {
     "content-length": Buffer.byteLength(payload),
     "access-control-allow-origin": "http://127.0.0.1:31000",
     "access-control-allow-headers": "authorization, apikey, content-type, x-client-info, x-supabase-api-version",
-    "access-control-allow-methods": "GET, POST, OPTIONS",
+    "access-control-allow-methods": "GET, POST, PATCH, OPTIONS",
   });
   response.end(payload);
 }
@@ -285,7 +498,7 @@ const server = createServer(async (request, response) => {
     response.writeHead(204, {
       "access-control-allow-origin": "http://127.0.0.1:31000",
       "access-control-allow-headers": "authorization, apikey, content-type, x-client-info, x-supabase-api-version",
-      "access-control-allow-methods": "GET, POST, OPTIONS",
+      "access-control-allow-methods": "GET, POST, PATCH, OPTIONS",
     });
     response.end();
     return;
@@ -316,6 +529,17 @@ const server = createServer(async (request, response) => {
       return;
     }
     nextOAuthAttempt = { email, outcome };
+    json(response, 200, { status: "ok" });
+    return;
+  }
+  if (request.method === "POST" && requestUrl.pathname === "/__test/attendee-failure") {
+    const body = await requestJson(request);
+    const event = tosEvents.find(({ slug }) => slug === String(body.slug ?? ""));
+    if (!event) {
+      json(response, 400, { error: "unknown test fixture" });
+      return;
+    }
+    attendeeFailureEventId = event.id;
     json(response, 200, { status: "ok" });
     return;
   }
@@ -486,6 +710,277 @@ const server = createServer(async (request, response) => {
       return;
     }
     json(response, 200, user.membership && user.active ? [user.membership] : []);
+    return;
+  }
+  if (request.method === "POST" && requestUrl.pathname === "/rest/v1/rpc/self_onboard_member") {
+    const user = bearerUser(request);
+    const body = await requestJson(request);
+    if (!user) {
+      json(response, 401, { code: "PGRST301", message: "invalid JWT" });
+      return;
+    }
+    if (!exactKeys(body, ["p_display_name"])) {
+      rejectMockContract(response, "onboardingpayload bevat onverwachte velden");
+      return;
+    }
+    const displayName = String(body.p_display_name ?? "").trim();
+    if (!user.active || user.membership || !displayName || displayName.length > 120) {
+      json(response, 403, { code: "42501", message: "onboarding rejected" });
+      return;
+    }
+    user.membership = {
+      id: randomUUID(),
+      display_name: displayName,
+      approval_status: user.email.startsWith("pending-onboarding") ? "pending" : "approved",
+      active: true,
+    };
+    json(response, 200, [user.membership]);
+    return;
+  }
+  if (
+    request.method === "POST" &&
+    requestUrl.pathname === "/rest/v1/rpc/participant_event_attendee_names"
+  ) {
+    const user = bearerUser(request);
+    const body = await requestJson(request);
+    if (!user) {
+      json(response, 401, { code: "PGRST301", message: "invalid JWT" });
+      return;
+    }
+    if (!exactKeys(body, ["p_event_id"])) {
+      rejectMockContract(response, "namen-RPC bevat onverwachte velden");
+      return;
+    }
+    const event = eventById(String(body.p_event_id ?? ""));
+    if (event?.id === attendeeFailureEventId) {
+      attendeeFailureEventId = null;
+      json(response, 503, { code: "PGRST500", message: "fixture failure" });
+      return;
+    }
+    if (
+      !validParticipant(user) ||
+      !event ||
+      event.status !== "open" ||
+      new Date(event.ends_at) < new Date()
+    ) {
+      json(response, 200, []);
+      return;
+    }
+    const names = attendeeFixtures
+      .filter(({ response: choice, active, approval }) =>
+        choice === "attending" && active && approval === "approved")
+      .map(({ display_name }) => display_name);
+    for (const registration of registrations.values()) {
+      if (registration.event_id !== event.id || registration.response !== "attending") continue;
+      const attendee = [...authUsers.values()].find(({ id }) => id === registration.user_id);
+      if (validParticipant(attendee)) names.push(attendee.membership.display_name);
+    }
+    const unique = [...new Set(names)].sort((left, right) =>
+      left.localeCompare(right, "nl", { sensitivity: "base" }));
+    json(response, 200, unique.map((display_name) => ({ display_name })));
+    return;
+  }
+  if (request.method === "GET" && requestUrl.pathname === "/rest/v1/tos_events") {
+    const user = bearerUser(request);
+    if (singleQueryValue(requestUrl, "select") !== TOS_EVENT_COLUMNS.join(",")) {
+      rejectMockContract(response, "eventprojectie wijkt af");
+      return;
+    }
+    const slug = eqValue(requestUrl, "slug");
+    if (slug !== null) {
+      const allowed = new Set(["select", "slug", "status", "limit"]);
+      const status = eqValue(requestUrl, "status");
+      if (
+        !hasOnlyQueryKeys(requestUrl, allowed) ||
+        singleQueryValue(requestUrl, "limit") !== "2" ||
+        (!user && status !== "open") ||
+        (status !== null && status !== "open")
+      ) {
+        rejectMockContract(response, "eventdetailfilter wijkt af");
+        return;
+      }
+      const event = tosEvents.find((candidate) => candidate.slug === slug) ?? null;
+      json(
+        response,
+        200,
+        event && (!status || event.status === status) && visibleEventForUser(event, user)
+          ? [event]
+          : [],
+      );
+      return;
+    }
+    const allowed = new Set(["select", "status", "ends_at", "or", "order"]);
+    if (
+      !user ||
+      !hasOnlyQueryKeys(requestUrl, allowed) ||
+      eqValue(requestUrl, "status") !== "open" ||
+      !singleQueryValue(requestUrl, "ends_at")?.startsWith("gte.") ||
+      !singleQueryValue(requestUrl, "or")?.includes("signup_deadline") ||
+      singleQueryValue(requestUrl, "order") !== "starts_at.asc"
+    ) {
+      rejectMockContract(response, "open-eventfilters wijken af");
+      return;
+    }
+    json(
+      response,
+      200,
+      tosEvents
+        .filter((event) =>
+          event.status === "open" &&
+          new Date(event.ends_at) >= new Date() &&
+          (!event.signup_deadline || new Date(event.signup_deadline) >= new Date()))
+        .sort((left, right) => new Date(left.starts_at) - new Date(right.starts_at)),
+    );
+    return;
+  }
+  if (request.method === "GET" && requestUrl.pathname === "/rest/v1/registrations") {
+    const user = bearerUser(request);
+    if (!user) {
+      json(response, 401, { code: "PGRST301", message: "invalid JWT" });
+      return;
+    }
+    const select = singleQueryValue(requestUrl, "select");
+    if (eqValue(requestUrl, "user_id") !== user.id) {
+      rejectMockContract(response, "eigen userfilter ontbreekt");
+      return;
+    }
+    if (select === OWN_REGISTRATION_WITH_EVENT_SELECT) {
+      const allowed = new Set(["select", "user_id", "tos_events.ends_at"]);
+      if (
+        !hasOnlyQueryKeys(requestUrl, allowed) ||
+        !singleQueryValue(requestUrl, "tos_events.ends_at")?.startsWith("gte.")
+      ) {
+        rejectMockContract(response, "dashboardregistratiefilter wijkt af");
+        return;
+      }
+      const result = [...registrations.values()]
+        .filter(({ user_id, event_id }) =>
+          user_id === user.id && new Date(eventById(event_id)?.ends_at ?? 0) >= new Date())
+        .sort((left, right) =>
+          new Date(eventById(left.event_id).starts_at) -
+          new Date(eventById(right.event_id).starts_at))
+        .map((registration) => registrationRow(registration, true));
+      json(response, 200, result);
+      return;
+    }
+    if (select === OWN_REGISTRATION_SELECT) {
+      const allowed = new Set(["select", "event_id", "user_id", "limit"]);
+      const eventId = eqValue(requestUrl, "event_id");
+      if (
+        !hasOnlyQueryKeys(requestUrl, allowed) ||
+        !eventId ||
+        singleQueryValue(requestUrl, "limit") !== "2"
+      ) {
+        rejectMockContract(response, "eigen registratiefilter wijkt af");
+        return;
+      }
+      const registration = registrationFor(user.id, eventId);
+      json(response, 200, registration ? [registrationRow(registration)] : []);
+      return;
+    }
+    rejectMockContract(response, "registrationprojectie wijkt af");
+    return;
+  }
+  if (request.method === "POST" && requestUrl.pathname === "/rest/v1/registrations") {
+    const user = bearerUser(request);
+    const body = await requestJson(request);
+    if (!user) {
+      json(response, 401, { code: "PGRST301", message: "invalid JWT" });
+      return;
+    }
+    if (
+      !hasOnlyQueryKeys(requestUrl, new Set(["select", "limit"])) ||
+      singleQueryValue(requestUrl, "select") !== OWN_REGISTRATION_SELECT ||
+      singleQueryValue(requestUrl, "limit") !== "2" ||
+      !exactKeys(body, ["event_id", "response", "available_from", "available_until"])
+    ) {
+      rejectMockContract(response, "registrationinsert bevat verboden velden");
+      return;
+    }
+    const event = eventById(String(body.event_id ?? ""));
+    if (!event || !validParticipant(user) || !selfServiceOpen(event)) {
+      json(response, 403, { code: "42501", message: "registration rejected" });
+      return;
+    }
+    if (registrationFor(user.id, event.id)) {
+      json(response, 409, { code: "23505", message: "duplicate registration" });
+      return;
+    }
+    const availability = registrationAvailability(
+      event,
+      body.response,
+      body.available_from,
+      body.available_until,
+    );
+    if (!availability) {
+      json(response, 400, { code: "22007", message: "invalid availability" });
+      return;
+    }
+    const now = new Date().toISOString();
+    const registration = {
+      id: randomUUID(),
+      event_id: event.id,
+      user_id: user.id,
+      member_id: user.membership.id,
+      response: body.response,
+      available_from: availability.from,
+      available_until: availability.until,
+      source: "self",
+      created_at: now,
+      updated_at: now,
+    };
+    registrations.set(registrationKey(user.id, event.id), registration);
+    json(response, 201, [registrationRow(registration)]);
+    return;
+  }
+  if (request.method === "PATCH" && requestUrl.pathname === "/rest/v1/registrations") {
+    const user = bearerUser(request);
+    const body = await requestJson(request);
+    if (!user) {
+      json(response, 401, { code: "PGRST301", message: "invalid JWT" });
+      return;
+    }
+    const allowed = new Set(["select", "id", "user_id", "event_id", "limit"]);
+    const eventId = eqValue(requestUrl, "event_id");
+    const registration = eventId ? registrationFor(user.id, eventId) : null;
+    if (
+      !hasOnlyQueryKeys(requestUrl, allowed) ||
+      singleQueryValue(requestUrl, "select") !== OWN_REGISTRATION_SELECT ||
+      singleQueryValue(requestUrl, "limit") !== "2" ||
+      eqValue(requestUrl, "user_id") !== user.id ||
+      !registration ||
+      eqValue(requestUrl, "id") !== registration.id ||
+      !exactKeys(body, ["response", "available_from", "available_until"])
+    ) {
+      rejectMockContract(response, "registrationupdate bevat verboden velden of filters");
+      return;
+    }
+    const event = eventById(eventId);
+    if (!event || !validParticipant(user) || !selfServiceOpen(event)) {
+      json(response, 403, { code: "42501", message: "registration rejected" });
+      return;
+    }
+    const availability = registrationAvailability(
+      event,
+      body.response,
+      body.available_from,
+      body.available_until,
+    );
+    if (!availability) {
+      json(response, 400, { code: "22007", message: "invalid availability" });
+      return;
+    }
+    Object.assign(registration, {
+      response: body.response,
+      available_from: availability.from,
+      available_until: availability.until,
+      updated_at: new Date().toISOString(),
+    });
+    json(response, 200, [registrationRow(registration)]);
+    return;
+  }
+  if (request.method === "DELETE" && requestUrl.pathname === "/rest/v1/registrations") {
+    rejectMockContract(response, "DELETE is verboden");
     return;
   }
   if (request.method !== "GET") {
