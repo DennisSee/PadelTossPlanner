@@ -3,7 +3,13 @@ set -euo pipefail
 
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 validator="$script_dir/validate-smoke-redirect.py"
+header_utils="$script_dir/smoke-header-utils.sh"
 base_url="https://test-tos.oddbounce.nl"
+redirect_fixture_count=0
+header_fixture_count=0
+
+# shellcheck source=deploy/staging/smoke-header-utils.sh
+source "$header_utils"
 
 command -v python3 >/dev/null 2>&1 || {
   printf 'FOUT  python3 ontbreekt.\n' >&2
@@ -29,6 +35,34 @@ run_fixture() {
     printf 'FOUT  Redirectfixture faalde: %s\n' "$name" >&2
     exit 1
   fi
+  ((redirect_fixture_count += 1))
+}
+
+run_header_fixture() {
+  local name=$1
+  local expected_result=$2
+  local headers=$3
+  local expected_path=$4
+  local status
+  local location
+  local actual_result="reject"
+  local validator_output
+
+  status=$(printf '%s' "$headers" | extract_last_http_status)
+  location=$(printf '%s' "$headers" | extract_last_http_location)
+  if [[ "$status" =~ ^30[2378]$ ]] &&
+    validator_output=$(printf '%s' "$location" | python3 "$validator" "$base_url" "$expected_path" 2>&1); then
+    actual_result="accept"
+  fi
+  if [[ -n "${validator_output:-}" ]]; then
+    printf 'FOUT  Redirectvalidator schreef onverwachte uitvoer voor headerfixture: %s\n' "$name" >&2
+    exit 1
+  fi
+  if [[ "$actual_result" != "$expected_result" ]]; then
+    printf 'FOUT  HTTP-headerfixture faalde: %s\n' "$name" >&2
+    exit 1
+  fi
+  ((header_fixture_count += 1))
 }
 
 run_fixture "ongecodeerd relatief" "accept" "/login?next=/account" "/account"
@@ -56,4 +90,14 @@ run_fixture "OTP in Location" "reject" \
 run_fixture "credentials in absolute URL" "reject" \
   "https://fixture:fixture@test-tos.oddbounce.nl/login?next=%2Faccount" "/account"
 
-printf 'OK  Alle veilige en onveilige redirectfixtures zijn correct beoordeeld.\n'
+run_header_fixture "CRLF account met lowercase location" "accept" \
+  $'HTTP/2 307\r\nlocation: /login?next=%2Faccount\r\ncache-control: no-store\r\n\r\n' "/account"
+run_header_fixture "CRLF TOS met normale Location" "accept" \
+  $'HTTP/1.1 307 Temporary Redirect\r\nLocation: /login?next=%2Ftos\r\ncache-control: no-store\r\n\r\n' "/tos"
+run_header_fixture "CRLF beheer" "accept" \
+  $'HTTP/2 307\r\nLocation: /login?next=%2Fbeheer\r\ncache-control: no-store\r\n\r\n' "/beheer"
+run_header_fixture "ingebedde CR blijft verboden" "reject" \
+  $'HTTP/2 307\r\nLocation: /login?next=%2Faccount\rfixture\r\n\r\n' "/account"
+
+printf 'OK  Redirectfixtures: %s; CRLF-headerfixtures: %s.\n' \
+  "$redirect_fixture_count" "$header_fixture_count"

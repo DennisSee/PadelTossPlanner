@@ -19,11 +19,15 @@ host=${BASH_REMATCH[1]}
 port=${BASH_REMATCH[3]:-443}
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 redirect_validator="$script_dir/validate-smoke-redirect.py"
+header_utils="$script_dir/smoke-header-utils.sh"
 
 for command_name in curl openssl grep tr awk sed tail python3; do
   command -v "$command_name" >/dev/null 2>&1 || fail "Vereist commando ontbreekt: $command_name"
 done
 [[ -f "$redirect_validator" ]] || fail "Redirectvalidator ontbreekt."
+[[ -f "$header_utils" ]] || fail "HTTP-headerhulpfuncties ontbreken."
+# shellcheck source=deploy/staging/smoke-header-utils.sh
+source "$header_utils"
 
 if ! openssl s_client \
   -connect "$host:$port" \
@@ -88,8 +92,8 @@ request_protected_redirect() {
   if ! headers=$(curl --silent --show-error --max-time 20 --dump-header - --output /dev/null "$base_url$path"); then
     fail "Protected-routecontrole is mislukt voor $path."
   fi
-  status=$(printf '%s\n' "$headers" | awk 'toupper($1) ~ /^HTTP\// { value=$2 } END { print value }')
-  location=$(printf '%s\n' "$headers" | sed -nE 's/^[Ll]ocation:[[:space:]]*(.*)\r?$/\1/p' | tail -n 1)
+  status=$(printf '%s\n' "$headers" | extract_last_http_status)
+  location=$(printf '%s\n' "$headers" | extract_last_http_location)
   [[ "$status" =~ ^30[2378]$ ]] || fail "$path gaf geen veilige redirect."
   if ! printf '%s' "$location" | python3 "$redirect_validator" "$base_url" "$path"; then
     fail "$path redirect niet naar de verwachte interne loginroute."

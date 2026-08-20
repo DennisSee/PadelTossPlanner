@@ -55,9 +55,15 @@ describe("WEB-3A route guards and cache boundaries", () => {
     const smoke = source("../../deploy/staging/smoke-test.sh");
     const validator = source("../../deploy/staging/validate-smoke-redirect.py");
     const fixtures = source("../../deploy/staging/test-smoke-redirects.sh");
+    const headerUtils = source("../../deploy/staging/smoke-header-utils.sh");
 
     expect(smoke).toContain('python3 "$redirect_validator" "$base_url" "$path"');
+    expect(smoke).toContain("extract_last_http_status");
+    expect(smoke).toContain("extract_last_http_location");
+    expect(headerUtils).toContain("sed $'s/\\r$//'");
+    expect(headerUtils).toContain("[Ll][Oo][Cc][Aa][Tt][Ii][Oo][Nn]");
     expect(validator).toContain("urlsplit(location)");
+    expect(validator).toContain("ord(character) < 0x20");
     expect(validator).toContain('parsed.path != "/login"');
     expect(validator).toContain('query == [("next", expected_path)]');
     expect(validator).toContain("normalized_origin(location) != base_origin");
@@ -76,5 +82,9 @@ describe("WEB-3A route guards and cache boundaries", () => {
     expect(fixtures).toContain('"OTP in Location" "reject"');
     expect(fixtures).toContain('"credentials in absolute URL" "reject"');
     expect(fixtures).toContain('[[ -n "$validator_output" ]]');
+    expect(fixtures).toContain('"CRLF account met lowercase location" "accept"');
+    expect(fixtures).toContain('"CRLF TOS met normale Location" "accept"');
+    expect(fixtures).toContain('"CRLF beheer" "accept"');
+    expect(fixtures).toContain('"ingebedde CR blijft verboden" "reject"');
   });
 });
