@@ -8,6 +8,7 @@ import {
   ANONYMOUS_NAVIGATION,
   AppHeader,
   Card,
+  CourtLines,
   SiteNavigation,
   StateMessage,
   type NavigationModel,
@@ -168,6 +169,7 @@ function RoundCard({
             ? styles.roundNext
             : styles.roundNeutral
       }`.trim()}
+      data-round-number={round.roundNumber}
     >
       <div className={styles.roundHeader}>
         <h3 className={styles.roundTitle}>Ronde {round.roundNumber}</h3>
@@ -217,6 +219,7 @@ function PersonalRoundCard({
             ? styles.roundNext
             : styles.roundNeutral
       } ${round.status === "playing" ? "" : styles.personalStateCard}`.trim()}
+      data-round-number={round.roundNumber}
     >
       <div className={styles.roundHeader}>
         <h3 className={styles.roundTitle}>Ronde {round.roundNumber}</h3>
@@ -469,13 +472,16 @@ export function LiveSchedule({
       <div className={styles.shell}>
         <div className={styles.topbar}>
           <AppHeader subtitle="Live TOS-schema" />
-          <SiteNavigation model={navigation} />
+          <SiteNavigation model={navigation} currentPath="/live" />
           <Link className={styles.backLink} href="/">← Terug</Link>
         </div>
 
         <Card className={styles.eventCard}>
+          <CourtLines className={styles.eventLines} />
           <div className={styles.eventSummary} data-testid="event-summary">
-            <h1 className={styles.eventTitle}>{formatEventDate(schedule.eventDate)}</h1>
+            <p className={styles.eventEyebrow}>Wedstrijdprogramma</p>
+            <h1 className={styles.eventTitle}>Live TOS-schema</h1>
+            <p className={styles.eventDate}>{formatEventDate(schedule.eventDate)}</p>
             <p className={styles.eventMeta}>
               <span>{schedule.startTime}–{schedule.endTime}</span>
               <span>{schedule.courts.length} {schedule.courts.length === 1 ? "baan" : "banen"}</span>

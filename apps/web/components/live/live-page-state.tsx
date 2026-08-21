@@ -31,7 +31,7 @@ export function LivePageState({
       <div className={styles.shell}>
         <div className={styles.topbar}>
           <AppHeader subtitle="Live TOS-schema" />
-          <SiteNavigation model={navigation} />
+          <SiteNavigation model={navigation} currentPath="/live" />
           <Link className={styles.backLink} href="/">← Terug</Link>
         </div>
         <StateMessage title={copy.title}>{copy.text}</StateMessage>

@@ -1,11 +1,16 @@
 .page {
   min-height: 100vh;
-  padding: clamp(0.7rem, 2.2vw, 1.5rem);
+  padding: var(--page-pad);
 }
 
 .shell {
-  width: min(100%, 72rem);
+  width: min(100%, var(--page-wide));
   margin: 0 auto;
+  padding: clamp(0.65rem, 1.7vw, 1.2rem);
+  border: 1px solid rgb(255 255 255 / 75%);
+  border-radius: var(--radius-lg);
+  background: rgb(255 253 248 / 82%);
+  box-shadow: var(--shadow-md);
 }
 
 .topbar {
@@ -13,33 +18,69 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
-  min-height: 3.5rem;
-  padding-bottom: var(--space-3);
+  min-height: 4rem;
+  padding: 0 var(--space-2) var(--space-3);
   border-bottom: 1px solid var(--border);
 }
 
 .pageHeader {
+  position: relative;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-4);
-  margin: clamp(1.3rem, 4vw, 2.5rem) 0 var(--space-5);
+  min-height: 12rem;
+  margin: var(--space-4) 0 var(--space-5);
+  overflow: hidden;
+  padding: clamp(1.35rem, 4vw, 2.5rem);
+  border-radius: var(--radius-md);
+  color: var(--surface);
+  background:
+    linear-gradient(120deg, var(--club-green-dark) 0 68%, transparent 68%),
+    var(--club-yellow);
+  isolation: isolate;
+}
+
+.pageHeaderManagement {
+  min-height: 10rem;
+}
+
+.pageHeaderTos {
+  min-height: 9.5rem;
+}
+
+.headerLines {
+  z-index: -1;
+  left: 56%;
+}
+
+.headerCopy {
+  position: relative;
+  z-index: 1;
+  max-width: 46rem;
 }
 
 .pageHeader h1 {
   margin: 0;
-  color: var(--club-green-dark);
-  font-size: clamp(1.7rem, 5vw, 2.5rem);
+  color: var(--surface);
+  font-family: var(--font-display);
+  font-size: clamp(2.8rem, 7vw, 5rem);
+  font-weight: 800;
+  line-height: 0.9;
+  letter-spacing: 0.015em;
+  text-transform: uppercase;
 }
 
 .pageHeader p {
   max-width: 42rem;
   margin: var(--space-2) 0 0;
-  color: var(--text-muted);
+  color: #f3eee3;
   line-height: 1.55;
 }
 
 .badges {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
@@ -59,7 +100,10 @@
 .contentCard h2 {
   margin: 0;
   color: var(--club-green-dark);
-  font-size: 1.1rem;
+  font-family: var(--font-display);
+  font-size: 1.65rem;
+  letter-spacing: 0.025em;
+  text-transform: uppercase;
 }
 
 .contentCard p {
@@ -72,13 +116,13 @@
   display: grid;
   grid-template-columns: minmax(7rem, auto) 1fr;
   gap: var(--space-2) var(--space-4);
-  margin: var(--space-4) 0 0;
+  margin: var(--space-3) 0 0;
 }
 
 .details dt {
   color: var(--text-muted);
   font-size: 0.88rem;
-  font-weight: 700;
+  font-weight: 800;
 }
 
 .details dd {
@@ -88,27 +132,95 @@
 }
 
 .logoutButton {
-  min-height: 2.75rem;
-  padding: 0.65rem 1rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  color: var(--club-green-dark);
-  background: var(--surface);
+  width: 100%;
+  min-height: 3rem;
+  padding: 0.7rem 1rem;
+  border: 1px solid var(--club-green-dark);
+  border-radius: var(--radius-sm);
+  color: var(--surface);
+  background: var(--club-green-dark);
   cursor: pointer;
-  font-weight: 750;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: 0.035em;
+  text-transform: uppercase;
 }
 
 .logoutButton:hover {
   border-color: var(--club-green);
+  background: var(--club-green);
 }
 
 .logoutWrap {
   margin-top: var(--space-4);
 }
 
+.identityBanner {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  min-height: 6.5rem;
+  gap: var(--space-4);
+  margin-top: var(--space-3);
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  color: var(--surface);
+  background:
+    linear-gradient(125deg, var(--club-green-dark) 0 80%, var(--club-yellow) 80%);
+}
+
+.identityBanner::after {
+  position: absolute;
+  right: -1rem;
+  width: 6rem;
+  height: 0.45rem;
+  content: "";
+  background: var(--surface);
+  transform: rotate(-45deg);
+}
+
+.initials {
+  display: grid;
+  align-self: stretch;
+  min-width: 7rem;
+  place-items: center;
+  border-right: 1px solid rgb(255 255 255 / 35%);
+  font-family: var(--font-display);
+  font-size: 3.5rem;
+  letter-spacing: 0.03em;
+}
+
+.identityName {
+  min-width: 0;
+  padding-right: 5rem;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
 @media (max-width: 42rem) {
+  .shell {
+    padding: 0.65rem;
+  }
+
   .pageHeader {
     display: grid;
+    min-height: 14rem;
+    margin-top: var(--space-3);
+    padding: 1.25rem;
+    background:
+      linear-gradient(155deg, var(--club-green-dark) 0 78%, transparent 78%),
+      var(--club-yellow);
+  }
+
+  .pageHeader h1 {
+    font-size: clamp(2.8rem, 13vw, 4.2rem);
+  }
+
+  .headerLines {
+    top: 45%;
+    left: 48%;
   }
 
   .badges {
@@ -126,5 +238,18 @@
 
   .details dd + dt {
     margin-top: var(--space-2);
+  }
+
+  .identityBanner {
+    grid-template-columns: 5rem minmax(0, 1fr);
+  }
+
+  .initials {
+    min-width: 5rem;
+    font-size: 2.6rem;
+  }
+
+  .identityName {
+    padding-right: 3.5rem;
   }
 }

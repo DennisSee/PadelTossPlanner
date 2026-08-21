@@ -20,24 +20,27 @@ async function expectNoHorizontalOverflow(page: Page) {
   expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth + 1);
 }
 
-test("homepage toont de publieke stagingingang en navigeert met toetsenbord", async ({ page }) => {
+test("homepage toont de publieke stagingingang en navigeert met toetsenbord", async ({ page }, testInfo) => {
   const response = await page.goto("/");
   expect(response?.status()).toBe(200);
   await expect(page.getByRole("img", { name: "Logo T.C. Zuid" })).toBeVisible();
   await expect(page.getByText("T.C. Zuid TOS", { exact: true })).toBeVisible();
-  await expect(page.getByText("Staging", { exact: true })).toBeVisible();
+  const stagingBadge = page.getByText("Staging", { exact: true });
+  if ((testInfo.project.use.viewport?.width ?? 0) <= 480) {
+    await expect(stagingBadge).toBeHidden();
+  } else {
+    await expect(stagingBadge).toBeVisible();
+  }
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(
     "Jouw TOS-avond in één oogopslag",
   );
   await expect(page.getByRole("heading", { level: 2 })).toHaveText(
     "Doe mee met de volgende TOS",
   );
-  await expect(
-    page
-      .getByRole("heading", { name: "Doe mee met de volgende TOS" })
-      .locator("..")
-      .getByRole("link", { name: "Inloggen / aanmelden" }),
-  ).toBeVisible();
+  const joinCard = page
+    .getByRole("heading", { name: "Doe mee met de volgende TOS" })
+    .locator("xpath=ancestor::section[1]");
+  await expect(joinCard.getByRole("link", { name: "Inloggen / aanmelden" })).toBeVisible();
 
   const liveLink = page.getByRole("link", { name: "Bekijk live TOS-schema" });
   await liveLink.focus();
@@ -97,7 +100,7 @@ test("persoonlijke selectie onderscheidt teams, rust, afwezigheid en exacte name
   const selectedHighlights = page.locator('[data-selected-player="true"]');
   expect(await selectedHighlights.count()).toBeGreaterThan(0);
   await expect(selectedHighlights.first()).toContainText("Zoë Accent");
-  await expect(selectedHighlights.first()).toContainText("jij");
+  await expect(selectedHighlights.first()).not.toContainText("jij");
 
   const playingCard = current.getByTestId("court-badge").first().locator("..").locator("..");
   const playingBox = await playingCard.boundingBox();

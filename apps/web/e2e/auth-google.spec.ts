@@ -194,7 +194,7 @@ test("bestaande OTP-identiteit houdt profiel en capabilities bij Google login", 
   await page.goto("/login?next=/account");
   await signInWithOtp(page, request, email);
   await expect(page).toHaveURL(/\/account$/u);
-  await expect(page.getByText("Testlid", { exact: true })).toBeVisible();
+  await expect(page.getByText("Testlid", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("Admin").first()).toBeVisible();
   await logout(page);
 
@@ -203,7 +203,7 @@ test("bestaande OTP-identiteit houdt profiel en capabilities bij Google login", 
   await startGoogle(page);
   await expect(page).toHaveURL(/\/account$/u);
   await expect(page.getByText(email, { exact: true })).toBeVisible();
-  await expect(page.getByText("Testlid", { exact: true })).toBeVisible();
+  await expect(page.getByText("Testlid", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("Admin").first()).toBeVisible();
   await expect(page.getByText("Niet gebruiken voor profiel of rollen")).toHaveCount(0);
 });

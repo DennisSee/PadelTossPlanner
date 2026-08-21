@@ -30,7 +30,7 @@ export default async function ManagementPage({ searchParams }: PageProps) {
     events = await new StaffTosEventRepository(client).listEvents();
   } catch {
     return (
-      <AccountShell account={account} title="Beheeromgeving" intro="Beheer TOS-avonden en open per event het read-only deelnemersoverzicht.">
+      <AccountShell account={account} title="Beheeromgeving" intro="Beheer TOS-avonden en open per event het read-only deelnemersoverzicht." variant="management">
         <StateMessage title="TOS-avonden tijdelijk niet beschikbaar"><p>Probeer het later opnieuw.</p></StateMessage>
       </AccountShell>
     );
@@ -42,6 +42,7 @@ export default async function ManagementPage({ searchParams }: PageProps) {
       account={account}
       title="Beheeromgeving"
       intro="Beheer TOS-avonden en open per event het read-only deelnemersoverzicht."
+      variant="management"
     >
       {message ? (
         <p className={`${styles.message} ${message.tone === "success" ? styles.messageSuccess : styles.messageDanger}`} role={message.tone === "danger" ? "alert" : "status"}>

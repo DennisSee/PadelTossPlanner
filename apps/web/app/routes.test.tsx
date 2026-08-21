@@ -100,6 +100,8 @@ describe("WEB-2 routes", () => {
   });
 
   it("keeps UI hierarchy and keyboard focus structural rather than pixel-bound", () => {
+    const globalCss = readFileSync(resolve(process.cwd(), "app/globals.css"), "utf8");
+    const uiCss = readFileSync(resolve(process.cwd(), "components/ui/ui.module.css"), "utf8");
     const liveCss = readFileSync(
       resolve(process.cwd(), "components/live/live-schedule.module.css"),
       "utf8",
@@ -111,5 +113,9 @@ describe("WEB-2 routes", () => {
     expect(liveCss).toContain(".courtKremer { --court-accent:");
     expect(liveCss).toContain(".courtZga { --court-accent:");
     expect(liveCss).toContain(".selectedPlayer");
+    expect(globalCss).toContain("--font-display:");
+    expect(globalCss).toContain("--club-yellow:");
+    expect(uiCss).toContain(".courtLines");
+    expect(uiCss).toContain(".dateRail");
   });
 });

@@ -1,4 +1,4 @@
-import { AccountShell, LogoutForm, membershipLabel } from "../../components/account/account-shell";
+import { AccountShell, displayInitials, LogoutForm, membershipLabel } from "../../components/account/account-shell";
 import { Card } from "../../components/ui";
 import { requireAccount } from "../../lib/auth/route-guard";
 
@@ -9,18 +9,24 @@ export const revalidate = 0;
 
 export default async function AccountPage() {
   const account = await requireAccount("/account");
+  const displayName = account.profile?.displayName ?? "Nog niet beschikbaar";
   return (
     <AccountShell
       account={account}
       title="Mijn account"
       intro="Je identiteit, clubstatus en huidige mogelijkheden binnen T.C. Zuid TOS."
+      variant="account"
     >
       <div className={styles.contentGrid}>
         <Card className={styles.contentCard}>
           <h2>Accountgegevens</h2>
+          <div className={styles.identityBanner}>
+            <span className={styles.initials} aria-hidden="true">{displayInitials(displayName)}</span>
+            <span className={styles.identityName}>{displayName}</span>
+          </div>
           <dl className={styles.details}>
             <dt>Naam</dt>
-            <dd>{account.profile?.displayName ?? "Nog niet beschikbaar"}</dd>
+            <dd>{displayName}</dd>
             <dt>E-mailadres</dt>
             <dd>{account.identity.email}</dd>
             <dt>Clubstatus</dt>

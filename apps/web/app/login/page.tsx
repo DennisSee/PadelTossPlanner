@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { AuthLogin } from "../../components/auth/auth-login";
-import { AppHeader, Card } from "../../components/ui";
+import { AppHeader, Card, CourtLines } from "../../components/ui";
 import { buildOAuthCallbackUrl } from "../../lib/auth/oauth";
 import { sanitizeReturnPath } from "../../lib/auth/return-path";
 import { destinationForAccount, loadOptionalAccountContext } from "../../lib/auth/session";
@@ -56,22 +56,30 @@ export default async function LoginPage({
           <Link className={styles.backLink} href="/">← Terug</Link>
         </div>
         <Card className={styles.card}>
-          <h1 className={styles.title}>Inloggen / aanmelden</h1>
-          <p className={styles.intro}>
-            Kies Google voor de snelste route of ontvang een eenmalige e-mailcode.
-          </p>
-          {config ? (
-            <AuthLogin
-              config={config}
-              callbackUrl={config.callbackUrl}
-              next={next}
-              initialOAuthError={rawError === "oauth"}
-            />
-          ) : (
-            <p className={styles.unavailable} role="alert">
-              Inloggen is tijdelijk niet beschikbaar. Probeer het later opnieuw.
-            </p>
-          )}
+          <div className={styles.loginIntro}>
+            <CourtLines className={styles.loginLines} />
+            <div className={styles.loginIntroCopy}>
+              <p className={styles.eyebrow}>T.C. Zuid TOS</p>
+              <h1 className={styles.title}>Inloggen / aanmelden</h1>
+              <p className={styles.intro}>
+                Kies Google voor de snelste route of ontvang een eenmalige e-mailcode.
+              </p>
+            </div>
+          </div>
+          <div className={styles.formBody}>
+            {config ? (
+              <AuthLogin
+                config={config}
+                callbackUrl={config.callbackUrl}
+                next={next}
+                initialOAuthError={rawError === "oauth"}
+              />
+            ) : (
+              <p className={styles.unavailable} role="alert">
+                Inloggen is tijdelijk niet beschikbaar. Probeer het later opnieuw.
+              </p>
+            )}
+          </div>
         </Card>
       </div>
     </main>

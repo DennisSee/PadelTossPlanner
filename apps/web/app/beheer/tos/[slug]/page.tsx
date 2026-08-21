@@ -123,6 +123,7 @@ export default async function TosEventParticipantsPage({ params, searchParams = 
       account={account}
       title="TOS-deelnemers"
       intro="Bekijk aanmeldingen en werk voor padel gecontroleerd verder naar een schema."
+      variant="management"
     >
       {message ? <StateMessage title={message.text}><span role={message.tone === "danger" ? "alert" : "status"} /></StateMessage> : null}
       <TosEventParticipants event={event} participants={participants} />

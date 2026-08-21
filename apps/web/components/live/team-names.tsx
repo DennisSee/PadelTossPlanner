@@ -35,7 +35,6 @@ export function TeamNames({
               data-selected-player={selected ? "true" : undefined}
             >
               <span>{name}</span>
-              {selected ? <span className={styles.youLabel}> · jij</span> : null}
             </span>
           </span>
         );

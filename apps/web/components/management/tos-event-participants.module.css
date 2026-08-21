@@ -11,12 +11,33 @@
   padding: clamp(1rem, 3vw, 1.5rem);
 }
 
+.eventCard {
+  position: relative;
+  overflow: hidden;
+  border: 0;
+  color: var(--surface);
+  background:
+    linear-gradient(132deg, var(--club-green-dark) 0 84%, var(--club-yellow) 84%);
+}
+
 .eventCard h2,
 .groupCard h2,
 .previewCard h2,
 .errorCard h2 {
   margin: 0;
   color: var(--club-green-dark);
+  font-family: var(--font-display);
+  font-size: clamp(1.55rem, 3vw, 2rem);
+  letter-spacing: 0.025em;
+  text-transform: uppercase;
+}
+
+.eventCard h2,
+.eventCard .eventTime,
+.eventCard .deadline {
+  position: relative;
+  z-index: 1;
+  color: var(--surface);
 }
 
 .badges,
@@ -30,6 +51,7 @@
 
 .eventCard h2 {
   margin-top: var(--space-3);
+  font-size: clamp(2rem, 4vw, 3rem);
 }
 
 .eventTime {
@@ -47,7 +69,15 @@
 }
 
 .actions {
+  position: relative;
+  z-index: 1;
   margin-top: var(--space-4);
+}
+
+.eventCard .actions a {
+  border-color: var(--surface);
+  color: var(--club-green-dark);
+  background: var(--surface);
 }
 
 .summary {
@@ -59,6 +89,7 @@
 .metric {
   min-width: 0;
   padding: var(--space-3);
+  border-top: 0.22rem solid var(--club-yellow);
 }
 
 .metric strong,
@@ -68,7 +99,8 @@
 
 .metric strong {
   color: var(--club-green-dark);
-  font-size: 1.45rem;
+  font-family: var(--font-display);
+  font-size: 2rem;
 }
 
 .metric span {
@@ -99,8 +131,8 @@
   min-width: 0;
   padding: var(--space-3);
   border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--surface-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
 }
 
 .participantHeading {
@@ -111,6 +143,11 @@
 .previewList strong,
 .previewList span {
   overflow-wrap: anywhere;
+}
+
+.participantHeading strong {
+  color: var(--club-green-dark);
+  font-size: 1.02rem;
 }
 
 .participantDetails {

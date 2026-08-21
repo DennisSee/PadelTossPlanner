@@ -22,38 +22,55 @@ export function navigationModelFromAccount(
   });
 }
 
-function NavigationLinks({ model }: { model: NavigationModel }) {
+function NavigationLink({ href, children, primary = false, currentPath }: { href: string; children: string; primary?: boolean; currentPath: string }) {
+  const route = href.split("?", 1)[0] ?? href;
+  const active = route === "/" ? currentPath === "/" : currentPath === route || currentPath.startsWith(`${route}/`);
+  return (
+    <Link
+      className={`${primary ? styles.navPrimary : ""} ${active ? styles.navActive : ""}`.trim()}
+      href={href}
+      aria-current={active ? "page" : undefined}
+    >
+      {children}
+    </Link>
+  );
+}
+
+function NavigationLinks({ model, currentPath }: { model: NavigationModel; currentPath: string }) {
   if (!model.authenticated) {
     return (
       <>
-        <Link href="/">Home</Link>
-        <Link href="/live">Live TOS-schema</Link>
-        <Link className={styles.navPrimary} href="/login?next=%2Ftos">
+        <NavigationLink href="/" currentPath={currentPath}>Home</NavigationLink>
+        <NavigationLink href="/live" currentPath={currentPath}>Live TOS-schema</NavigationLink>
+        <NavigationLink primary href="/login?next=%2Ftos" currentPath={currentPath}>
           Inloggen / aanmelden
-        </Link>
+        </NavigationLink>
       </>
     );
   }
   return (
     <>
-      <Link href="/live">Live TOS-schema</Link>
-      <Link href="/tos">TOS-avonden</Link>
-      <Link href="/account">Mijn account</Link>
-      {model.canPlan ? <Link href="/beheer">Beheer</Link> : null}
+      <NavigationLink href="/live" currentPath={currentPath}>Live TOS-schema</NavigationLink>
+      <NavigationLink href="/tos" currentPath={currentPath}>TOS-avonden</NavigationLink>
+      <NavigationLink href="/account" currentPath={currentPath}>Mijn account</NavigationLink>
+      {model.canPlan ? <NavigationLink href="/beheer" currentPath={currentPath}>Beheer</NavigationLink> : null}
     </>
   );
 }
 
-export function SiteNavigation({ model }: { model: NavigationModel }) {
+export function SiteNavigation({ model, currentPath = "" }: { model: NavigationModel; currentPath?: string }) {
   return (
     <nav className={styles.navigation} aria-label="Hoofdnavigatie">
       <div className={styles.desktopNavigation}>
-        <NavigationLinks model={model} />
+        <NavigationLinks model={model} currentPath={currentPath} />
       </div>
       <details className={styles.mobileNavigation}>
-        <summary>Menu</summary>
+        <summary aria-label="Menu openen">
+          <span className={styles.menuLabel}>Menu</span>
+          <span className={styles.menuIcon} aria-hidden="true"><span /><span /><span /></span>
+        </summary>
         <div className={styles.mobileNavigationLinks}>
-          <NavigationLinks model={model} />
+          <NavigationLinks model={model} currentPath={currentPath} />
         </div>
       </details>
     </nav>

@@ -49,6 +49,7 @@ export default async function TosPage({ searchParams }: { searchParams: SearchPa
         account={account}
         title="TOS-avonden"
         intro="Bekijk je clubstatus en meld je daarna eenvoudig aan."
+        variant="tos"
       >
         <div className={styles.stack}>
           {message ? (
@@ -79,6 +80,7 @@ export default async function TosPage({ searchParams }: { searchParams: SearchPa
         account={account}
         title="TOS-avonden"
         intro="Bekijk en wijzig hier je eigen TOS-aanmeldingen."
+        variant="tos"
       >
         <StateMessage title="TOS-avonden tijdelijk niet beschikbaar">
           <p>Probeer het later opnieuw.</p>
@@ -92,6 +94,7 @@ export default async function TosPage({ searchParams }: { searchParams: SearchPa
       account={account}
       title="TOS-avonden"
       intro={`Hoi ${account.membership.displayName ?? account.profile?.displayName ?? "clublid"}. Bekijk en wijzig hier je TOS-aanmeldingen.`}
+      variant="tos"
     >
       <div className={styles.stack}>
         {message ? (

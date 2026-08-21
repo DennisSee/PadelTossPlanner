@@ -26,7 +26,7 @@
 }
 
 .layout {
-  grid-template-columns: minmax(17rem, 0.85fr) minmax(0, 1.55fr);
+  grid-template-columns: minmax(17rem, 0.72fr) minmax(0, 1.7fr);
   align-items: start;
 }
 
@@ -36,11 +36,29 @@
   padding: clamp(1rem, 3vw, 1.4rem);
 }
 
+.formCard {
+  position: sticky;
+  top: var(--space-4);
+  border-top: 0.25rem solid var(--club-yellow);
+}
+
 .formCard h2,
 .eventCard h3,
 .sectionHeader h2 {
   margin: 0;
   color: var(--club-green-dark);
+  font-family: var(--font-display);
+  letter-spacing: 0.025em;
+  text-transform: uppercase;
+}
+
+.formCard h2,
+.sectionHeader h2 {
+  font-size: clamp(1.65rem, 3vw, 2.1rem);
+}
+
+.eventCard h3 {
+  font-size: 1.55rem;
 }
 
 .form,
@@ -73,7 +91,7 @@
   min-height: 3rem;
   padding: 0.7rem 0.8rem;
   border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   color: var(--text);
   background: var(--surface);
   font: inherit;
@@ -106,16 +124,20 @@
 .secondaryButton {
   min-height: 3rem;
   padding: 0.75rem 1rem;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   cursor: pointer;
   font: inherit;
   font-weight: 800;
 }
 
 .primaryButton {
-  border: 2px solid var(--club-green);
-  color: var(--surface);
-  background: var(--club-green);
+  border: 2px solid var(--club-yellow);
+  color: var(--club-green-ink);
+  background: var(--club-yellow);
+  font-family: var(--font-display);
+  font-size: 1rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
 }
 
 .secondaryButton {
@@ -135,11 +157,44 @@
 }
 
 .eventGrid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
 }
 
 .eventCard {
   align-content: start;
+  padding: 0;
+  overflow: hidden;
+}
+
+.eventSummary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  border-bottom: 1px solid var(--border);
+}
+
+.eventMain {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-2);
+  padding: var(--space-4);
+}
+
+.eventCard > .form {
+  display: grid;
+  grid-template-columns: minmax(10rem, 1fr) minmax(12rem, 1.1fr) minmax(10rem, 0.8fr) auto;
+  align-items: end;
+  margin-top: 0;
+  padding: var(--space-4);
+  background: var(--surface-subtle);
+}
+
+.eventCard > .form .immutableNote {
+  grid-column: 1 / -1;
+  order: 2;
+}
+
+.eventCard > .form .secondaryButton {
+  white-space: nowrap;
 }
 
 .badges {
@@ -191,11 +246,27 @@
   .layout {
     grid-template-columns: 1fr;
   }
+
+  .formCard {
+    position: static;
+  }
+
+  .eventCard > .form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 46rem) {
   .eventGrid,
   .twoColumns {
+    grid-template-columns: 1fr;
+  }
+
+  .eventSummary {
+    grid-template-columns: 4rem minmax(0, 1fr);
+  }
+
+  .eventCard > .form {
     grid-template-columns: 1fr;
   }
 

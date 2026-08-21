@@ -31,7 +31,7 @@ async function signIn(page: Page, request: APIRequestContext, email: string) {
 
 async function openNavigationIfCollapsed(page: Page) {
   if ((page.viewportSize()?.width ?? 0) <= 832) {
-    await page.getByText("Menu", { exact: true }).click();
+    await page.locator('summary[aria-label="Menu openen"]').click();
   }
 }
 
@@ -46,7 +46,7 @@ test("participant doorloopt OTP, persistente sessie, guard en logout", async ({ 
   await page.goto("/");
   await page
     .getByRole("heading", { name: "Doe mee met de volgende TOS" })
-    .locator("..")
+    .locator("xpath=ancestor::section[1]")
     .getByRole("link", { name: "Inloggen / aanmelden" })
     .click();
   await expect(page).toHaveURL(/\/login\?next=%2Ftos$/u);

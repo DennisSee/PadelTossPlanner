@@ -4,6 +4,7 @@ import type { AccountContext, MembershipState } from "../../lib/auth/account-con
 import {
   AppHeader,
   Badge,
+  CourtLines,
   navigationModelFromAccount,
   SiteNavigation,
 } from "../ui";
@@ -26,11 +27,15 @@ export function AccountShell({
   account,
   title,
   intro,
+  variant = "account",
+  currentPath,
   children,
 }: {
   account: AccountContext;
   title: string;
   intro: string;
+  variant?: "account" | "tos" | "management";
+  currentPath?: string;
   children: ReactNode;
 }) {
   return (
@@ -38,10 +43,11 @@ export function AccountShell({
       <div className={styles.shell}>
         <div className={styles.topbar}>
           <AppHeader subtitle={title} />
-          <SiteNavigation model={navigationModelFromAccount(account)} />
+          <SiteNavigation model={navigationModelFromAccount(account)} currentPath={currentPath ?? (variant === "management" ? "/beheer" : variant === "tos" ? "/tos" : "/account")} />
         </div>
-        <header className={styles.pageHeader}>
-          <div>
+        <header className={`${styles.pageHeader} ${styles[`pageHeader${variant[0].toUpperCase()}${variant.slice(1)}`]}`}>
+          <CourtLines className={styles.headerLines} />
+          <div className={styles.headerCopy}>
             <h1>{title}</h1>
             <p>{intro}</p>
           </div>
@@ -65,4 +71,12 @@ export function LogoutForm() {
       <button className={styles.logoutButton} type="submit">Uitloggen</button>
     </form>
   );
+}
+
+export function displayInitials(displayName: string | null | undefined): string {
+  const parts = (displayName ?? "").trim().split(/\s+/u).filter(Boolean);
+  if (parts.length === 0) return "TC";
+  const first = Array.from(parts[0] ?? "")[0] ?? "T";
+  const last = parts.length > 1 ? Array.from(parts.at(-1) ?? "")[0] ?? "" : "";
+  return `${first}${last}`.toLocaleUpperCase("nl-NL");
 }

@@ -15,6 +15,14 @@
   color: var(--club-green-dark);
 }
 
+.sectionHeader h2,
+.formTitle {
+  font-family: var(--font-display);
+  font-size: clamp(1.55rem, 3vw, 2rem);
+  letter-spacing: 0.025em;
+  text-transform: uppercase;
+}
+
 .sectionHeader p,
 .muted,
 .metadata,
@@ -42,27 +50,44 @@
   padding: clamp(1rem, 3vw, 1.45rem);
 }
 
+.formCard,
+.membershipCard,
+.attendeeCard {
+  border-top: 0.22rem solid var(--club-green);
+}
+
 .eventCard {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  border-top: 0.25rem solid var(--border);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0;
+  overflow: hidden;
+  padding: 0;
+  border-top: 0;
+  border-left: 0.25rem solid var(--border);
 }
 
 .eventCardOpen {
-  border-top-color: var(--club-yellow);
+  border-left-color: var(--club-yellow);
 }
 
 .eventCardRegistered {
-  border-top-color: var(--club-green);
+  border-left-color: var(--club-green);
 }
 
 .eventCardClosed {
-  border-top-color: var(--text-muted);
+  border-left-color: var(--text-muted);
 }
 
 .eventCardCancelled {
-  border-top-color: var(--danger);
+  border-left-color: var(--danger);
+}
+
+.eventBody {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
 }
 
 .badges,
@@ -77,7 +102,9 @@
 
 .eventTitle {
   overflow-wrap: anywhere;
-  font-size: clamp(1.1rem, 3vw, 1.3rem);
+  font-family: var(--font-display);
+  font-size: clamp(1.4rem, 3vw, 1.85rem);
+  letter-spacing: 0.015em;
 }
 
 .metadata {
@@ -95,8 +122,12 @@
 }
 
 .personalStatus {
-  margin: 0;
+  width: fit-content;
+  margin: var(--space-1) 0 0;
+  padding: 0.35rem 0.55rem;
+  border-left: 0.22rem solid var(--club-green);
   color: var(--club-green-dark);
+  background: var(--success-soft);
   font-weight: 800;
 }
 
@@ -142,7 +173,7 @@
   min-height: 3rem;
   padding: 0.7rem 0.8rem;
   border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   color: var(--text);
   background: var(--surface);
   font: inherit;
@@ -166,7 +197,7 @@
   gap: 0.55rem;
   padding: 0.65rem 0.8rem;
   border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   background: var(--surface-subtle);
   cursor: pointer;
   font-weight: 750;
@@ -182,7 +213,7 @@
   min-height: 3rem;
   padding: 0.75rem 1.15rem;
   border: 2px solid var(--club-green);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   color: var(--surface);
   background: var(--club-green);
   cursor: pointer;
@@ -197,12 +228,17 @@
 
 .publicPage {
   min-height: 100vh;
-  padding: clamp(0.7rem, 2.2vw, 1.5rem);
+  padding: var(--page-pad);
 }
 
 .publicShell {
-  width: min(100%, 72rem);
+  width: min(100%, var(--page-medium));
   margin: 0 auto;
+  padding: clamp(0.65rem, 1.7vw, 1.2rem);
+  border: 1px solid rgb(255 255 255 / 75%);
+  border-radius: var(--radius-lg);
+  background: rgb(255 253 248 / 82%);
+  box-shadow: var(--shadow-md);
 }
 
 .publicTopbar {
@@ -223,9 +259,32 @@
 }
 
 .eventHero {
+  position: relative;
   display: grid;
   gap: var(--space-3);
+  overflow: hidden;
   padding: clamp(1rem, 4vw, 1.75rem);
+  border: 0;
+  color: var(--surface);
+  background:
+    linear-gradient(130deg, var(--club-green-dark) 0 82%, var(--club-yellow) 82%);
+}
+
+.eventHero .eventTitle,
+.eventHero .metadata,
+.eventHero .deadline {
+  position: relative;
+  z-index: 1;
+  color: var(--surface);
+}
+
+.eventHero .eventTitle {
+  font-size: clamp(2rem, 5vw, 3rem);
+  text-transform: uppercase;
+}
+
+.eventHero .deadline {
+  color: #eee7d9;
 }
 
 .attendeeNames {
@@ -243,6 +302,10 @@
 
   .publicTopbar {
     align-items: flex-start;
+  }
+
+  .eventCard {
+    grid-template-columns: 4rem minmax(0, 1fr);
   }
 }
 

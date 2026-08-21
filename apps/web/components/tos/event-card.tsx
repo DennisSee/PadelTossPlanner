@@ -6,7 +6,7 @@ import {
   formatEventClock,
   formatEventDate,
 } from "../../lib/tos/time";
-import { Badge, Card, LinkButton, SecondaryLinkButton } from "../ui";
+import { Badge, Card, EventDateRail, LinkButton, SecondaryLinkButton } from "../ui";
 
 import styles from "./tos.module.css";
 
@@ -45,47 +45,50 @@ export function TosEventCard({
     : null;
   return (
     <Card className={`${styles.eventCard} ${cardClass(event, registration)}`}>
-      <div className={styles.badges}>
-        <Badge tone="neutral">{event.sport.toUpperCase()}</Badge>
-        <Badge tone={statusTone(event, now)}>{status}</Badge>
-        {registration ? (
-          <Badge tone={registration.response === "attending" ? "success" : "neutral"}>
-            {registration.response === "attending" ? "✓ Aangemeld" : "Afgemeld"}
-          </Badge>
+      <EventDateRail startsAt={event.startsAt} accent={registration ? "green" : "yellow"} />
+      <div className={styles.eventBody}>
+        <div className={styles.badges}>
+          <Badge tone="neutral">{event.sport.toUpperCase()}</Badge>
+          <Badge tone={statusTone(event, now)}>{status}</Badge>
+          {registration ? (
+            <Badge tone={registration.response === "attending" ? "success" : "neutral"}>
+              {registration.response === "attending" ? "✓ Aangemeld" : "Afgemeld"}
+            </Badge>
+          ) : null}
+        </div>
+        <h3 className={styles.eventTitle}>{event.title}</h3>
+        <p className={styles.metadata}>
+          {formatEventDate(event.startsAt)} · {formatEventClock(event.startsAt)}–{formatEventClock(event.endsAt)}
+        </p>
+        {availability ? <p className={styles.personalStatus}>Je doet mee · {availability}</p> : null}
+        {event.signupDeadline ? (
+          <p className={styles.deadline}>
+            Inschrijven t/m {formatEventDate(event.signupDeadline)} · {formatEventClock(event.signupDeadline)}
+          </p>
         ) : null}
-      </div>
-      <h3 className={styles.eventTitle}>{event.title}</h3>
-      <p className={styles.metadata}>
-        {formatEventDate(event.startsAt)} · {formatEventClock(event.startsAt)}–{formatEventClock(event.endsAt)}
-      </p>
-      {availability ? <p className={styles.personalStatus}>Je doet mee · {availability}</p> : null}
-      {event.signupDeadline ? (
-        <p className={styles.deadline}>
-          Inschrijven t/m {formatEventDate(event.signupDeadline)} · {formatEventClock(event.signupDeadline)}
-        </p>
-      ) : null}
-      {attendeeNames ? (
-        <p className={styles.attendeePreview}>
-          {attendeeNames.length} {attendeeNames.length === 1 ? "deelnemer" : "deelnemers"}
-          {attendeeNames.length ? ` · ${attendeeNamesPreview(attendeeNames)}` : ""}
-        </p>
-      ) : null}
-      {attendeeNamesUnavailable ? (
-        <p className={styles.attendeePreview}>De deelnemerslijst is tijdelijk niet beschikbaar.</p>
-      ) : null}
-      <div className={styles.actions}>
-        {registration && !canChange ? (
-          <>
-            <SecondaryLinkButton href={`/tos/${event.slug}`}>
-              Aanmelding bekijken
-            </SecondaryLinkButton>
-            <p className={styles.muted}>Deze aanmelding kan niet meer worden gewijzigd.</p>
-          </>
-        ) : (
-          <LinkButton href={`/tos/${event.slug}`}>
-            {registration ? "Aanmelding wijzigen" : "Aanmelden"}
-          </LinkButton>
-        )}
+        {attendeeNames ? (
+          <p className={styles.attendeePreview}>
+            {attendeeNames.length} {attendeeNames.length === 1 ? "deelnemer" : "deelnemers"}
+            {attendeeNames.length ? ` · ${attendeeNamesPreview(attendeeNames)}` : ""}
+          </p>
+        ) : null}
+        {attendeeNamesUnavailable ? (
+          <p className={styles.attendeePreview}>De deelnemerslijst is tijdelijk niet beschikbaar.</p>
+        ) : null}
+        <div className={styles.actions}>
+          {registration && !canChange ? (
+            <>
+              <SecondaryLinkButton href={`/tos/${event.slug}`}>
+                Aanmelding bekijken
+              </SecondaryLinkButton>
+              <p className={styles.muted}>Deze aanmelding kan niet meer worden gewijzigd.</p>
+            </>
+          ) : (
+            <LinkButton href={`/tos/${event.slug}`}>
+              {registration ? "Aanmelding wijzigen" : "Aanmelden"}
+            </LinkButton>
+          )}
+        </div>
       </div>
     </Card>
   );

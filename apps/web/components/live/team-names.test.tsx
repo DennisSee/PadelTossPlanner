@@ -13,7 +13,7 @@ describe("TeamNames", () => {
       "data-selected-player",
       "true",
     );
-    expect(screen.getByText("jij", { exact: false })).toBeInTheDocument();
+    expect(screen.queryByText("jij", { exact: false })).not.toBeInTheDocument();
   });
 
   it("does not use substring matching and leaves everyone neutral", () => {

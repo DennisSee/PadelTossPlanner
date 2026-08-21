@@ -62,7 +62,8 @@ describe("live schedule UI", () => {
   it("shows event metadata, participants and current/next rounds", () => {
     render(<LiveSchedule schedule={schedule()} initialNowIso="2026-08-21T18:05:00.000Z" />);
     expect(screen.getAllByText("T.C. Zuid TOS")).toHaveLength(1);
-    expect(screen.getByRole("heading", { name: "vrijdag 21 augustus 2026" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Live TOS-schema" })).toBeInTheDocument();
+    expect(screen.getByText("vrijdag 21 augustus 2026", { exact: true })).toBeInTheDocument();
     expect(screen.getByText("20:00–20:40")).toBeInTheDocument();
     expect(screen.getByText("2 banen")).toBeInTheDocument();
     expect(screen.getByText("Deelnemers (2)")).toBeInTheDocument();
@@ -151,7 +152,8 @@ describe("live schedule UI", () => {
   it("uses a logical h1, h2 and round h3 heading structure", async () => {
     const user = userEvent.setup();
     render(<LiveSchedule schedule={schedule()} initialNowIso="2026-08-21T17:55:00.000Z" />);
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("vrijdag 21 augustus 2026");
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Live TOS-schema");
+    expect(screen.getByText("vrijdag 21 augustus 2026", { exact: true })).toBeVisible();
     expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("Wedstrijdschema");
     expect(screen.getAllByRole("heading", { level: 3 }).length).toBeGreaterThan(0);
     await user.selectOptions(screen.getByLabelText("Kies je naam"), "Zoë");
@@ -198,7 +200,7 @@ describe("live schedule UI", () => {
     });
     render(<LiveSchedule schedule={schedule()} initialNowIso="2026-08-21T17:55:00.000Z" />);
     expect(screen.getByLabelText("Kies je naam")).toHaveValue("Iedereen");
-    expect(screen.getByRole("heading", { name: "vrijdag 21 augustus 2026" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Live TOS-schema" })).toBeInTheDocument();
   });
 
   it("keeps the select usable when localStorage writes throw", async () => {

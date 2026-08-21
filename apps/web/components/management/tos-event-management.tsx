@@ -1,4 +1,4 @@
-import { Badge, Card, SecondaryLinkButton } from "../ui";
+import { Badge, Card, EventDateRail, SecondaryLinkButton } from "../ui";
 import { createEventDefaults } from "../../lib/tos/staff-management";
 import { tosDetailPath } from "../../lib/tos/slug";
 import {
@@ -83,27 +83,32 @@ function EventCard({ event }: { event: TosEvent }) {
     : "Deze status is niet publiek zichtbaar; staff kan de eventpagina wel bekijken.";
   return (
     <Card className={styles.eventCard}>
-      <div className={styles.badges}>
-        <Badge tone="neutral">{event.sport.toUpperCase()}</Badge>
-        <Badge tone={statusTone(event.status)}>{STATUS_LABELS[event.status]}</Badge>
-      </div>
-      <h3>{event.title}</h3>
-      <p className={styles.dateTime}>
-        {formatEventDate(event.startsAt)} · {formatEventClock(event.startsAt)}–{formatEventClock(event.endsAt)}
-      </p>
-      <dl className={styles.details}>
-        <dt>Deadline</dt>
-        <dd>{event.signupDeadline ? `${formatEventDate(event.signupDeadline)} · ${formatEventClock(event.signupDeadline)}` : "Geen deadline"}</dd>
-        <dt>Eventlink</dt>
-        <dd><code>{tosDetailPath(event.slug)}</code></dd>
-      </dl>
-      <p className={styles.publicNote}>{publicNote}</p>
-      {presentation !== STATUS_LABELS[event.status] ? (
-        <p className={styles.presentationNote}>{presentation}</p>
-      ) : null}
-      <div className={styles.eventActions}>
-        <SecondaryLinkButton href={`/beheer/tos/${event.slug}`}>Deelnemers bekijken</SecondaryLinkButton>
-        <SecondaryLinkButton href={tosDetailPath(event.slug)}>Eventpagina bekijken</SecondaryLinkButton>
+      <div className={styles.eventSummary}>
+        <EventDateRail startsAt={event.startsAt} accent={event.status === "draft" ? "yellow" : "green"} />
+        <div className={styles.eventMain}>
+          <div className={styles.badges}>
+            <Badge tone="neutral">{event.sport.toUpperCase()}</Badge>
+            <Badge tone={statusTone(event.status)}>{STATUS_LABELS[event.status]}</Badge>
+          </div>
+          <h3>{event.title}</h3>
+          <p className={styles.dateTime}>
+            {formatEventDate(event.startsAt)} · {formatEventClock(event.startsAt)}–{formatEventClock(event.endsAt)}
+          </p>
+          <dl className={styles.details}>
+            <dt>Deadline</dt>
+            <dd>{event.signupDeadline ? `${formatEventDate(event.signupDeadline)} · ${formatEventClock(event.signupDeadline)}` : "Geen deadline"}</dd>
+            <dt>Eventlink</dt>
+            <dd><code>{tosDetailPath(event.slug)}</code></dd>
+          </dl>
+          <p className={styles.publicNote}>{publicNote}</p>
+          {presentation !== STATUS_LABELS[event.status] ? (
+            <p className={styles.presentationNote}>{presentation}</p>
+          ) : null}
+          <div className={styles.eventActions}>
+            <SecondaryLinkButton href={`/beheer/tos/${event.slug}`}>Deelnemers bekijken</SecondaryLinkButton>
+            <SecondaryLinkButton href={tosDetailPath(event.slug)}>Eventpagina bekijken</SecondaryLinkButton>
+          </div>
+        </div>
       </div>
       <form className={styles.form} action="/api/beheer/tos/update" method="post">
         <input type="hidden" name="slug" value={event.slug} />

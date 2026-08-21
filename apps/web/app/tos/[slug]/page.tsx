@@ -192,7 +192,7 @@ export default async function TosDetailPage({ params, searchParams }: PageProps)
 
   if (account) {
     return (
-      <AccountShell account={account} title="TOS-avond" intro="Bekijk de avond en beheer je eigen aanmelding.">
+      <AccountShell account={account} title="TOS-avond" intro="Bekijk de avond en beheer je eigen aanmelding." variant="tos">
         {content}
       </AccountShell>
     );
@@ -202,7 +202,7 @@ export default async function TosDetailPage({ params, searchParams }: PageProps)
       <div className={styles.publicShell}>
         <div className={styles.publicTopbar}>
           <AppHeader subtitle="TOS-avond" />
-          <SiteNavigation model={navigationModelFromAccount(null)} />
+          <SiteNavigation model={navigationModelFromAccount(null)} currentPath="/tos" />
         </div>
         <div className={styles.publicContent}>{content}</div>
       </div>

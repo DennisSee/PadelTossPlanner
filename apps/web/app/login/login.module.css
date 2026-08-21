@@ -1,52 +1,107 @@
 .page {
   min-height: 100vh;
-  padding: clamp(0.7rem, 2.2vw, 1.5rem);
+  padding: var(--page-pad);
 }
 
 .shell {
-  width: min(100%, 72rem);
+  width: min(100%, var(--page-medium));
   margin: 0 auto;
+  padding: clamp(0.65rem, 1.7vw, 1.2rem);
+  border: 1px solid rgb(255 255 255 / 75%);
+  border-radius: var(--radius-lg);
+  background: rgb(255 253 248 / 82%);
+  box-shadow: var(--shadow-md);
 }
 
 .topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 3.5rem;
-  padding-bottom: var(--space-3);
+  min-height: 4rem;
+  padding: 0 var(--space-2) var(--space-3);
   border-bottom: 1px solid var(--border);
 }
 
 .backLink {
   padding: 0.5rem;
   color: var(--club-green);
-  font-weight: 700;
+  font-weight: 800;
   text-decoration: none;
 }
 
 .card {
-  width: min(100%, 30rem);
-  margin: clamp(1.5rem, 7vw, 4.5rem) auto 0;
-  padding: clamp(1.25rem, 4vw, 2rem);
-  border-top: 0.3rem solid var(--club-yellow);
+  width: min(100%, 34rem);
+  margin: clamp(1rem, 5vw, 3rem) auto 0;
+  overflow: hidden;
+  padding: 0;
+}
+
+.loginIntro {
+  position: relative;
+  min-height: 13rem;
+  overflow: hidden;
+  padding: clamp(1.3rem, 4vw, 2.1rem);
+  color: var(--surface);
+  background:
+    linear-gradient(135deg, var(--club-green-dark) 0 78%, transparent 78%),
+    var(--club-yellow);
+  isolation: isolate;
+}
+
+.loginLines {
+  z-index: -1;
+  left: 56%;
+}
+
+.loginIntroCopy {
+  position: relative;
+  z-index: 1;
+  max-width: 25rem;
+}
+
+.eyebrow {
+  margin: 0 0 var(--space-3);
+  color: var(--club-yellow);
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .title {
   margin: 0;
-  color: var(--club-green-dark);
-  font-size: clamp(1.55rem, 5vw, 2rem);
-  line-height: 1.15;
+  color: var(--surface);
+  font-family: var(--font-display);
+  font-size: clamp(2.6rem, 8vw, 4.15rem);
+  line-height: 0.9;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
 
 .intro {
-  margin: var(--space-2) 0 var(--space-5);
-  color: var(--text-muted);
+  margin: var(--space-3) 0 0;
+  color: #f2ece0;
   line-height: 1.55;
 }
 
+.formBody {
+  padding: clamp(1.25rem, 4vw, 2rem);
+}
+
 .unavailable {
+  margin: 0;
   padding: var(--space-4);
   border-radius: var(--radius-sm);
   color: var(--danger);
   background: var(--danger-soft);
+}
+
+@media (max-width: 32rem) {
+  .shell {
+    padding: 0.65rem;
+  }
+
+  .loginIntro {
+    min-height: 12rem;
+  }
 }

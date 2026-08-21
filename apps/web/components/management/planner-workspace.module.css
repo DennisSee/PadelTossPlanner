@@ -1,33 +1,33 @@
-.stack { display: grid; gap: var(--space-4); }
-.card { min-width: 0; padding: clamp(1rem, 3vw, 1.5rem); }
-.card h2 { margin: 0; color: var(--club-green-dark); }
+.stack { display: grid; gap: var(--space-4); margin-top: var(--space-5); }
+.card { min-width: 0; padding: clamp(1rem, 3vw, 1.5rem); border-radius: var(--radius-sm); }
+.card h2 { margin: 0; color: var(--club-green-dark); font-family: var(--font-display); font-size: clamp(1.55rem, 3vw, 2rem); letter-spacing: .025em; text-transform: uppercase; }
 .card p { margin: var(--space-2) 0 0; }
 .headingRow { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--space-3); }
 .muted, .headingRow p { color: var(--text-muted); }
 .unsaved { color: #8a5a00; font-weight: 750; }
 .reload { color: var(--club-green-dark); font-weight: 750; }
 .previewList, .playerList { display: grid; gap: var(--space-3); margin: var(--space-4) 0; padding: 0; list-style: none; }
-.previewList li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-2); padding: var(--space-2) var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-md); }
+.previewList li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-2); padding: var(--space-2) var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-sm); }
 .previewList span { color: var(--text-muted); }
-.playerRow { display: grid; grid-template-columns: minmax(8rem, .7fr) minmax(12rem, 1.5fr) repeat(3, minmax(7rem, .7fr)) auto; gap: var(--space-3); align-items: end; padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-md); }
+.playerRow { display: grid; grid-template-columns: minmax(8rem, .7fr) minmax(12rem, 1.5fr) repeat(3, minmax(7rem, .7fr)) auto; gap: var(--space-3); align-items: end; padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-subtle); }
 .playerRow legend { padding: 0 var(--space-1); color: var(--text-muted); font-size: .8rem; font-weight: 700; }
 .playerRow label, .settings label { display: grid; gap: var(--space-1); font-size: .86rem; font-weight: 700; }
-.playerRow input:not([type="checkbox"]), .settings input:not([type="checkbox"]), .settings select { width: 100%; min-height: 2.75rem; padding: .65rem .75rem; border: 1px solid var(--border); border-radius: var(--radius-md); background: white; color: var(--text); }
+.playerRow input:not([type="checkbox"]), .settings input:not([type="checkbox"]), .settings select { width: 100%; min-height: 2.75rem; padding: .65rem .75rem; border: 1px solid var(--border); border-radius: var(--radius-sm); background: white; color: var(--text); }
 .courts, .settings { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); margin-top: var(--space-4); }
 .courts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .checkbox { display: flex !important; grid-template-columns: none !important; align-items: center; gap: var(--space-2); min-height: 2.75rem; }
 .checkbox input { width: 1.1rem; height: 1.1rem; }
-.primaryButton, .secondaryButton, .removeButton { min-height: 2.75rem; padding: .65rem 1rem; border-radius: var(--radius-md); font-weight: 800; cursor: pointer; }
+.primaryButton, .secondaryButton, .removeButton { min-height: 2.75rem; padding: .65rem 1rem; border-radius: var(--radius-sm); font-weight: 800; cursor: pointer; }
 .primaryButton { margin-top: var(--space-4); border: 1px solid var(--club-green); background: var(--club-green); color: white; }
 .secondaryButton { border: 1px solid var(--club-green); background: white; color: var(--club-green-dark); }
 .removeButton { border: 1px solid #c95b50; background: white; color: #8a2f27; }
 .generation { margin-top: var(--space-4); }
 .scheduleRows { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); margin: var(--space-3) 0; }
-.scheduleRows > div { display: grid; gap: var(--space-1); padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-md); }
+.scheduleRows > div { position: relative; display: grid; gap: var(--space-1); overflow: hidden; padding: var(--space-3); border: 1px solid var(--border); border-left: .3rem solid var(--club-green); border-radius: var(--radius-sm); background: var(--surface); }
 .scheduleRows span, .scheduleRows small { overflow-wrap: anywhere; }
 .generation pre { max-height: 22rem; overflow: auto; padding: var(--space-3); background: var(--surface-subtle); }
 .savedSchedules { display: grid; gap: var(--space-3); margin: var(--space-4) 0 0; padding: 0; list-style: none; }
-.savedSchedules li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-md); }
+.savedSchedules li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-3); border: 1px solid var(--border); border-left: .3rem solid var(--club-yellow); border-radius: var(--radius-sm); }
 .savedSchedules li > div { display: grid; gap: var(--space-1); }
 .savedSchedules span { color: var(--text-muted); }
 .savedSchedules a, .scheduleActions > a { color: var(--club-green-dark); font-weight: 750; }
