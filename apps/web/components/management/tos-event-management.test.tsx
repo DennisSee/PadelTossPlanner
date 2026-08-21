@@ -37,6 +37,8 @@ describe("TOS event management UI", () => {
     expect(screen.getByText("Geannuleerd", { selector: "span" })).toBeVisible();
     expect(screen.getAllByRole("link", { name: "Eventpagina bekijken" })[0])
       .toHaveAttribute("href", "/tos/padel-tos-20260828-a1b2c3d4");
+    expect(screen.getAllByRole("link", { name: "Deelnemers bekijken" })[0])
+      .toHaveAttribute("href", "/beheer/tos/padel-tos-20260828-a1b2c3d4");
     const update = container.querySelector<HTMLFormElement>('form[action="/api/beheer/tos/update"]')!;
     expect([...update.querySelectorAll("[name]")].map((node) => node.getAttribute("name"))).toEqual([
       "slug", "title", "signup_deadline", "status",
@@ -44,6 +46,6 @@ describe("TOS event management UI", () => {
     expect(within(update).queryByLabelText("Sport")).not.toBeInTheDocument();
     expect(within(update).queryByLabelText("Starttijd")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /verwijder|delete/u })).not.toBeInTheDocument();
-    expect(container.textContent).not.toMatch(/aanmeldingen|deelnemers|ranking/u);
+    expect(container.textContent).not.toMatch(/aanmeldingen|ranking/u);
   });
 });

@@ -38,3 +38,20 @@ export type RegistrationWrite = Readonly<{
   availableFrom: string | null;
   availableUntil: string | null;
 }>;
+
+export type MemberApprovalStatus = "pending" | "approved" | "rejected";
+
+export type StaffPlannerInput = Readonly<{
+  registrationId: string;
+  userId: string;
+  memberId: string;
+  response: RegistrationResponse;
+  availableFrom: string | null;
+  availableUntil: string | null;
+  registrationUpdatedAt: string;
+  displayName: string;
+  approvalStatus: MemberApprovalStatus;
+  memberActive: boolean;
+  sportProfileActive: boolean;
+  ranking: number | null;
+}>;

@@ -128,8 +128,166 @@ const tosEvents = [
     signup_deadline: relativeIso(180),
     status: "open",
   },
+  {
+    id: "5d100000-0000-4000-8000-000000000001",
+    slug: "web5b1-padel",
+    title: "WEB-5B1 Padelavond",
+    sport: "padel",
+    starts_at: "2099-08-21T18:00:00.000Z",
+    ends_at: "2099-08-21T20:00:00.000Z",
+    signup_deadline: "2099-08-21T17:00:00.000Z",
+    status: "closed",
+  },
+  {
+    id: "5d100000-0000-4000-8000-000000000002",
+    slug: "web5b1-tennis",
+    title: "WEB-5B1 Tennisavond",
+    sport: "tennis",
+    starts_at: "2099-08-22T18:00:00.000Z",
+    ends_at: "2099-08-22T20:00:00.000Z",
+    signup_deadline: null,
+    status: "closed",
+  },
 ];
 const initialTosEvents = tosEvents.map((event) => ({ ...event }));
+
+const staffPlannerInputFixtures = [
+  {
+    event_id: "5d100000-0000-4000-8000-000000000001",
+    registration_id: "5e100000-0000-4000-8000-000000000001",
+    user_id: "5b100000-0000-4000-8000-000000000001",
+    member_id: "5c100000-0000-4000-8000-000000000001",
+    response: "attending",
+    available_from: "2099-08-21T18:00:00.000Z",
+    available_until: "2099-08-21T20:00:00.000Z",
+    registration_updated_at: "2099-08-01T10:01:00.000Z",
+    display_name: "Ready Hele Avond",
+    approval_status: "approved",
+    member_active: true,
+    sport_profile_active: true,
+    ranking: 4,
+  },
+  {
+    event_id: "5d100000-0000-4000-8000-000000000001",
+    registration_id: "5e100000-0000-4000-8000-000000000002",
+    user_id: "5b100000-0000-4000-8000-000000000002",
+    member_id: "5c100000-0000-4000-8000-000000000002",
+    response: "attending",
+    available_from: "2099-08-21T18:07:00.000Z",
+    available_until: "2099-08-21T19:43:00.000Z",
+    registration_updated_at: "2099-08-01T10:02:00.000Z",
+    display_name: "Ready Partieel",
+    approval_status: "approved",
+    member_active: true,
+    sport_profile_active: true,
+    ranking: 3,
+  },
+  {
+    event_id: "5d100000-0000-4000-8000-000000000001",
+    registration_id: "5e100000-0000-4000-8000-000000000003",
+    user_id: "5b100000-0000-4000-8000-000000000003",
+    member_id: "5c100000-0000-4000-8000-000000000003",
+    response: "declined",
+    available_from: null,
+    available_until: null,
+    registration_updated_at: "2099-08-01T10:03:00.000Z",
+    display_name: "Afgemelde Speler",
+    approval_status: "approved",
+    member_active: true,
+    sport_profile_active: true,
+    ranking: 5,
+  },
+  {
+    event_id: "5d100000-0000-4000-8000-000000000001",
+    registration_id: "5e100000-0000-4000-8000-000000000004",
+    user_id: "5b100000-0000-4000-8000-000000000004",
+    member_id: "5c100000-0000-4000-8000-000000000004",
+    response: "attending",
+    available_from: "2099-08-21T18:00:00.000Z",
+    available_until: "2099-08-21T20:00:00.000Z",
+    registration_updated_at: "2099-08-01T10:04:00.000Z",
+    display_name: "Pending Speler",
+    approval_status: "pending",
+    member_active: true,
+    sport_profile_active: true,
+    ranking: 3,
+  },
+  {
+    event_id: "5d100000-0000-4000-8000-000000000001",
+    registration_id: "5e100000-0000-4000-8000-000000000005",
+    user_id: "5b100000-0000-4000-8000-000000000005",
+    member_id: "5c100000-0000-4000-8000-000000000005",
+    response: "attending",
+    available_from: "2099-08-21T18:00:00.000Z",
+    available_until: "2099-08-21T20:00:00.000Z",
+    registration_updated_at: "2099-08-01T10:05:00.000Z",
+    display_name: "Rejected Speler",
+    approval_status: "rejected",
+    member_active: true,
+    sport_profile_active: true,
+    ranking: 4,
+  },
+  {
+    event_id: "5d100000-0000-4000-8000-000000000001",
+    registration_id: "5e100000-0000-4000-8000-000000000006",
+    user_id: "5b100000-0000-4000-8000-000000000006",
+    member_id: "5c100000-0000-4000-8000-000000000006",
+    response: "attending",
+    available_from: "2099-08-21T18:00:00.000Z",
+    available_until: "2099-08-21T20:00:00.000Z",
+    registration_updated_at: "2099-08-01T10:06:00.000Z",
+    display_name: "Inactief Clublid",
+    approval_status: "approved",
+    member_active: false,
+    sport_profile_active: true,
+    ranking: 2,
+  },
+  {
+    event_id: "5d100000-0000-4000-8000-000000000001",
+    registration_id: "5e100000-0000-4000-8000-000000000007",
+    user_id: "5b100000-0000-4000-8000-000000000007",
+    member_id: "5c100000-0000-4000-8000-000000000007",
+    response: "attending",
+    available_from: "2099-08-21T18:00:00.000Z",
+    available_until: "2099-08-21T20:00:00.000Z",
+    registration_updated_at: "2099-08-01T10:07:00.000Z",
+    display_name: "Inactief Padelprofiel",
+    approval_status: "approved",
+    member_active: true,
+    sport_profile_active: false,
+    ranking: 2,
+  },
+  {
+    event_id: "5d100000-0000-4000-8000-000000000001",
+    registration_id: "5e100000-0000-4000-8000-000000000008",
+    user_id: "5b100000-0000-4000-8000-000000000008",
+    member_id: "5c100000-0000-4000-8000-000000000008",
+    response: "attending",
+    available_from: "2099-08-21T18:00:00.000Z",
+    available_until: "2099-08-21T20:00:00.000Z",
+    registration_updated_at: "2099-08-01T10:08:00.000Z",
+    display_name: "Niveau Ontbreekt",
+    approval_status: "approved",
+    member_active: true,
+    sport_profile_active: true,
+    ranking: null,
+  },
+  {
+    event_id: "5d100000-0000-4000-8000-000000000002",
+    registration_id: "5e100000-0000-4000-8000-000000000009",
+    user_id: "5b100000-0000-4000-8000-000000000001",
+    member_id: "5c100000-0000-4000-8000-000000000001",
+    response: "attending",
+    available_from: "2099-08-22T18:00:00.000Z",
+    available_until: "2099-08-22T20:00:00.000Z",
+    registration_updated_at: "2099-08-01T10:09:00.000Z",
+    display_name: "Ready Hele Avond",
+    approval_status: "approved",
+    member_active: true,
+    sport_profile_active: true,
+    ranking: 2,
+  },
+];
 
 const attendeeFixtures = [
   { display_name: "Dennis", response: "attending", active: true, approval: "approved" },
@@ -821,6 +979,32 @@ const server = createServer(async (request, response) => {
     const unique = [...new Set(names)].sort((left, right) =>
       left.localeCompare(right, "nl", { sensitivity: "base" }));
     json(response, 200, unique.map((display_name) => ({ display_name })));
+    return;
+  }
+  if (
+    request.method === "POST" &&
+    requestUrl.pathname === "/rest/v1/rpc/staff_event_planner_input"
+  ) {
+    const user = bearerUser(request);
+    const body = await requestJson(request);
+    if (!user) {
+      json(response, 401, { code: "PGRST301", message: "invalid JWT" });
+      return;
+    }
+    if (!exactKeys(body, ["p_event_id"])) {
+      rejectMockContract(response, "staff plannerinput-RPC bevat onverwachte velden");
+      return;
+    }
+    const eventId = String(body.p_event_id ?? "");
+    if (!validStaff(user) || !eventById(eventId)) {
+      json(response, 200, []);
+      return;
+    }
+    json(response, 200, staffPlannerInputFixtures
+      .filter(({ event_id }) => event_id === eventId)
+      .map((fixture) => Object.fromEntries(
+        Object.entries(fixture).filter(([key]) => key !== "event_id"),
+      )));
     return;
   }
   if (request.method === "GET" && requestUrl.pathname === "/rest/v1/tos_events") {

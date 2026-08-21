@@ -101,7 +101,10 @@ function EventCard({ event }: { event: TosEvent }) {
       {presentation !== STATUS_LABELS[event.status] ? (
         <p className={styles.presentationNote}>{presentation}</p>
       ) : null}
-      <SecondaryLinkButton href={tosDetailPath(event.slug)}>Eventpagina bekijken</SecondaryLinkButton>
+      <div className={styles.eventActions}>
+        <SecondaryLinkButton href={`/beheer/tos/${event.slug}`}>Deelnemers bekijken</SecondaryLinkButton>
+        <SecondaryLinkButton href={tosDetailPath(event.slug)}>Eventpagina bekijken</SecondaryLinkButton>
+      </div>
       <form className={styles.form} action="/api/beheer/tos/update" method="post">
         <input type="hidden" name="slug" value={event.slug} />
         <label className={styles.field}>

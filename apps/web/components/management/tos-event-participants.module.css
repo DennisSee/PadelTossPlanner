@@ -1,0 +1,182 @@
+.stack {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.eventCard,
+.groupCard,
+.previewCard,
+.errorCard {
+  min-width: 0;
+  padding: clamp(1rem, 3vw, 1.5rem);
+}
+
+.eventCard h2,
+.groupCard h2,
+.previewCard h2,
+.errorCard h2 {
+  margin: 0;
+  color: var(--club-green-dark);
+}
+
+.badges,
+.actions,
+.participantHeading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.eventCard h2 {
+  margin-top: var(--space-3);
+}
+
+.eventTime {
+  margin: var(--space-2) 0 0;
+  font-weight: 750;
+}
+
+.deadline,
+.previewIntro,
+.empty,
+.errorCard p {
+  margin: var(--space-2) 0 0;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.actions {
+  margin-top: var(--space-4);
+}
+
+.summary {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.metric {
+  min-width: 0;
+  padding: var(--space-3);
+}
+
+.metric strong,
+.metric span {
+  display: block;
+}
+
+.metric strong {
+  color: var(--club-green-dark);
+  font-size: 1.45rem;
+}
+
+.metric span {
+  margin-top: var(--space-1);
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.groups {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(16rem, 0.6fr);
+  align-items: start;
+  gap: var(--space-4);
+}
+
+.participantList,
+.previewList {
+  display: grid;
+  gap: var(--space-3);
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.participantRow,
+.previewList li {
+  min-width: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-subtle);
+}
+
+.participantHeading {
+  justify-content: space-between;
+}
+
+.participantHeading strong,
+.previewList strong,
+.previewList span {
+  overflow-wrap: anywhere;
+}
+
+.participantDetails {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-1) var(--space-3);
+  margin: var(--space-3) 0 0;
+}
+
+.participantDetails dt {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.participantDetails dd {
+  margin: 0;
+  font-weight: 700;
+}
+
+.previewCard {
+  border-left: 4px solid var(--club-green);
+}
+
+.previewList {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.previewList li {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.previewList span {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.errorCard {
+  border-color: #efc3bd;
+  background: var(--danger-soft);
+}
+
+@media (max-width: 64rem) {
+  .summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .groups {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 46rem) {
+  .summary,
+  .previewList {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .actions > * {
+    width: 100%;
+  }
+}
+
+@media (max-width: 26rem) {
+  .summary {
+    grid-template-columns: 1fr;
+  }
+}
