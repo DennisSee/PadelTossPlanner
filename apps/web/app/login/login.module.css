@@ -43,7 +43,7 @@
   padding: clamp(1.3rem, 4vw, 2.1rem);
   color: var(--surface);
   background:
-    linear-gradient(135deg, var(--club-green-dark) 0 78%, transparent 78%),
+    linear-gradient(135deg, var(--club-green) 0 78%, transparent 78%),
     var(--club-yellow);
   isolation: isolate;
 }
@@ -62,9 +62,10 @@
 .eyebrow {
   margin: 0 0 var(--space-3);
   color: var(--club-yellow);
-  font-family: var(--font-display);
+  font-family: var(--font-interface);
+  font-weight: 700;
   font-size: 0.85rem;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
 }
 

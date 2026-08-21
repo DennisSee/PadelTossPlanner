@@ -17,10 +17,10 @@
 
 .sectionHeader h2,
 .formTitle {
-  font-family: var(--font-display);
-  font-size: clamp(1.55rem, 3vw, 2rem);
-  letter-spacing: 0.025em;
-  text-transform: uppercase;
+  font-family: var(--font-interface);
+  font-size: clamp(1.4rem, 2.7vw, 1.8rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
 .sectionHeader p,
@@ -102,9 +102,10 @@
 
 .eventTitle {
   overflow-wrap: anywhere;
-  font-family: var(--font-display);
-  font-size: clamp(1.4rem, 3vw, 1.85rem);
-  letter-spacing: 0.015em;
+  font-family: var(--font-interface);
+  font-size: clamp(1.25rem, 2.6vw, 1.6rem);
+  font-weight: 700;
+  letter-spacing: -0.015em;
 }
 
 .metadata {
@@ -267,7 +268,7 @@
   border: 0;
   color: var(--surface);
   background:
-    linear-gradient(130deg, var(--club-green-dark) 0 82%, var(--club-yellow) 82%);
+    linear-gradient(130deg, var(--club-green) 0 82%, var(--club-yellow) 82%);
 }
 
 .eventHero .eventTitle,
@@ -279,8 +280,7 @@
 }
 
 .eventHero .eventTitle {
-  font-size: clamp(2rem, 5vw, 3rem);
-  text-transform: uppercase;
+  font-size: clamp(1.65rem, 4.5vw, 2.5rem);
 }
 
 .eventHero .deadline {

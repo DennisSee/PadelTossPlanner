@@ -42,7 +42,7 @@
   border: 0;
   color: var(--surface);
   background:
-    linear-gradient(120deg, var(--club-green-dark) 0 61%, transparent 61%),
+    linear-gradient(120deg, var(--club-green) 0 61%, transparent 61%),
     var(--club-yellow);
   isolation: isolate;
 }
@@ -74,10 +74,10 @@
 .eyebrow {
   margin: 0 0 var(--space-3);
   color: var(--club-yellow);
-  font-family: var(--font-display);
+  font-family: var(--font-interface);
   font-size: clamp(0.95rem, 1.8vw, 1.2rem);
-  font-weight: 850;
-  letter-spacing: 0.09em;
+  font-weight: 700;
+  letter-spacing: 0.055em;
   text-transform: uppercase;
 }
 
@@ -106,6 +106,7 @@
   color: var(--club-green-ink);
   background: var(--club-yellow);
   box-shadow: 0 0.45rem 0 rgb(177 127 0 / 35%);
+  text-transform: uppercase;
 }
 
 .intro a:hover {
@@ -150,8 +151,8 @@
   place-items: center;
   border-radius: 50%;
   color: var(--surface);
-  background: var(--club-green-dark);
-  font-family: var(--font-display);
+  background: var(--club-green);
+  font-family: var(--font-interface);
   font-size: 2.1rem;
 }
 
@@ -168,16 +169,17 @@
   width: 100%;
   border-color: var(--club-green-dark);
   color: var(--surface);
-  background: var(--club-green-dark);
+  background: var(--club-green);
+  text-transform: uppercase;
 }
 
 .sideTitle {
   margin: 0;
   color: var(--club-green-dark);
-  font-family: var(--font-display);
-  font-size: clamp(1.6rem, 3vw, 2.15rem);
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
+  font-family: var(--font-interface);
+  font-size: clamp(1.35rem, 2.5vw, 1.75rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
 .sideText {
@@ -201,7 +203,7 @@
   .intro {
     min-height: 31rem;
     background:
-      linear-gradient(160deg, var(--club-green-dark) 0 72%, transparent 72%),
+      linear-gradient(160deg, var(--club-green) 0 72%, transparent 72%),
       var(--club-yellow);
   }
 

@@ -36,7 +36,7 @@
   border-radius: var(--radius-md);
   color: var(--surface);
   background:
-    linear-gradient(120deg, var(--club-green-dark) 0 68%, transparent 68%),
+    linear-gradient(120deg, var(--club-green) 0 68%, transparent 68%),
     var(--club-yellow);
   isolation: isolate;
 }
@@ -110,10 +110,10 @@
 .contentCard h2 {
   margin: 0;
   color: var(--club-green-dark);
-  font-family: var(--font-display);
-  font-size: 1.65rem;
-  letter-spacing: 0.025em;
-  text-transform: uppercase;
+  font-family: var(--font-interface);
+  font-size: 1.45rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
 .contentCard p {
@@ -148,13 +148,12 @@
   border: 1px solid var(--club-green-dark);
   border-radius: var(--radius-sm);
   color: var(--surface);
-  background: var(--club-green-dark);
+  background: var(--club-green);
   cursor: pointer;
-  font-family: var(--font-display);
-  font-size: 1.05rem;
-  font-weight: 800;
-  letter-spacing: 0.035em;
-  text-transform: uppercase;
+  font-family: var(--font-interface);
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
 }
 
 .logoutButton:hover {
@@ -178,7 +177,7 @@
   border-radius: var(--radius-sm);
   color: var(--surface);
   background:
-    linear-gradient(125deg, var(--club-green-dark) 0 80%, var(--club-yellow) 80%);
+    linear-gradient(125deg, var(--club-green) 0 80%, var(--club-yellow) 80%);
 }
 
 .identityBanner::after {
@@ -220,7 +219,7 @@
     margin-top: var(--space-3);
     padding: 1.25rem;
     background:
-      linear-gradient(155deg, var(--club-green-dark) 0 78%, transparent 78%),
+      linear-gradient(155deg, var(--club-green) 0 78%, transparent 78%),
       var(--club-yellow);
   }
 

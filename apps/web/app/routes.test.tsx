@@ -114,7 +114,13 @@ describe("WEB-2 routes", () => {
     expect(liveCss).toContain(".courtZga { --court-accent:");
     expect(liveCss).toContain(".selectedPlayer");
     expect(globalCss).toContain("--font-display:");
+    expect(globalCss).toContain("--font-interface:");
+    expect(globalCss).not.toContain("--font-body:");
+    expect(globalCss).toContain("--club-green: #004b36;");
+    expect(globalCss).toContain("--page-background: #faf7ef;");
     expect(globalCss).toContain("--club-yellow:");
+    expect(uiCss).toContain(".linkButton");
+    expect(uiCss).toContain("font-family: var(--font-interface)");
     expect(uiCss).toContain(".courtLines");
     expect(uiCss).toContain(".dateRail");
   });
