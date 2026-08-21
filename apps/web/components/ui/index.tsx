@@ -14,18 +14,20 @@ export {
 export function AppHeader({ subtitle }: { subtitle?: string }) {
   return (
     <header className={styles.header}>
-      <Image
-        className={styles.logo}
-        src="/tc-zuid-logo.png"
-        width={52}
-        height={52}
-        alt="Logo T.C. Zuid"
-        priority
-      />
-      <div className={styles.brandText}>
-        <p className={styles.brandName}>T.C. Zuid TOS</p>
-        {subtitle ? <p className={styles.subtitle}>{subtitle}</p> : null}
-      </div>
+      <Link className={styles.brandLink} href="/" aria-label="Naar startpagina">
+        <Image
+          className={styles.logo}
+          src="/tc-zuid-logo.png"
+          width={52}
+          height={52}
+          alt="Logo T.C. Zuid"
+          priority
+        />
+        <div className={styles.brandText}>
+          <p className={styles.brandName}>T.C. Zuid TOS</p>
+          {subtitle ? <p className={styles.subtitle}>{subtitle}</p> : null}
+        </div>
+      </Link>
     </header>
   );
 }

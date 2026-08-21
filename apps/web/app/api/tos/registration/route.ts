@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
       : existing
         ? "registration-updated"
         : "registration-created";
-    return tosRedirect(appBaseUrl, destination, { notice });
+    return tosRedirect(appBaseUrl, "/tos", { notice });
   } catch (error) {
     if (error instanceof TosConflictError) {
       return tosRedirect(appBaseUrl, destination, { error: "conflict" });

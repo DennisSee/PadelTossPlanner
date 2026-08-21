@@ -53,6 +53,8 @@ test("openbare detaildeeplink bewaart exact dezelfde OTP-return zonder private d
   await expect(page.getByText("<b>Veilige testnaam</b>", { exact: false })).toBeVisible();
   await expect(page.locator("b", { hasText: "Veilige testnaam" })).toHaveCount(0);
   await assertNoHorizontalOverflow(page);
+  await page.getByRole("link", { name: "Naar startpagina" }).click();
+  await expect(page).toHaveURL(/\/$/u);
 });
 
 test("Google PKCE gebruikt dezelfde dynamische eventreturn en malicious next valt terug", async ({ page, request }) => {
@@ -151,26 +153,33 @@ test("aanmelden, minutenavailability, afmelden en opnieuw aanmelden behouden exa
   const customMinute = `${Math.floor(changedMinutes / 60).toString().padStart(2, "0")}:${(changedMinutes % 60).toString().padStart(2, "0")}`;
   await from.fill(customMinute);
   await page.getByRole("button", { name: "Aanmelden", exact: true }).click();
-  await expect(page).toHaveURL(/notice=registration-created/u);
+  await expect(page).toHaveURL(/\/tos\?notice=registration-created$/u);
+  await expect(page.getByText("Je aanmelding is opgeslagen.")).toBeVisible();
+  const own = page.getByRole("region", { name: "Mijn komende TOS" });
+  const available = page.getByRole("region", { name: "Nog aanmelden" });
+  await expect(own.getByText("Padel TOS vrijdagavond")).toBeVisible();
+  await expect(own.getByText(`Je doet mee · ${customMinute}–${originalUntil}`)).toBeVisible();
+  await expect(available.getByText("Padel TOS vrijdagavond")).toHaveCount(0);
+
+  await own.getByRole("link", { name: "Aanmelding wijzigen" }).first().click();
   await expect(page.getByLabel("Vanaf")).toHaveValue(customMinute);
   await expect(page.getByLabel("Tot")).toHaveValue(originalUntil);
 
   await page.getByLabel("Ik doe niet mee").click();
   await page.getByRole("button", { name: "Aanmelding wijzigen" }).click();
-  await expect(page).toHaveURL(/notice=registration-declined/u);
-  await expect(page.getByLabel("Ik doe niet mee")).toBeChecked();
-
-  await page.goto("/tos");
-  const own = page.getByRole("region", { name: "Mijn komende TOS" });
-  const available = page.getByRole("region", { name: "Nog aanmelden" });
+  await expect(page).toHaveURL(/\/tos\?notice=registration-declined$/u);
+  await expect(page.getByText("Je hebt je afgemeld.")).toBeVisible();
+  await expect(own.getByText("Afgemeld")).toBeVisible();
   await expect(own.getByText("Padel TOS vrijdagavond")).toBeVisible();
   await expect(available.getByText("Padel TOS vrijdagavond")).toHaveCount(0);
 
   await own.getByRole("link", { name: "Aanmelding wijzigen" }).first().click();
+  await expect(page.getByLabel("Ik doe niet mee")).toBeChecked();
   await page.getByLabel("Ik doe mee").click();
   await page.getByRole("button", { name: "Aanmelding wijzigen" }).click();
-  await expect(page).toHaveURL(/notice=registration-updated/u);
-  await expect(page.getByLabel("Ik doe mee")).toBeChecked();
+  await expect(page).toHaveURL(/\/tos\?notice=registration-updated$/u);
+  await expect(page.getByText("Je aanmelding is gewijzigd.")).toBeVisible();
+  await expect(own.getByText(`Je doet mee · ${originalFrom}–${originalUntil}`)).toBeVisible();
 });
 
 test("deadline, closed en cancelled blijven read-only en verborgen events lekken niet", async ({ page, request }) => {

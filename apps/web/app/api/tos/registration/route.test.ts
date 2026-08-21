@@ -90,7 +90,7 @@ describe("registration POST boundary", () => {
   it("rechecks account, event and own row on one client before and after create", async () => {
     const response = await POST(request(attendingFields));
     expect(response.status).toBe(303);
-    expect(response.headers.get("location")).toBe(`${APP_BASE_URL}/tos/vrijdag-padel?notice=registration-created`);
+    expect(response.headers.get("location")).toBe(`${APP_BASE_URL}/tos?notice=registration-created`);
     expect(loadAccountContextWithClient).toHaveBeenCalledWith(client);
     expect(eventBySlug).toHaveBeenCalledWith("vrijdag-padel", { openOnly: false });
     expect(ownRegistration).toHaveBeenNthCalledWith(1, EVENT_ID, USER_ID);
@@ -100,6 +100,19 @@ describe("registration POST boundary", () => {
       availableUntil: "2026-08-21T19:43:00.000Z",
     });
     expect(ownRegistration).toHaveBeenNthCalledWith(2, EVENT_ID, USER_ID);
+  });
+
+  it("returns to the TOS overview after updating an attending registration", async () => {
+    ownRegistration.mockReset();
+    ownRegistration.mockResolvedValueOnce(saved).mockResolvedValueOnce(saved);
+    const response = await POST(request(attendingFields));
+    expect(updateRegistration).toHaveBeenCalledWith(saved, USER_ID, {
+      response: "attending",
+      availableFrom: "2026-08-21T18:07:00.000Z",
+      availableUntil: "2026-08-21T19:43:00.000Z",
+    });
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe(`${APP_BASE_URL}/tos?notice=registration-updated`);
   });
 
   it("updates only the server-read own registration and supports declined", async () => {
@@ -114,7 +127,16 @@ describe("registration POST boundary", () => {
       availableUntil: null,
     });
     expect(createRegistration).not.toHaveBeenCalled();
-    expect(response.headers.get("location")).toBe(`${APP_BASE_URL}/tos/vrijdag-padel?notice=registration-declined`);
+    expect(response.headers.get("location")).toBe(`${APP_BASE_URL}/tos?notice=registration-declined`);
+  });
+
+  it("keeps the event detail as the anonymous login return", async () => {
+    loadAccountContextWithClient.mockResolvedValueOnce(null);
+    const response = await POST(request(attendingFields));
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location"))
+      .toBe(`${APP_BASE_URL}/login?next=%2Ftos%2Fvrijdag-padel`);
+    expect(eventBySlug).not.toHaveBeenCalled();
   });
 
   it.each([null, "https://evil.example"])("rejects origin %s", async (origin) => {
