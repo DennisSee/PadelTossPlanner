@@ -1,5 +1,11 @@
 import { attendeeNamesPreview } from "../../lib/tos/dashboard";
-import type { OwnRegistration, TosEvent } from "../../lib/tos/types";
+import type {
+  EventCapacity,
+  OwnRegistration,
+  OwnRegistrationPosition,
+  ParticipantAttendance,
+  TosEvent,
+} from "../../lib/tos/types";
 import {
   eventAllowsSelfService,
   eventPresentationStatus,
@@ -7,6 +13,8 @@ import {
   formatEventDate,
 } from "../../lib/tos/time";
 import { Badge, Card, EventDateRail, LinkButton, SecondaryLinkButton } from "../ui";
+import { EventCapacityPanel } from "./event-capacity";
+import { ParticipantsSheet } from "./participants-sheet";
 
 import styles from "./tos.module.css";
 
@@ -28,14 +36,18 @@ function cardClass(event: TosEvent, registration?: OwnRegistration): string {
 export function TosEventCard({
   event,
   registration,
-  attendeeNames,
-  attendeeNamesUnavailable = false,
+  capacity,
+  attendance,
+  registrationPosition,
+  socialDataUnavailable = false,
   now,
 }: {
   event: TosEvent;
   registration?: OwnRegistration;
-  attendeeNames?: readonly string[];
-  attendeeNamesUnavailable?: boolean;
+  capacity: EventCapacity;
+  attendance: readonly ParticipantAttendance[];
+  registrationPosition?: OwnRegistrationPosition | null;
+  socialDataUnavailable?: boolean;
   now: Date;
 }) {
   const status = eventPresentationStatus(event, now);
@@ -43,6 +55,16 @@ export function TosEventCard({
   const availability = registration?.response === "attending"
     ? `${formatEventClock(registration.availableFrom!)}–${formatEventClock(registration.availableUntil!)}`
     : null;
+  const placedNames = attendance
+    .filter((person) => person.placementStatus === "placed")
+    .map((person) => person.displayName);
+  const personalLabel = registrationPosition?.placementStatus === "waitlist"
+    ? `Wachtlijst · plek ${registrationPosition.waitlistPosition}`
+    : registrationPosition?.placementStatus === "placed"
+      ? "✓ Geplaatst"
+      : registration?.response === "declined"
+        ? "Afgemeld"
+        : null;
   return (
     <Card className={`${styles.eventCard} ${cardClass(event, registration)}`}>
       <EventDateRail startsAt={event.startsAt} accent={registration ? "green" : "yellow"} />
@@ -51,8 +73,8 @@ export function TosEventCard({
           <Badge tone="neutral">{event.sport.toUpperCase()}</Badge>
           <Badge tone={statusTone(event, now)}>{status}</Badge>
           {registration ? (
-            <Badge tone={registration.response === "attending" ? "success" : "neutral"}>
-              {registration.response === "attending" ? "✓ Aangemeld" : "Afgemeld"}
+            <Badge tone={registrationPosition?.placementStatus === "waitlist" ? "warning" : registration.response === "attending" ? "success" : "neutral"}>
+              {personalLabel ?? (registration.response === "attending" ? "✓ Aangemeld" : "Afgemeld")}
             </Badge>
           ) : null}
         </div>
@@ -66,15 +88,18 @@ export function TosEventCard({
             Inschrijven t/m {formatEventDate(event.signupDeadline)} · {formatEventClock(event.signupDeadline)}
           </p>
         ) : null}
-        {attendeeNames ? (
-          <p className={styles.attendeePreview}>
-            {attendeeNames.length} {attendeeNames.length === 1 ? "deelnemer" : "deelnemers"}
-            {attendeeNames.length ? ` · ${attendeeNamesPreview(attendeeNames)}` : ""}
-          </p>
-        ) : null}
-        {attendeeNamesUnavailable ? (
+        <EventCapacityPanel capacity={capacity} />
+        {!socialDataUnavailable ? (
+          <>
+            <p className={styles.attendeePreview}>
+              {placedNames.length} {placedNames.length === 1 ? "deelnemer" : "deelnemers"}
+              {placedNames.length ? ` · ${attendeeNamesPreview(placedNames)}` : ""}
+            </p>
+            <ParticipantsSheet event={event} capacity={capacity} attendance={attendance} />
+          </>
+        ) : (
           <p className={styles.attendeePreview}>De deelnemerslijst is tijdelijk niet beschikbaar.</p>
-        ) : null}
+        )}
         <div className={styles.actions}>
           {registration && !canChange ? (
             <>
@@ -83,10 +108,18 @@ export function TosEventCard({
               </SecondaryLinkButton>
               <p className={styles.muted}>Deze aanmelding kan niet meer worden gewijzigd.</p>
             </>
-          ) : (
+          ) : canChange ? (
             <LinkButton href={`/tos/${event.slug}`}>
-              {registration ? "Aanmelding wijzigen" : "Aanmelden"}
+              {registration
+                ? "Aanmelding wijzigen"
+                : capacity.availableCount === 0
+                  ? "Op wachtlijst"
+                  : "Aanmelden"}
             </LinkButton>
+          ) : (
+            <button className={styles.disabledAction} type="button" disabled>
+              Inschrijving gesloten
+            </button>
           )}
         </div>
       </div>

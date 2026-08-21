@@ -13,12 +13,14 @@ export function RegistrationForm({
   initialFrom,
   initialUntil,
   existing,
+  waitlistExpected = false,
 }: {
   slug: string;
   initialResponse: RegistrationResponse;
   initialFrom: string;
   initialUntil: string;
   existing: boolean;
+  waitlistExpected?: boolean;
 }) {
   const [response, setResponse] = useState<RegistrationResponse>(initialResponse);
   return (
@@ -76,7 +78,7 @@ export function RegistrationForm({
         </label>
       </div>
       <button className={styles.primaryButton} type="submit">
-        {existing ? "Aanmelding wijzigen" : "Aanmelden"}
+        {existing ? "Aanmelding wijzigen" : waitlistExpected ? "Aanmelden voor wachtlijst" : "Aanmelden"}
       </button>
     </form>
   );

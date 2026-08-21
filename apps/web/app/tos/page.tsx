@@ -1,10 +1,11 @@
 import { AccountShell } from "../../components/account/account-shell";
 import { TosEventCard } from "../../components/tos/event-card";
 import { MembershipPanel } from "../../components/tos/membership-panel";
+import { TosFilters } from "../../components/tos/tos-filters";
 import styles from "../../components/tos/tos.module.css";
 import { StateMessage } from "../../components/ui";
 import { requireAccount } from "../../lib/auth/route-guard";
-import { eventsWithoutOwnRegistration } from "../../lib/tos/dashboard";
+import { filterParticipantEvents, participantFilters } from "../../lib/tos/event-filters";
 import { publicTosMessage } from "../../lib/tos/messages";
 import { TosRepository } from "../../lib/tos/repository";
 import { createServerSupabaseClient } from "../../lib/supabase/server";
@@ -15,6 +16,8 @@ export const revalidate = 0;
 type SearchParams = Promise<{
   notice?: string | string[];
   error?: string | string[];
+  status?: string | string[];
+  sport?: string | string[];
 }>;
 
 function last(value: string | string[] | undefined): string | undefined {
@@ -25,16 +28,36 @@ async function loadDashboard(
   repository: TosRepository,
   userId: string,
   now: Date,
+  filters: ReturnType<typeof participantFilters>,
 ) {
-  const [registrations, openEvents] = await Promise.all([
+  const [registrations, participantEvents] = await Promise.all([
     repository.listOwnUpcomingRegistrations(userId, now),
-    repository.listOpenEvents(now),
+    repository.listParticipantEvents(now),
   ]);
-  const unregisteredEvents = eventsWithoutOwnRegistration(openEvents, registrations);
-  const attendeeResults = await Promise.allSettled(
-    unregisteredEvents.map((event) => repository.attendeeNames(event.id)),
-  );
-  return { registrations, unregisteredEvents, attendeeResults };
+  const registrationByEvent = new Map(registrations.map((registration) => [registration.eventId, registration]));
+  const events = filterParticipantEvents(participantEvents, filters, now);
+  const snapshots = await Promise.all(events.map(async (event) => {
+    const registration = registrationByEvent.get(event.id);
+    const [capacity, attendanceResult, positionResult] = await Promise.all([
+      repository.eventCapacity(event.id),
+      repository.eventAttendance(event.id).then(
+        (attendance) => ({ attendance, unavailable: false }),
+        () => ({ attendance: [], unavailable: true }),
+      ),
+      registration
+        ? repository.ownRegistrationPosition(event.id)
+        : Promise.resolve(null),
+    ]);
+    return Object.freeze({
+      event,
+      registration,
+      capacity,
+      attendance: attendanceResult.attendance,
+      socialDataUnavailable: attendanceResult.unavailable,
+      registrationPosition: positionResult,
+    });
+  }));
+  return { snapshots };
 }
 
 export default async function TosPage({ searchParams }: { searchParams: SearchParams }) {
@@ -42,6 +65,7 @@ export default async function TosPage({ searchParams }: { searchParams: SearchPa
   const account = await requireAccount("/tos", client);
   const params = await searchParams;
   const message = publicTosMessage(last(params.notice), last(params.error));
+  const filters = participantFilters(params);
 
   if (!account.capabilities.canParticipate) {
     return (
@@ -70,7 +94,7 @@ export default async function TosPage({ searchParams }: { searchParams: SearchPa
   const now = new Date();
   let dashboard: Awaited<ReturnType<typeof loadDashboard>> | null = null;
   try {
-    dashboard = await loadDashboard(repository, account.identity.userId, now);
+    dashboard = await loadDashboard(repository, account.identity.userId, now, filters);
   } catch {
     dashboard = null;
   }
@@ -88,7 +112,7 @@ export default async function TosPage({ searchParams }: { searchParams: SearchPa
       </AccountShell>
     );
   }
-  const { registrations, unregisteredEvents, attendeeResults } = dashboard;
+  const { snapshots } = dashboard;
   return (
     <AccountShell
       account={account}
@@ -105,48 +129,20 @@ export default async function TosPage({ searchParams }: { searchParams: SearchPa
             {message.text}
           </p>
         ) : null}
-        <section className={styles.section} aria-labelledby="my-upcoming-tos">
+        <TosFilters status={filters.status} sport={filters.sport} resultCount={snapshots.length} />
+        <section className={styles.section} aria-labelledby="available-tos">
           <div className={styles.sectionHeader}>
-            <h2 id="my-upcoming-tos">Mijn komende TOS</h2>
-            <p>Je eigen aanmeldingen en afmeldingen, in chronologische volgorde.</p>
+            <h2 id="available-tos">TOS-avonden</h2>
+            <p>Bekijk capaciteit, deelnemers en je eigen aanmelding.</p>
           </div>
-          {registrations.length ? (
+          {snapshots.length ? (
             <div className={styles.eventGrid}>
-              {registrations.map((registration) => (
-                <TosEventCard
-                  key={registration.id}
-                  event={registration.event}
-                  registration={registration}
-                  now={now}
-                />
+              {snapshots.map((snapshot) => (
+                <TosEventCard key={snapshot.event.id} {...snapshot} now={now} />
               ))}
             </div>
           ) : (
-            <p className={styles.muted}>Je bent nog niet aangemeld voor een komende TOS.</p>
-          )}
-        </section>
-        <section className={styles.section} aria-labelledby="available-tos">
-          <div className={styles.sectionHeader}>
-            <h2 id="available-tos">Nog aanmelden</h2>
-            <p>Open TOS-avonden waarop je nog geen reactie hebt gegeven.</p>
-          </div>
-          {unregisteredEvents.length ? (
-            <div className={styles.eventGrid}>
-              {unregisteredEvents.map((event, index) => {
-                const attendees = attendeeResults[index];
-                return (
-                  <TosEventCard
-                    key={event.id}
-                    event={event}
-                    attendeeNames={attendees.status === "fulfilled" ? attendees.value : undefined}
-                    attendeeNamesUnavailable={attendees.status === "rejected"}
-                    now={now}
-                  />
-                );
-              })}
-            </div>
-          ) : (
-            <p className={styles.muted}>Geen andere open TOS-avonden.</p>
+            <p className={styles.muted}>Geen TOS-avonden gevonden met deze filters.</p>
           )}
         </section>
       </div>

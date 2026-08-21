@@ -1,7 +1,7 @@
 import { isTosEventSlug, type TosDetailPath } from "../tos/slug";
 
 export const DEFAULT_RETURN_PATH = "/tos" as const;
-export const ALLOWED_RETURN_PATHS = ["/tos", "/account", "/beheer", "/live"] as const;
+export const ALLOWED_RETURN_PATHS = ["/tos", "/account", "/beheer", "/beheer/leden", "/live"] as const;
 
 export type SafeReturnPath = (typeof ALLOWED_RETURN_PATHS)[number] | TosDetailPath;
 

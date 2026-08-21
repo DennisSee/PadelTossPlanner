@@ -15,6 +15,7 @@ const event: TosEvent = Object.freeze({
   id: "11111111-1111-4111-8111-111111111111", slug: "planner-padel", title: "Planner",
   sport: "padel", startsAt: "2026-08-21T18:00:00Z", endsAt: "2026-08-21T20:00:00Z",
   signupDeadline: null, status: "closed",
+  maxParticipants: 24,
 });
 
 function storedRow(overrides: Record<string, unknown> = {}) {

@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { AccountShell } from "../../../components/account/account-shell";
 import { MembershipPanel } from "../../../components/tos/membership-panel";
 import { RegistrationForm } from "../../../components/tos/registration-form";
+import { EventCapacityPanel } from "../../../components/tos/event-capacity";
+import { ParticipantsSheet } from "../../../components/tos/participants-sheet";
 import styles from "../../../components/tos/tos.module.css";
 import {
   AppHeader,
@@ -25,7 +27,13 @@ import {
   formatEventDate,
   fullEventAvailability,
 } from "../../../lib/tos/time";
-import type { OwnRegistration, TosEvent } from "../../../lib/tos/types";
+import type {
+  EventCapacity,
+  OwnRegistration,
+  OwnRegistrationPosition,
+  ParticipantAttendance,
+  TosEvent,
+} from "../../../lib/tos/types";
 import { createServerSupabaseClient } from "../../../lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -68,11 +76,22 @@ function EventSummary({ event, heading = "h2" }: { event: TosEvent; heading?: "h
           Inschrijven t/m {formatEventDate(event.signupDeadline)} · {formatEventClock(event.signupDeadline)}
         </p>
       ) : null}
+      <p className={styles.deadline}>Maximaal {event.maxParticipants} deelnemers</p>
     </Card>
   );
 }
 
-function RegistrationCard({ event, registration }: { event: TosEvent; registration: OwnRegistration | null }) {
+function RegistrationCard({
+  event,
+  registration,
+  capacity,
+  position,
+}: {
+  event: TosEvent;
+  registration: OwnRegistration | null;
+  capacity: EventCapacity;
+  position: OwnRegistrationPosition | null;
+}) {
   const defaults = fullEventAvailability(event);
   const initialFrom = registration?.response === "attending"
     ? formatEventClock(registration.availableFrom!)
@@ -83,6 +102,13 @@ function RegistrationCard({ event, registration }: { event: TosEvent; registrati
   return (
     <Card className={styles.formCard}>
       <h2 className={styles.formTitle}>{registration ? "Mijn aanmelding" : "Aanmelden"}</h2>
+      {position?.placementStatus === "placed" ? (
+        <p className={styles.personalStatus}>Je bent geplaatst.</p>
+      ) : position?.placementStatus === "waitlist" ? (
+        <p className={styles.waitlistNotice}>Je staat op plek {position.waitlistPosition} van de wachtlijst.</p>
+      ) : position?.placementStatus === "declined" ? (
+        <p className={styles.muted}>Je bent afgemeld.</p>
+      ) : null}
       {eventAllowsSelfService(event) ? (
         <RegistrationForm
           slug={event.slug}
@@ -90,6 +116,7 @@ function RegistrationCard({ event, registration }: { event: TosEvent; registrati
           initialFrom={initialFrom}
           initialUntil={initialUntil}
           existing={Boolean(registration)}
+          waitlistExpected={!registration && capacity.availableCount === 0}
         />
       ) : (
         <p className={styles.muted}>Deze aanmelding kan niet meer worden gewijzigd.</p>
@@ -98,20 +125,33 @@ function RegistrationCard({ event, registration }: { event: TosEvent; registrati
   );
 }
 
-function AttendeeCard({ names, unavailable }: { names: readonly string[]; unavailable: boolean }) {
+function AttendeeCard({
+  event,
+  capacity,
+  attendance,
+  unavailable,
+}: {
+  event: TosEvent;
+  capacity: EventCapacity;
+  attendance: readonly ParticipantAttendance[];
+  unavailable: boolean;
+}) {
+  const placed = attendance.filter((person) => person.placementStatus === "placed");
   return (
     <Card className={styles.attendeeCard}>
       <div className={styles.attendeeHeader}>
         <h2 className={styles.formTitle}>Wie doen er mee?</h2>
-        {!unavailable ? <Badge tone="success">{names.length} {names.length === 1 ? "deelnemer" : "deelnemers"}</Badge> : null}
+        {!unavailable ? <Badge tone="success">{placed.length} {placed.length === 1 ? "deelnemer" : "deelnemers"}</Badge> : null}
       </div>
+      <EventCapacityPanel capacity={capacity} />
       {unavailable ? (
         <p className={styles.muted}>De deelnemerslijst is tijdelijk niet beschikbaar.</p>
-      ) : names.length ? (
-        <p className={styles.attendeeNames}>{names.join(" · ")}</p>
+      ) : placed.length ? (
+        <p className={styles.attendeeNames}>{placed.map((person) => person.displayName).join(" · ")}</p>
       ) : (
         <p className={styles.muted}>Er zijn nog geen deelnemers zichtbaar.</p>
       )}
+      {!unavailable ? <ParticipantsSheet event={event} capacity={capacity} attendance={attendance} /> : null}
     </Card>
   );
 }
@@ -146,7 +186,9 @@ export default async function TosDetailPage({ params, searchParams }: PageProps)
   if (!event) notFound();
 
   let registration: OwnRegistration | null = null;
-  let attendeeNames: string[] = [];
+  let capacity: EventCapacity | null = null;
+  let attendance: ParticipantAttendance[] = [];
+  let registrationPosition: OwnRegistrationPosition | null = null;
   let attendeeNamesUnavailable = false;
   if (account) {
     try {
@@ -156,9 +198,14 @@ export default async function TosDetailPage({ params, searchParams }: PageProps)
     }
     if (account.capabilities.canParticipate) {
       try {
-        attendeeNames = await repository.attendeeNames(event.id);
+        [capacity, attendance, registrationPosition] = await Promise.all([
+          repository.eventCapacity(event.id),
+          repository.eventAttendance(event.id),
+          registration ? repository.ownRegistrationPosition(event.id) : Promise.resolve(null),
+        ]);
       } catch {
         attendeeNamesUnavailable = true;
+        capacity = null;
       }
     }
   }
@@ -180,10 +227,12 @@ export default async function TosDetailPage({ params, searchParams }: PageProps)
           <div className={styles.actions}><LinkButton href={loginPathFor(path)}>Inloggen / aanmelden</LinkButton></div>
         </Card>
       ) : account.capabilities.canParticipate ? (
-        <>
-          <AttendeeCard names={attendeeNames} unavailable={attendeeNamesUnavailable} />
-          <RegistrationCard event={event} registration={registration} />
-        </>
+        capacity ? (
+          <>
+            <AttendeeCard event={event} capacity={capacity} attendance={attendance} unavailable={attendeeNamesUnavailable} />
+            <RegistrationCard event={event} registration={registration} capacity={capacity} position={registrationPosition} />
+          </>
+        ) : <StateMessage title="Capaciteit tijdelijk niet beschikbaar"><p>Probeer het later opnieuw.</p></StateMessage>
       ) : (
         <MembershipPanel account={account} returnPath={path} />
       )}

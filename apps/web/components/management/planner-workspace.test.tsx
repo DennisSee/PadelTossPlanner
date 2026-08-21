@@ -7,6 +7,7 @@ const event = Object.freeze({
   slug: "vrijdag-padel", title: "Vrijdag Padel", sport: "padel" as const,
   startsAt: "2026-08-21T18:00:00Z", endsAt: "2026-08-21T20:00:00Z",
   signupDeadline: null, status: "closed" as const,
+  maxParticipants: 24,
 });
 
 const draft = Object.freeze({

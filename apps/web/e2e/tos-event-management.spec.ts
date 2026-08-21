@@ -63,6 +63,11 @@ test("lists all statuses and creates, opens and cancels a server-slugged event",
   await page.goto("/login?next=/beheer");
   const staffEmail = email("planner-no-member");
   await signIn(page, request, staffEmail);
+  await expect(page).toHaveURL(/\/beheer$/u);
+  const filters = page.locator("form").filter({ has: page.getByRole("button", { name: "Filteren" }) });
+  await filters.getByLabel("Status").selectOption("all");
+  await filters.getByRole("button", { name: "Filteren" }).click();
+  await expect(page).toHaveURL(/\/beheer\?status=all&sport=all$/u);
 
   for (const label of ["Concept", "Open voor inschrijving", "Inschrijving gesloten", "Geannuleerd"]) {
     await expect(page.locator("span", { hasText: label }).first()).toBeVisible();
@@ -109,6 +114,7 @@ const forgedCreateFields = {
   ends_at: "22:00",
   signup_deadline: "2026-08-28T19:00",
   status: "draft",
+  max_participants: "24",
 };
 
 test("rejects forged authority fields", async ({ page, request }) => {
@@ -145,6 +151,6 @@ test("rejects participant direct event writes", async ({ page, request }) => {
     }, { ...forgedCreateFields, status: "open" }).catch(() => undefined),
   ]);
   await expect(page).toHaveURL(/\/tos$/u);
-  await expect(page.getByRole("heading", { name: "TOS-avonden" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "TOS-avonden", level: 1 })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Forged event" })).toHaveCount(0);
 });

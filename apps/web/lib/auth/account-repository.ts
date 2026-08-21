@@ -80,4 +80,13 @@ export class AccountContextRepository {
     }
     return deriveAccountContext(identity, profile, member);
   }
+
+  async updateOwnDisplayName(displayName: string): Promise<void> {
+    const result = await this.client.rpc("update_my_display_name", {
+      new_display_name: displayName,
+    });
+    if (result.error || !Array.isArray(result.data) || result.data.length !== 1) {
+      throw new AccountContextUnavailableError();
+    }
+  }
 }

@@ -5,7 +5,7 @@ import { emptyPlannerDraft } from "./planner-draft";
 import { PlannerDraftConflictError, PlannerDraftRepository } from "./planner-draft-repository";
 import type { TosEvent } from "./types";
 
-const event: TosEvent = { id: "11111111-1111-4111-8111-111111111111", slug: "planner-padel", title: "Planner", sport: "padel", startsAt: "2026-08-21T18:00:00Z", endsAt: "2026-08-21T20:00:00Z", signupDeadline: null, status: "closed" };
+const event: TosEvent = { id: "11111111-1111-4111-8111-111111111111", slug: "planner-padel", title: "Planner", sport: "padel", startsAt: "2026-08-21T18:00:00Z", endsAt: "2026-08-21T20:00:00Z", signupDeadline: null, status: "closed", maxParticipants: 24 };
 
 it("uses only the two event-scoped RPCs and returns explicit defaults for no row", async () => {
   const rpc = vi.fn().mockResolvedValueOnce({ data: [], error: null }).mockResolvedValueOnce({ data: 1, error: null });

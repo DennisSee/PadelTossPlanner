@@ -2,7 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { TosEventParticipants } from "./tos-event-participants";
-import type { StaffPlannerInput, TosEvent } from "../../lib/tos/types";
+import type { StaffRegistrationOverview, TosEvent } from "../../lib/tos/types";
 
 const padelEvent: TosEvent = Object.freeze({
   id: "11111111-1111-4111-8111-111111111111",
@@ -13,13 +13,14 @@ const padelEvent: TosEvent = Object.freeze({
   endsAt: "2026-08-21T20:00:00Z",
   signupDeadline: "2026-08-21T17:00:00Z",
   status: "closed",
+  maxParticipants: 24,
 });
 
 let counter = 1;
 function participant(
   displayName: string,
-  overrides: Partial<StaffPlannerInput> = {},
-): StaffPlannerInput {
+  overrides: Partial<StaffRegistrationOverview> = {},
+): StaffRegistrationOverview {
   const suffix = String(counter++).padStart(12, "0");
   return Object.freeze({
     registrationId: `10000000-0000-4000-8000-${suffix}`,
@@ -34,6 +35,8 @@ function participant(
     memberActive: true,
     sportProfileActive: true,
     ranking: 4,
+    placementStatus: "placed",
+    waitlistPosition: null,
     ...overrides,
   });
 }
@@ -49,7 +52,12 @@ describe("staff event participant presentation", () => {
       participant("Inactief profiel", { sportProfileActive: false }),
       participant("Geen niveau", { ranking: null }),
       participant("Ongeldige tijd", { availableFrom: null }),
-      participant("Afgemelde speler", { response: "declined", availableFrom: null, availableUntil: null }),
+      participant("Afgemelde speler", {
+        response: "declined",
+        availableFrom: null,
+        availableUntil: null,
+        placementStatus: "declined",
+      }),
     ];
     const { container } = render(<TosEventParticipants event={padelEvent} participants={participants} />);
     expect(screen.getByRole("heading", { name: "WEB-5B1 Padelavond" })).toBeVisible();
@@ -61,7 +69,7 @@ describe("staff event participant presentation", () => {
 
     const summary = screen.getByLabelText("Deelnemerssamenvatting");
     for (const [label, value] of [
-      ["Totaal reacties", "9"], ["Doet mee", "8"], ["Afgemeld", "1"],
+      ["Totaal reacties", "9"], ["Geplaatst", "8"], ["Wachtlijst", "0"], ["Afgemeld", "1"],
       ["Klaar voor planner", "2"], ["Aandacht nodig", "6"],
     ]) {
       const card = within(summary).getByText(label).closest("section")!;

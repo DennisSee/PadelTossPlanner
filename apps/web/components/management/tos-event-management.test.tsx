@@ -13,7 +13,16 @@ const event: TosEvent = {
   endsAt: "2026-08-28T20:00:00Z",
   signupDeadline: "2026-08-28T17:00:00Z",
   status: "draft",
+  maxParticipants: 24,
 };
+
+const capacity = {
+  eventId: event.id,
+  maxParticipants: 24,
+  placedCount: 2,
+  availableCount: 22,
+  waitlistCount: 0,
+} as const;
 
 describe("TOS event management UI", () => {
   it("renders the exact create fields and Amsterdam defaults without authority inputs", () => {
@@ -21,27 +30,35 @@ describe("TOS event management UI", () => {
     const form = container.querySelector('form[action="/api/beheer/tos/create"]')!;
     expect(form).toBeInTheDocument();
     expect([...form.querySelectorAll("[name]")].map((node) => node.getAttribute("name"))).toEqual([
-      "title", "sport", "event_date", "starts_at", "ends_at", "signup_deadline", "status",
+      "title", "sport", "event_date", "starts_at", "ends_at", "signup_deadline", "max_participants", "status",
     ]);
     expect(screen.getByLabelText("Titel")).toHaveValue("TOS-avond");
     expect(screen.getByLabelText("Datum")).toHaveValue("2026-08-27");
-    expect(screen.getByLabelText("Starttijd")).toHaveAttribute("step", "300");
+    expect(screen.getByLabelText("Starttijd")).toHaveAttribute("step", "60");
+    expect(screen.getByLabelText("Maximaal aantal deelnemers")).toHaveValue(24);
     expect(form.textContent).not.toMatch(/created_by|member_id|user_id/u);
   });
 
   it("shows safe event metadata, link and only mutable update inputs", () => {
-    const { container } = render(<TosEventList events={[event, { ...event, id: "22222222-2222-4222-8222-222222222222", slug: "tennis-tos-20260828-deadbeef", sport: "tennis", status: "cancelled" }]} />);
+    const tennisEvent = { ...event, id: "22222222-2222-4222-8222-222222222222", slug: "tennis-tos-20260828-deadbeef", sport: "tennis", status: "cancelled" } as const;
+    const { container } = render(<TosEventList
+      events={[event, tennisEvent]}
+      capacityByEvent={new Map([
+        [event.id, capacity],
+        [tennisEvent.id, { ...capacity, eventId: tennisEvent.id }],
+      ])}
+    />);
     expect(screen.getAllByText("TOS vrijdag", { selector: "h3" })).toHaveLength(2);
     expect(screen.getAllByText("PADEL")).toHaveLength(1);
     expect(screen.getByText("Concept", { selector: "span" })).toBeVisible();
     expect(screen.getByText("Geannuleerd", { selector: "span" })).toBeVisible();
     expect(screen.getAllByRole("link", { name: "Eventpagina bekijken" })[0])
       .toHaveAttribute("href", "/tos/padel-tos-20260828-a1b2c3d4");
-    expect(screen.getAllByRole("link", { name: "Deelnemers bekijken" })[0])
+    expect(screen.getAllByRole("link", { name: "TOS-avond beheren" })[0])
       .toHaveAttribute("href", "/beheer/tos/padel-tos-20260828-a1b2c3d4");
     const update = container.querySelector<HTMLFormElement>('form[action="/api/beheer/tos/update"]')!;
     expect([...update.querySelectorAll("[name]")].map((node) => node.getAttribute("name"))).toEqual([
-      "slug", "title", "signup_deadline", "status",
+      "slug", "title", "signup_deadline", "max_participants", "status",
     ]);
     expect(within(update).queryByLabelText("Sport")).not.toBeInTheDocument();
     expect(within(update).queryByLabelText("Starttijd")).not.toBeInTheDocument();

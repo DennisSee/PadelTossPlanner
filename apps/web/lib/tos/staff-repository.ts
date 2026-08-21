@@ -3,9 +3,10 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { parseTosEvent, rows } from "./parser";
+import { parseStaffEventCapacityRows } from "./staff-data-parser";
 import { isTosEventSlug } from "./slug";
 import type { StaffEventCreateWrite, StaffEventUpdateWrite } from "./staff-management";
-import { TOS_EVENT_SELECT, type TosEvent } from "./types";
+import { TOS_EVENT_SELECT, type StaffEventCapacity, type TosEvent } from "./types";
 
 type QueryResult = Readonly<{ data?: unknown; error?: unknown; status?: number }>;
 
@@ -57,6 +58,16 @@ export class StaffTosEventRepository {
     return parseRows(result);
   }
 
+  async capacitySummaries(): Promise<StaffEventCapacity[]> {
+    const result = await this.client.rpc("staff_event_capacity_summaries");
+    if (result.error) throw new StaffEventDataError();
+    try {
+      return parseStaffEventCapacityRows(result.data);
+    } catch {
+      throw new StaffEventDataError();
+    }
+  }
+
   async eventBySlug(slug: string): Promise<TosEvent | null> {
     if (!isTosEventSlug(slug)) throw new StaffEventDataError();
     const values = parseRows(
@@ -79,6 +90,7 @@ export class StaffTosEventRepository {
       ends_at: write.endsAt,
       signup_deadline: write.signupDeadline,
       status: write.status,
+      max_participants: write.maxParticipants,
     }));
   }
 
@@ -89,6 +101,7 @@ export class StaffTosEventRepository {
         title: write.title,
         signup_deadline: write.signupDeadline,
         status: write.status,
+        max_participants: write.maxParticipants,
       })
       .eq("id", event.id)
       .eq("slug", event.slug));

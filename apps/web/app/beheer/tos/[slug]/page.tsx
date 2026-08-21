@@ -6,6 +6,7 @@ import { TosEventParticipants } from "../../../../components/management/tos-even
 import { requirePlannerAccount } from "../../../../lib/auth/route-guard";
 import { createServerSupabaseClient } from "../../../../lib/supabase/server";
 import { StaffPlannerInputRepository } from "../../../../lib/tos/staff-planner-input-repository";
+import { StaffRegistrationOverviewRepository } from "../../../../lib/tos/staff-registration-overview-repository";
 import { editablePlannerPlayers, importRegistrations } from "../../../../lib/tos/planner-draft";
 import { PlannerDraftRepository } from "../../../../lib/tos/planner-draft-repository";
 import { plannerMessage } from "../../../../lib/tos/planner-management-request";
@@ -13,7 +14,7 @@ import { StaffScheduleRepository } from "../../../../lib/tos/schedule-repository
 import { StaffTosEventRepository } from "../../../../lib/tos/staff-repository";
 import { isUuid } from "../../../../lib/tos/parser";
 import { isTosEventSlug } from "../../../../lib/tos/slug";
-import type { StaffPlannerInput } from "../../../../lib/tos/types";
+import type { StaffPlannerInput, StaffRegistrationOverview } from "../../../../lib/tos/types";
 import { randomUUID } from "node:crypto";
 import { StateMessage } from "../../../../components/ui";
 
@@ -43,11 +44,16 @@ export default async function TosEventParticipantsPage({ params, searchParams = 
   }
   if (!event) notFound();
 
-  let participants: StaffPlannerInput[] | null;
+  let participants: StaffRegistrationOverview[] | null;
+  let plannerInput: StaffPlannerInput[] | null;
   try {
-    participants = await new StaffPlannerInputRepository(client).plannerInputForEvent(event.id);
+    [participants, plannerInput] = await Promise.all([
+      new StaffRegistrationOverviewRepository(client).forEvent(event.id),
+      new StaffPlannerInputRepository(client).plannerInputForEvent(event.id),
+    ]);
   } catch {
     participants = null;
+    plannerInput = null;
   }
 
   const query = await searchParams;
@@ -57,7 +63,7 @@ export default async function TosEventParticipantsPage({ params, searchParams = 
   if (event.sport === "padel") {
     try {
       const draft = await new PlannerDraftRepository(client).load(event);
-      const preview = participants ? importRegistrations(event, draft, participants, randomUUID).preview : [];
+      const preview = plannerInput ? importRegistrations(event, draft, plannerInput, randomUUID).preview : [];
       const scheduleRepository = new StaffScheduleRepository(client);
       const schedules = await scheduleRepository.list(event.id);
       const requestedSchedule = last(query.schedule);
@@ -73,6 +79,7 @@ export default async function TosEventParticipantsPage({ params, searchParams = 
             endsAt: event.endsAt,
             signupDeadline: event.signupDeadline,
             status: event.status,
+            maxParticipants: event.maxParticipants,
           },
           draft: {
             players: editablePlannerPlayers(event, draft.players),

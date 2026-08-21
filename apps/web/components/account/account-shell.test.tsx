@@ -28,6 +28,18 @@ describe("protected account shell", () => {
     expect(form).toHaveAttribute("action", "/auth/logout");
   });
 
+  it("keeps role and membership badges out of the participant TOS context", () => {
+    const account = deriveAccountContext(identity, {
+      id: "user-1", display_name: "Admin", role: "admin", active: true, member_id: "member-1",
+    }, {
+      id: "member-1", display_name: "Admin", approval_status: "approved", active: true,
+    });
+    render(<AccountShell account={account} title="TOS-avonden" intro="TOS" variant="tos"><p>Inhoud</p></AccountShell>);
+    expect(screen.queryByLabelText("Accountmogelijkheden")).not.toBeInTheDocument();
+    expect(screen.queryByText("Planner")).not.toBeInTheDocument();
+    expect(screen.queryByText("Admin")).not.toBeInTheDocument();
+  });
+
   it.each(["missing", "pending", "approved", "rejected", "inactive", "inconsistent"] as const)(
     "has controlled copy for %s membership",
     (state) => expect(membershipLabel(state)).not.toMatch(/undefined|error/i),

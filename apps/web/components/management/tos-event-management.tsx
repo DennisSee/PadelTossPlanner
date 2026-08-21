@@ -7,7 +7,7 @@ import {
   formatEventDate,
   formatEventDateTimeInput,
 } from "../../lib/tos/time";
-import type { TosEvent, TosEventStatus } from "../../lib/tos/types";
+import type { StaffEventCapacity, TosEvent, TosEventStatus } from "../../lib/tos/types";
 
 import styles from "./tos-event-management.module.css";
 
@@ -51,16 +51,20 @@ export function CreateTosEventForm({ now = new Date() }: { now?: Date }) {
         <div className={styles.twoColumns}>
           <label className={styles.field}>
             Starttijd
-            <input name="starts_at" type="time" step={300} required defaultValue={defaults.startsAt} />
+            <input name="starts_at" type="time" step={60} required defaultValue={defaults.startsAt} />
           </label>
           <label className={styles.field}>
             Eindtijd
-            <input name="ends_at" type="time" step={300} required defaultValue={defaults.endsAt} />
+            <input name="ends_at" type="time" step={60} required defaultValue={defaults.endsAt} />
           </label>
         </div>
         <label className={styles.field}>
           Inschrijfdeadline <span className={styles.optional}>(optioneel)</span>
-          <input name="signup_deadline" type="datetime-local" step={300} defaultValue={defaults.signupDeadline} />
+          <input name="signup_deadline" type="datetime-local" step={60} defaultValue={defaults.signupDeadline} />
+        </label>
+        <label className={styles.field}>
+          Maximaal aantal deelnemers
+          <input name="max_participants" type="number" min={1} max={500} step={1} required defaultValue={defaults.maxParticipants} />
         </label>
         <label className={styles.field}>
           Initiële status
@@ -76,7 +80,7 @@ export function CreateTosEventForm({ now = new Date() }: { now?: Date }) {
   );
 }
 
-function EventCard({ event }: { event: TosEvent }) {
+function EventCard({ event, capacity }: { event: TosEvent; capacity: StaffEventCapacity }) {
   const presentation = eventPresentationStatus(event);
   const publicNote = event.status === "open"
     ? "Dit event is publiek zichtbaar via de eventpagina."
@@ -99,13 +103,15 @@ function EventCard({ event }: { event: TosEvent }) {
             <dd>{event.signupDeadline ? `${formatEventDate(event.signupDeadline)} · ${formatEventClock(event.signupDeadline)}` : "Geen deadline"}</dd>
             <dt>Eventlink</dt>
             <dd><code>{tosDetailPath(event.slug)}</code></dd>
+            <dt>Capaciteit</dt>
+            <dd>{capacity.placedCount} / {capacity.maxParticipants} bezet · {capacity.availableCount} vrij{capacity.waitlistCount ? ` · ${capacity.waitlistCount} wachtend` : ""}</dd>
           </dl>
           <p className={styles.publicNote}>{publicNote}</p>
           {presentation !== STATUS_LABELS[event.status] ? (
             <p className={styles.presentationNote}>{presentation}</p>
           ) : null}
           <div className={styles.eventActions}>
-            <SecondaryLinkButton href={`/beheer/tos/${event.slug}`}>Deelnemers bekijken</SecondaryLinkButton>
+            <SecondaryLinkButton href={`/beheer/tos/${event.slug}`}>TOS-avond beheren</SecondaryLinkButton>
             <SecondaryLinkButton href={tosDetailPath(event.slug)}>Eventpagina bekijken</SecondaryLinkButton>
           </div>
         </div>
@@ -121,9 +127,13 @@ function EventCard({ event }: { event: TosEvent }) {
           <input
             name="signup_deadline"
             type="datetime-local"
-            step={300}
+            step={60}
             defaultValue={event.signupDeadline ? formatEventDateTimeInput(event.signupDeadline) : ""}
           />
+        </label>
+        <label className={styles.field}>
+          Maximaal aantal deelnemers
+          <input name="max_participants" type="number" min={1} max={500} step={1} required defaultValue={event.maxParticipants} />
         </label>
         <label className={styles.field}>
           Status
@@ -142,7 +152,13 @@ function EventCard({ event }: { event: TosEvent }) {
   );
 }
 
-export function TosEventList({ events }: { events: readonly TosEvent[] }) {
+export function TosEventList({
+  events,
+  capacityByEvent,
+}: {
+  events: readonly TosEvent[];
+  capacityByEvent: ReadonlyMap<string, StaffEventCapacity>;
+}) {
   return (
     <section className={styles.section} aria-labelledby="tos-events-heading">
       <div className={styles.sectionHeader}>
@@ -151,7 +167,10 @@ export function TosEventList({ events }: { events: readonly TosEvent[] }) {
       </div>
       {events.length ? (
         <div className={styles.eventGrid}>
-          {events.map((event) => <EventCard key={event.id} event={event} />)}
+          {events.map((event) => {
+            const capacity = capacityByEvent.get(event.id);
+            return capacity ? <EventCard key={event.id} event={event} capacity={capacity} /> : null;
+          })}
         </div>
       ) : (
         <p className={styles.empty}>Er zijn nog geen TOS-avonden aangemaakt.</p>

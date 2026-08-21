@@ -35,6 +35,7 @@ const TOS_EVENT_COLUMNS = [
   "ends_at",
   "signup_deadline",
   "status",
+  "max_participants",
 ];
 const OWN_REGISTRATION_COLUMNS = [
   "id",
@@ -42,6 +43,7 @@ const OWN_REGISTRATION_COLUMNS = [
   "response",
   "available_from",
   "available_until",
+  "attending_since",
   "created_at",
   "updated_at",
 ];
@@ -51,6 +53,7 @@ const OWN_REGISTRATION_WITH_EVENT_SELECT =
 const registrations = new Map();
 const plannerDrafts = new Map();
 const staffSchedules = new Map();
+const sportProfileOverrides = new Map();
 
 function relativeIso(hours) {
   const value = new Date();
@@ -151,6 +154,13 @@ const tosEvents = [
     status: "closed",
   },
 ];
+for (const event of tosEvents) {
+  event.max_participants = event.slug === "web5b1-padel"
+    ? 6
+    : event.slug === "tennis-avond-2026"
+      ? 2
+      : 24;
+}
 const initialTosEvents = tosEvents.map((event) => ({ ...event }));
 
 const staffPlannerInputFixtures = [
@@ -300,6 +310,123 @@ const attendeeFixtures = [
   { display_name: "Inactief lid", response: "attending", active: false, approval: "approved" },
 ];
 
+function participantAttendance(event) {
+  const names = attendeeFixtures
+    .filter(({ response, active, approval }) =>
+      response === "attending" && active && approval === "approved")
+    .map(({ display_name }, index) => ({
+      order: index,
+      id: `fixture-${index}`,
+      display_name,
+    }));
+  for (const registration of registrations.values()) {
+    if (registration.event_id !== event.id || registration.response !== "attending") continue;
+    const attendee = [...authUsers.values()].find(({ id }) => id === registration.user_id);
+    if (!validParticipant(attendee)) continue;
+    names.push({
+      order: Date.parse(registration.attending_since),
+      id: registration.id,
+      display_name: attendee.membership.display_name,
+    });
+  }
+  const unique = [...new Map(names.map((item) => [item.display_name, item])).values()]
+    .sort((left, right) => left.order - right.order || left.id.localeCompare(right.id));
+  return unique.map((item, index) => ({
+    display_name: item.display_name,
+    placement_status: index < event.max_participants ? "placed" : "waitlist",
+    waitlist_position: index < event.max_participants ? null : index - event.max_participants + 1,
+  }));
+}
+
+function staffOverview(event) {
+  const fixtures = staffPlannerInputFixtures.filter(({ event_id }) => event_id === event.id);
+  let attendingPosition = 0;
+  return fixtures.map((fixture) => {
+    const safe = Object.fromEntries(
+      Object.entries(fixture).filter(([key]) => key !== "event_id"),
+    );
+    if (fixture.response === "declined") {
+      return { ...safe, placement_status: "declined", waitlist_position: null };
+    }
+    attendingPosition += 1;
+    return {
+      ...safe,
+      placement_status: attendingPosition <= event.max_participants ? "placed" : "waitlist",
+      waitlist_position: attendingPosition <= event.max_participants
+        ? null
+        : attendingPosition - event.max_participants,
+    };
+  });
+}
+
+function staffCapacity(event) {
+  const fixtureCount = staffPlannerInputFixtures.filter(
+    ({ event_id, response }) => event_id === event.id && response === "attending",
+  ).length;
+  const registrationCount = [...registrations.values()].filter(
+    ({ event_id, response }) => event_id === event.id && response === "attending",
+  ).length;
+  const total = fixtureCount + registrationCount;
+  return {
+    event_id: event.id,
+    max_participants: event.max_participants,
+    placed_count: Math.min(total, event.max_participants),
+    available_count: Math.max(event.max_participants - total, 0),
+    waitlist_count: Math.max(total - event.max_participants, 0),
+  };
+}
+
+function staffMemberDirectory() {
+  const members = new Map();
+  for (const fixture of staffPlannerInputFixtures) {
+    const existing = members.get(fixture.member_id) ?? {
+      member_id: fixture.member_id,
+      display_name: fixture.display_name,
+      approval_status: fixture.approval_status,
+      member_active: fixture.member_active,
+      account_linked: true,
+      padel_profile_active: false,
+      padel_ranking: null,
+      tennis_profile_active: false,
+      tennis_ranking: null,
+    };
+    const event = eventById(fixture.event_id);
+    if (event?.sport === "padel") {
+      existing.padel_profile_active = fixture.sport_profile_active;
+      existing.padel_ranking = fixture.ranking;
+    } else if (event?.sport === "tennis") {
+      existing.tennis_profile_active = fixture.sport_profile_active;
+      existing.tennis_ranking = fixture.ranking;
+    }
+    members.set(fixture.member_id, existing);
+  }
+  for (const user of authUsers.values()) {
+    if (!user.membership) continue;
+    if (!members.has(user.membership.id)) {
+      members.set(user.membership.id, {
+        member_id: user.membership.id,
+        display_name: user.membership.display_name,
+        approval_status: user.membership.approval_status,
+        member_active: user.membership.active,
+        account_linked: true,
+        padel_profile_active: false,
+        padel_ranking: null,
+        tennis_profile_active: false,
+        tennis_ranking: null,
+      });
+    }
+  }
+  for (const [key, override] of sportProfileOverrides) {
+    const [memberId, sport] = key.split(":");
+    const member = members.get(memberId);
+    if (!member) continue;
+    member[`${sport}_profile_active`] = override.active;
+    member[`${sport}_ranking`] = override.ranking;
+  }
+  return [...members.values()].sort((left, right) =>
+    left.display_name.localeCompare(right.display_name, "nl", { sensitivity: "base" }));
+}
+
 function registrationKey(userId, eventId) {
   return `${userId}:${eventId}`;
 }
@@ -332,6 +459,7 @@ function seedRegistration(user, eventId, response) {
     response,
     available_from: response === "attending" ? event.starts_at : null,
     available_until: response === "attending" ? event.ends_at : null,
+    attending_since: response === "attending" ? now : null,
     source: "self",
     created_at: now,
     updated_at: now,
@@ -627,7 +755,9 @@ function validStaff(user) {
 }
 
 function visibleEventForUser(event, user) {
-  return validStaff(user) || event.status === "open" || Boolean(user && registrationFor(user.id, event.id));
+  return validStaff(user) || event.status === "open" ||
+    (validParticipant(user) && event.status === "closed") ||
+    Boolean(user && registrationFor(user.id, event.id));
 }
 
 function validEventPayload(body) {
@@ -640,6 +770,7 @@ function validEventPayload(body) {
     typeof body.title === "string" && body.title.trim().length >= 1 && body.title.trim().length <= 160 &&
     new Set(["padel", "tennis"]).has(body.sport) &&
     new Set(["draft", "open", "closed", "cancelled"]).has(body.status) &&
+    Number.isInteger(body.max_participants) && body.max_participants > 0 && body.max_participants <= 500 &&
     !Number.isNaN(startsAt.getTime()) && !Number.isNaN(endsAt.getTime()) && endsAt > startsAt &&
     (deadline === null || (!Number.isNaN(deadline.getTime()) && deadline <= startsAt))
   );
@@ -742,6 +873,7 @@ const server = createServer(async (request, response) => {
     registrations.clear();
     plannerDrafts.clear();
     staffSchedules.clear();
+    sportProfileOverrides.clear();
     nextOAuthAttempt = null;
     attendeeFailureEventId = null;
     response.writeHead(204);
@@ -929,7 +1061,7 @@ const server = createServer(async (request, response) => {
     }
     json(response, 200, [{
       id: user.id,
-      display_name: "Testlid",
+      display_name: user.display_name ?? user.membership?.display_name ?? "Testlid",
       role: user.role,
       active: user.active,
       member_id: user.membership?.id ?? null,
@@ -968,6 +1100,91 @@ const server = createServer(async (request, response) => {
       active: true,
     };
     json(response, 200, [user.membership]);
+    return;
+  }
+  if (request.method === "POST" && requestUrl.pathname === "/rest/v1/rpc/update_my_display_name") {
+    const user = bearerUser(request);
+    const body = await requestJson(request);
+    if (!user || !exactKeys(body, ["new_display_name"])) {
+      json(response, user ? 400 : 401, { code: "42501", message: "display-name rejected" });
+      return;
+    }
+    const displayName = String(body.new_display_name ?? "").trim();
+    if (!validParticipant(user) || !displayName || displayName.length > 120 || /[\u0000-\u001f\u007f]/u.test(displayName)) {
+      json(response, 403, { code: "42501", message: "display-name rejected" });
+      return;
+    }
+    user.membership.display_name = displayName;
+    user.display_name = displayName;
+    json(response, 200, [{ display_name: displayName }]);
+    return;
+  }
+  if (request.method === "POST" && requestUrl.pathname === "/rest/v1/rpc/participant_event_capacity") {
+    const user = bearerUser(request);
+    const body = await requestJson(request);
+    const event = eventById(String(body.p_event_id ?? ""));
+    if (!user || !exactKeys(body, ["p_event_id"])) {
+      json(response, user ? 400 : 401, { code: "42501", message: "capacity rejected" });
+      return;
+    }
+    if (!validParticipant(user) || !event || !new Set(["open", "closed"]).has(event.status) || new Date(event.ends_at) < new Date()) {
+      json(response, 200, []);
+      return;
+    }
+    const attendance = participantAttendance(event);
+    const placedCount = attendance.filter(({ placement_status }) => placement_status === "placed").length;
+    json(response, 200, [{
+      max_participants: event.max_participants,
+      placed_count: placedCount,
+      available_count: Math.max(event.max_participants - placedCount, 0),
+      waitlist_count: attendance.filter(({ placement_status }) => placement_status === "waitlist").length,
+    }]);
+    return;
+  }
+  if (request.method === "POST" && requestUrl.pathname === "/rest/v1/rpc/participant_event_attendance") {
+    const user = bearerUser(request);
+    const body = await requestJson(request);
+    const event = eventById(String(body.p_event_id ?? ""));
+    if (!user || !exactKeys(body, ["p_event_id"])) {
+      json(response, user ? 400 : 401, { code: "42501", message: "attendance rejected" });
+      return;
+    }
+    if (event?.id === attendeeFailureEventId) {
+      attendeeFailureEventId = null;
+      json(response, 503, { code: "PGRST500", message: "fixture failure" });
+      return;
+    }
+    if (!validParticipant(user) || !event || !new Set(["open", "closed"]).has(event.status) || new Date(event.ends_at) < new Date()) {
+      json(response, 200, []);
+      return;
+    }
+    json(response, 200, participantAttendance(event));
+    return;
+  }
+  if (request.method === "POST" && requestUrl.pathname === "/rest/v1/rpc/participant_own_registration_position") {
+    const user = bearerUser(request);
+    const body = await requestJson(request);
+    const event = eventById(String(body.p_event_id ?? ""));
+    if (!user || !exactKeys(body, ["p_event_id"])) {
+      json(response, user ? 400 : 401, { code: "42501", message: "position rejected" });
+      return;
+    }
+    const registration = event ? registrationFor(user.id, event.id) : null;
+    if (!validParticipant(user) || !registration) {
+      json(response, 200, []);
+      return;
+    }
+    if (registration.response === "declined") {
+      json(response, 200, [{ placement_status: "declined", waitlist_position: null }]);
+      return;
+    }
+    const position = participantAttendance(event).find(
+      ({ display_name }) => display_name === user.membership.display_name,
+    );
+    json(response, 200, [{
+      placement_status: position?.placement_status ?? "placed",
+      waitlist_position: position?.waitlist_position ?? null,
+    }]);
     return;
   }
   if (
@@ -1013,6 +1230,62 @@ const server = createServer(async (request, response) => {
     json(response, 200, unique.map((display_name) => ({ display_name })));
     return;
   }
+  if (request.method === "POST" && requestUrl.pathname === "/rest/v1/rpc/staff_event_capacity_summaries") {
+    const user = bearerUser(request);
+    const body = await requestJson(request);
+    if (!user || !exactKeys(body, [])) {
+      json(response, user ? 400 : 401, { code: "42501", message: "staff capacity rejected" });
+      return;
+    }
+    json(response, 200, validStaff(user) ? tosEvents.map(staffCapacity) : []);
+    return;
+  }
+  if (request.method === "POST" && requestUrl.pathname === "/rest/v1/rpc/staff_event_registration_overview") {
+    const user = bearerUser(request);
+    const body = await requestJson(request);
+    const event = eventById(String(body.p_event_id ?? ""));
+    if (!user || !exactKeys(body, ["p_event_id"])) {
+      json(response, user ? 400 : 401, { code: "42501", message: "staff overview rejected" });
+      return;
+    }
+    json(response, 200, validStaff(user) && event ? staffOverview(event) : []);
+    return;
+  }
+  if (request.method === "POST" && requestUrl.pathname === "/rest/v1/rpc/staff_member_directory") {
+    const user = bearerUser(request);
+    const body = await requestJson(request);
+    if (!user || !exactKeys(body, [])) {
+      json(response, user ? 400 : 401, { code: "42501", message: "member directory rejected" });
+      return;
+    }
+    json(response, 200, validStaff(user) ? staffMemberDirectory() : []);
+    return;
+  }
+  if (request.method === "POST" && requestUrl.pathname === "/rest/v1/rpc/staff_update_member_sport_profile") {
+    const user = bearerUser(request);
+    const body = await requestJson(request);
+    if (!user || !exactKeys(body, ["p_member_id", "p_sport", "p_active", "p_ranking"])) {
+      json(response, user ? 400 : 401, { code: "42501", message: "sport profile rejected" });
+      return;
+    }
+    const directory = staffMemberDirectory();
+    const memberId = String(body.p_member_id ?? "");
+    const sport = String(body.p_sport ?? "");
+    const ranking = body.p_ranking;
+    if (
+      !validStaff(user) ||
+      !directory.some(({ member_id }) => member_id === memberId) ||
+      !new Set(["padel", "tennis"]).has(sport) ||
+      typeof body.p_active !== "boolean" ||
+      (ranking !== null && (!Number.isInteger(ranking) || ranking < 1 || ranking > 5))
+    ) {
+      json(response, 403, { code: "42501", message: "sport profile rejected" });
+      return;
+    }
+    sportProfileOverrides.set(`${memberId}:${sport}`, { active: body.p_active, ranking });
+    json(response, 200, [{ member_id: memberId, sport, active: body.p_active, ranking }]);
+    return;
+  }
   if (
     request.method === "POST" &&
     requestUrl.pathname === "/rest/v1/rpc/staff_event_planner_input"
@@ -1032,10 +1305,13 @@ const server = createServer(async (request, response) => {
       json(response, 200, []);
       return;
     }
-    json(response, 200, staffPlannerInputFixtures
-      .filter(({ event_id }) => event_id === eventId)
+    const event = eventById(eventId);
+    json(response, 200, staffOverview(event)
+      .filter(({ placement_status }) => placement_status === "placed")
       .map((fixture) => Object.fromEntries(
-        Object.entries(fixture).filter(([key]) => key !== "event_id"),
+        Object.entries(fixture).filter(
+          ([key]) => key !== "placement_status" && key !== "waitlist_position",
+        ),
       )));
     return;
   }
@@ -1202,6 +1478,18 @@ const server = createServer(async (request, response) => {
         new Date(right.starts_at) - new Date(left.starts_at)));
       return;
     }
+    if (
+      validParticipant(user) &&
+      hasOnlyQueryKeys(requestUrl, new Set(["select", "status", "ends_at", "order"])) &&
+      singleQueryValue(requestUrl, "status") === "in.(open,closed)" &&
+      singleQueryValue(requestUrl, "ends_at")?.startsWith("gte.") &&
+      singleQueryValue(requestUrl, "order") === "starts_at.asc"
+    ) {
+      json(response, 200, tosEvents
+        .filter((event) => new Set(["open", "closed"]).has(event.status) && new Date(event.ends_at) >= new Date())
+        .sort((left, right) => new Date(left.starts_at) - new Date(right.starts_at)));
+      return;
+    }
     const allowed = new Set(["select", "status", "ends_at", "or", "order"]);
     if (
       !user ||
@@ -1236,7 +1524,7 @@ const server = createServer(async (request, response) => {
     if (
       !validStaff(user) ||
       !hasOnlyQueryKeys(requestUrl, new Set()) ||
-      !exactKeys(body, ["slug", "title", "sport", "starts_at", "ends_at", "signup_deadline", "status"])
+      !exactKeys(body, ["slug", "title", "sport", "starts_at", "ends_at", "signup_deadline", "status", "max_participants"])
     ) {
       json(response, 403, { code: "42501", message: "event insert rejected" });
       return;
@@ -1255,6 +1543,7 @@ const server = createServer(async (request, response) => {
       ends_at: new Date(body.ends_at).toISOString(),
       signup_deadline: body.signup_deadline === null ? null : new Date(body.signup_deadline).toISOString(),
       status: body.status,
+      max_participants: body.max_participants,
     });
     json(response, 201, []);
     return;
@@ -1273,7 +1562,7 @@ const server = createServer(async (request, response) => {
       !validStaff(user) ||
       !hasOnlyQueryKeys(requestUrl, new Set(["id", "slug"])) ||
       !event ||
-      !exactKeys(body, ["title", "signup_deadline", "status"])
+      !exactKeys(body, ["title", "signup_deadline", "status", "max_participants"])
     ) {
       json(response, 403, { code: "42501", message: "event update rejected" });
       return;
@@ -1282,6 +1571,7 @@ const server = createServer(async (request, response) => {
     if (
       typeof body.title !== "string" || !body.title.trim() || body.title.trim().length > 160 ||
       !new Set(["draft", "open", "closed", "cancelled"]).has(body.status) ||
+      !Number.isInteger(body.max_participants) || body.max_participants < 1 || body.max_participants > 500 ||
       (deadline !== null && (Number.isNaN(deadline.getTime()) || deadline > new Date(event.starts_at)))
     ) {
       json(response, 400, { code: "23514", message: "event constraint rejected" });
@@ -1291,6 +1581,7 @@ const server = createServer(async (request, response) => {
       title: body.title.trim(),
       signup_deadline: deadline?.toISOString() ?? null,
       status: body.status,
+      max_participants: body.max_participants,
     });
     json(response, 200, []);
     return;
@@ -1387,6 +1678,7 @@ const server = createServer(async (request, response) => {
       response: body.response,
       available_from: availability.from,
       available_until: availability.until,
+      attending_since: body.response === "attending" ? now : null,
       source: "self",
       created_at: now,
       updated_at: now,
@@ -1436,6 +1728,11 @@ const server = createServer(async (request, response) => {
       response: body.response,
       available_from: availability.from,
       available_until: availability.until,
+      attending_since: body.response === "attending"
+        ? registration.response === "attending"
+          ? registration.attending_since
+          : new Date().toISOString()
+        : null,
       updated_at: new Date().toISOString(),
     });
     json(response, 200, [registrationRow(registration)]);

@@ -27,12 +27,14 @@ export type StaffEventCreateWrite = Readonly<{
   endsAt: string;
   signupDeadline: string | null;
   status: TosEventStatus;
+  maxParticipants: number;
 }>;
 
 export type StaffEventUpdateWrite = Readonly<{
   title: string;
   signupDeadline: string | null;
   status: TosEventStatus;
+  maxParticipants: number;
 }>;
 
 export type CreateEventInput = Readonly<{
@@ -43,12 +45,14 @@ export type CreateEventInput = Readonly<{
   endsAt: string;
   signupDeadline: string;
   status: string;
+  maxParticipants: string;
 }>;
 
 export type UpdateEventInput = Readonly<{
   title: string;
   signupDeadline: string;
   status: string;
+  maxParticipants: string;
 }>;
 
 export class InvalidStaffEventRequestError extends Error {
@@ -74,6 +78,15 @@ function sport(value: string): TosSport {
 function status(value: string): TosEventStatus {
   if (!STATUSES.has(value as TosEventStatus)) throw new InvalidStaffEventRequestError();
   return value as TosEventStatus;
+}
+
+function maxParticipants(value: string): number {
+  if (!/^[1-9]\d*$/u.test(value)) throw new InvalidStaffEventRequestError();
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed < 1 || parsed > 500) {
+    throw new InvalidStaffEventRequestError();
+  }
+  return parsed;
 }
 
 function strictDate(value: string): string {
@@ -144,6 +157,7 @@ export function validateCreateEvent(
     endsAt: endsAt.toISOString(),
     signupDeadline: deadline(input.signupDeadline, startsAt),
     status: status(input.status),
+    maxParticipants: maxParticipants(input.maxParticipants),
   });
 }
 
@@ -155,6 +169,7 @@ export function validateUpdateEvent(
     title: title(input.title),
     signupDeadline: deadline(input.signupDeadline, new Date(event.startsAt)),
     status: status(input.status),
+    maxParticipants: maxParticipants(input.maxParticipants),
   });
 }
 
@@ -175,6 +190,7 @@ export function createEventDefaults(now = new Date()) {
     endsAt: "22:00",
     signupDeadline: `${eventDate}T19:00`,
     status: "draft" as const,
+    maxParticipants: 24,
   });
 }
 
@@ -186,7 +202,8 @@ export function sameEventCreateWrite(event: TosEvent, write: StaffEventCreateWri
     new Date(event.startsAt).getTime() === new Date(write.startsAt).getTime() &&
     new Date(event.endsAt).getTime() === new Date(write.endsAt).getTime() &&
     nullableInstantEqual(event.signupDeadline, write.signupDeadline) &&
-    event.status === write.status
+    event.status === write.status &&
+    event.maxParticipants === write.maxParticipants
   );
 }
 
@@ -203,7 +220,8 @@ export function sameEventUpdate(
     new Date(after.endsAt).getTime() === new Date(before.endsAt).getTime() &&
     after.title === write.title &&
     nullableInstantEqual(after.signupDeadline, write.signupDeadline) &&
-    after.status === write.status
+    after.status === write.status &&
+    after.maxParticipants === write.maxParticipants
   );
 }
 

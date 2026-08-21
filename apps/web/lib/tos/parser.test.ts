@@ -3,9 +3,12 @@ import { describe, expect, it } from "vitest";
 import {
   InvalidTosDataError,
   parseAttendeeNames,
+  parseEventCapacity,
   parseOffsetTimestamp,
   parseOwnRegistration,
+  parseOwnRegistrationPosition,
   parseOwnRegistrationWithEvent,
+  parseParticipantAttendance,
   parseTosEvent,
 } from "./parser";
 
@@ -22,6 +25,7 @@ function event(overrides: Record<string, unknown> = {}) {
     ends_at: "2026-08-21T20:00:00Z",
     signup_deadline: "2026-08-21T16:00:00+00:00",
     status: "open",
+    max_participants: 24,
     ...overrides,
   };
 }
@@ -33,6 +37,7 @@ function registration(overrides: Record<string, unknown> = {}) {
     response: "attending",
     available_from: "2026-08-21T18:07:00Z",
     available_until: "2026-08-21T19:43:00Z",
+    attending_since: "2026-08-20T10:00:00Z",
     created_at: "2026-08-20T10:00:00Z",
     updated_at: "2026-08-20T10:00:00Z",
     ...overrides,
@@ -50,6 +55,7 @@ describe("TOS PostgREST parsers", () => {
       endsAt: "2026-08-21T20:00:00Z",
       signupDeadline: "2026-08-21T16:00:00+00:00",
       status: "open",
+      maxParticipants: 24,
     });
   });
 
@@ -70,7 +76,8 @@ describe("TOS PostgREST parsers", () => {
       response: "declined",
       available_from: null,
       available_until: null,
-    }))).toMatchObject({ response: "declined", availableFrom: null, availableUntil: null });
+      attending_since: null,
+    }))).toMatchObject({ response: "declined", availableFrom: null, availableUntil: null, attendingSince: null });
   });
 
   it.each([
@@ -105,5 +112,62 @@ describe("TOS PostgREST parsers", () => {
     ])).toEqual(["Dennis", "<img src=x onerror=alert(1)>"]);
     expect(() => parseAttendeeNames([{ display_name: "Dennis", email: "private@example.test" }]))
       .toThrow(InvalidTosDataError);
+  });
+
+  it("parses only internally consistent capacity counters", () => {
+    expect(parseEventCapacity({
+      max_participants: 24,
+      placed_count: 21,
+      available_count: 3,
+      waitlist_count: 2,
+    })).toEqual({ maxParticipants: 24, placedCount: 21, availableCount: 3, waitlistCount: 2 });
+    expect(() => parseEventCapacity({
+      max_participants: 24,
+      placed_count: 25,
+      available_count: 0,
+      waitlist_count: 1,
+    })).toThrow(InvalidTosDataError);
+    expect(() => parseEventCapacity({
+      max_participants: 24,
+      placed_count: 21,
+      available_count: 3,
+      waitlist_count: 2,
+      email: "private@example.test",
+    })).toThrow(InvalidTosDataError);
+  });
+
+  it("parses the minimal attendee placement projection", () => {
+    expect(parseParticipantAttendance({
+      display_name: " Dennis ",
+      placement_status: "waitlist",
+      waitlist_position: 2,
+    })).toEqual({ displayName: "Dennis", placementStatus: "waitlist", waitlistPosition: 2 });
+    expect(parseParticipantAttendance({
+      display_name: "Marieke",
+      placement_status: "placed",
+      waitlist_position: null,
+    })).toEqual({ displayName: "Marieke", placementStatus: "placed", waitlistPosition: null });
+    expect(() => parseParticipantAttendance({
+      display_name: "Dennis",
+      placement_status: "placed",
+      waitlist_position: 1,
+    })).toThrow(InvalidTosDataError);
+    expect(() => parseParticipantAttendance({
+      display_name: "Dennis",
+      placement_status: "declined",
+      waitlist_position: null,
+    })).toThrow(InvalidTosDataError);
+  });
+
+  it("parses only a valid own placement without identity fields", () => {
+    expect(parseOwnRegistrationPosition({ placement_status: "waitlist", waitlist_position: 1 }))
+      .toEqual({ placementStatus: "waitlist", waitlistPosition: 1 });
+    expect(parseOwnRegistrationPosition({ placement_status: "declined", waitlist_position: null }))
+      .toEqual({ placementStatus: "declined", waitlistPosition: null });
+    expect(() => parseOwnRegistrationPosition({
+      placement_status: "placed",
+      waitlist_position: null,
+      user_id: "private",
+    })).toThrow(InvalidTosDataError);
   });
 });

@@ -4,8 +4,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
   parseAttendeeNames,
+  parseEventCapacity,
   parseOwnRegistration,
+  parseOwnRegistrationPosition,
   parseOwnRegistrationWithEvent,
+  parseParticipantAttendance,
   parseTosEvent,
   rows,
 } from "./parser";
@@ -14,8 +17,11 @@ import {
   OWN_REGISTRATION_SELECT,
   OWN_REGISTRATION_WITH_EVENT_SELECT,
   TOS_EVENT_SELECT,
+  type EventCapacity,
   type OwnRegistration,
+  type OwnRegistrationPosition,
   type OwnRegistrationWithEvent,
+  type ParticipantAttendance,
   type RegistrationWrite,
   type TosEvent,
 } from "./types";
@@ -112,6 +118,21 @@ export class TosRepository {
     }
   }
 
+  async listParticipantEvents(now: Date): Promise<TosEvent[]> {
+    const result = await this.client
+      .from("tos_events")
+      .select(TOS_EVENT_SELECT)
+      .in("status", ["open", "closed"])
+      .gte("ends_at", now.toISOString())
+      .order("starts_at", { ascending: true });
+    try {
+      return sortEvents(resultRows(result).map(parseTosEvent));
+    } catch (error) {
+      if (error instanceof TosDataUnavailableError) throw error;
+      throw new TosDataUnavailableError();
+    }
+  }
+
   async listOwnUpcomingRegistrations(
     userId: string,
     now: Date,
@@ -156,6 +177,42 @@ export class TosRepository {
     if (result.error) throw new TosDataUnavailableError();
     try {
       return parseAttendeeNames(result.data);
+    } catch {
+      throw new TosDataUnavailableError();
+    }
+  }
+
+  async eventCapacity(eventId: string): Promise<EventCapacity> {
+    const row = requiredSingle(await this.client.rpc("participant_event_capacity", {
+      p_event_id: eventId,
+    }));
+    try {
+      return parseEventCapacity(row);
+    } catch {
+      throw new TosDataUnavailableError();
+    }
+  }
+
+  async eventAttendance(eventId: string): Promise<ParticipantAttendance[]> {
+    const result = await this.client.rpc("participant_event_attendance", {
+      p_event_id: eventId,
+    });
+    if (result.error) throw new TosDataUnavailableError();
+    try {
+      return rows(result.data).map(parseParticipantAttendance);
+    } catch {
+      throw new TosDataUnavailableError();
+    }
+  }
+
+  async ownRegistrationPosition(eventId: string): Promise<OwnRegistrationPosition | null> {
+    const row = optionalSingle(await this.client.rpc(
+      "participant_own_registration_position",
+      { p_event_id: eventId },
+    ));
+    if (!row) return null;
+    try {
+      return parseOwnRegistrationPosition(row);
     } catch {
       throw new TosDataUnavailableError();
     }

@@ -13,6 +13,7 @@ const event: TosEvent = {
   endsAt: "2026-08-21T20:00:00Z",
   signupDeadline: "2026-08-21T17:00:00Z",
   status: "open",
+  maxParticipants: 24,
 };
 
 const declined: OwnRegistration = {
@@ -21,6 +22,7 @@ const declined: OwnRegistration = {
   response: "declined",
   availableFrom: null,
   availableUntil: null,
+  attendingSince: null,
   createdAt: "2026-08-20T10:00:00Z",
   updatedAt: "2026-08-20T10:00:00Z",
 };
@@ -30,7 +32,11 @@ describe("participant TOS cards", () => {
     const { container } = render(
       <TosEventCard
         event={event}
-        attendeeNames={["Dennis", "<img src=x onerror=alert(1)>"]}
+        capacity={{ maxParticipants: 24, placedCount: 2, availableCount: 22, waitlistCount: 0 }}
+        attendance={[
+          { displayName: "Dennis", placementStatus: "placed", waitlistPosition: null },
+          { displayName: "<img src=x onerror=alert(1)>", placementStatus: "placed", waitlistPosition: null },
+        ]}
         now={new Date("2026-08-20T12:00:00Z")}
       />,
     );
@@ -46,6 +52,8 @@ describe("participant TOS cards", () => {
       <TosEventCard
         event={event}
         registration={declined}
+        capacity={{ maxParticipants: 24, placedCount: 0, availableCount: 24, waitlistCount: 0 }}
+        attendance={[]}
         now={new Date("2026-08-20T12:00:00Z")}
       />,
     );
@@ -58,6 +66,8 @@ describe("participant TOS cards", () => {
       <TosEventCard
         event={event}
         registration={declined}
+        capacity={{ maxParticipants: 24, placedCount: 0, availableCount: 24, waitlistCount: 0 }}
+        attendance={[]}
         now={new Date("2026-08-21T17:00:01Z")}
       />,
     );
@@ -67,5 +77,44 @@ describe("participant TOS cards", () => {
       "href",
       "/tos/vrijdag-padel",
     );
+  });
+
+  it("offers a waitlist CTA when an open event is full", () => {
+    render(<TosEventCard
+      event={{ ...event, maxParticipants: 2 }}
+      capacity={{ maxParticipants: 2, placedCount: 2, availableCount: 0, waitlistCount: 1 }}
+      attendance={[
+        { displayName: "Dennis", placementStatus: "placed", waitlistPosition: null },
+        { displayName: "Marieke", placementStatus: "placed", waitlistPosition: null },
+        { displayName: "Peter", placementStatus: "waitlist", waitlistPosition: 1 },
+      ]}
+      now={new Date("2026-08-20T12:00:00Z")}
+    />);
+    expect(screen.getAllByText("2 / 2")[0]).toBeVisible();
+    expect(screen.getByText("1 op wachtlijst")).toBeVisible();
+    expect(screen.getByRole("link", { name: "Op wachtlijst" })).toHaveAttribute(
+      "href",
+      "/tos/vrijdag-padel",
+    );
+  });
+
+  it("shows only the own derived waitlist position", () => {
+    const attending = {
+      ...declined,
+      response: "attending" as const,
+      availableFrom: event.startsAt,
+      availableUntil: event.endsAt,
+      attendingSince: "2026-08-20T10:00:00Z",
+    };
+    render(<TosEventCard
+      event={{ ...event, maxParticipants: 2 }}
+      registration={attending}
+      registrationPosition={{ placementStatus: "waitlist", waitlistPosition: 2 }}
+      capacity={{ maxParticipants: 2, placedCount: 2, availableCount: 0, waitlistCount: 2 }}
+      attendance={[]}
+      now={new Date("2026-08-20T12:00:00Z")}
+    />);
+    expect(screen.getByText("Wachtlijst · plek 2")).toBeVisible();
+    expect(screen.getByRole("link", { name: "Aanmelding wijzigen" })).toBeVisible();
   });
 });

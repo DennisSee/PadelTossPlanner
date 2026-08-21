@@ -1,7 +1,7 @@
 export const TOS_EVENT_SELECT =
-  "id,slug,title,sport,starts_at,ends_at,signup_deadline,status" as const;
+  "id,slug,title,sport,starts_at,ends_at,signup_deadline,status,max_participants" as const;
 export const OWN_REGISTRATION_SELECT =
-  "id,event_id,response,available_from,available_until,created_at,updated_at" as const;
+  "id,event_id,response,available_from,available_until,attending_since,created_at,updated_at" as const;
 export const OWN_REGISTRATION_WITH_EVENT_SELECT =
   `${OWN_REGISTRATION_SELECT},tos_events!inner(${TOS_EVENT_SELECT})` as const;
 
@@ -18,6 +18,7 @@ export type TosEvent = Readonly<{
   endsAt: string;
   signupDeadline: string | null;
   status: TosEventStatus;
+  maxParticipants: number;
 }>;
 
 export type OwnRegistration = Readonly<{
@@ -26,6 +27,7 @@ export type OwnRegistration = Readonly<{
   response: RegistrationResponse;
   availableFrom: string | null;
   availableUntil: string | null;
+  attendingSince: string | null;
   createdAt: string;
   updatedAt: string;
 }>;
@@ -40,6 +42,25 @@ export type RegistrationWrite = Readonly<{
 }>;
 
 export type MemberApprovalStatus = "pending" | "approved" | "rejected";
+export type RegistrationPlacement = "placed" | "waitlist" | "declined";
+
+export type EventCapacity = Readonly<{
+  maxParticipants: number;
+  placedCount: number;
+  availableCount: number;
+  waitlistCount: number;
+}>;
+
+export type ParticipantAttendance = Readonly<{
+  displayName: string;
+  placementStatus: Exclude<RegistrationPlacement, "declined">;
+  waitlistPosition: number | null;
+}>;
+
+export type OwnRegistrationPosition = Readonly<{
+  placementStatus: RegistrationPlacement;
+  waitlistPosition: number | null;
+}>;
 
 export type StaffPlannerInput = Readonly<{
   registrationId: string;
@@ -53,6 +74,32 @@ export type StaffPlannerInput = Readonly<{
   approvalStatus: MemberApprovalStatus;
   memberActive: boolean;
   sportProfileActive: boolean;
+  ranking: number | null;
+}>;
+
+export type StaffRegistrationOverview = StaffPlannerInput & Readonly<{
+  placementStatus: RegistrationPlacement;
+  waitlistPosition: number | null;
+}>;
+
+export type StaffEventCapacity = EventCapacity & Readonly<{ eventId: string }>;
+
+export type StaffMemberDirectoryItem = Readonly<{
+  memberId: string;
+  displayName: string;
+  approvalStatus: MemberApprovalStatus;
+  memberActive: boolean;
+  accountLinked: boolean;
+  padelProfileActive: boolean;
+  padelRanking: number | null;
+  tennisProfileActive: boolean;
+  tennisRanking: number | null;
+}>;
+
+export type StaffSportProfileWrite = Readonly<{
+  memberId: string;
+  sport: TosSport;
+  active: boolean;
   ranking: number | null;
 }>;
 

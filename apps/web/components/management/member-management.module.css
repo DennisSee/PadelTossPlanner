@@ -1,0 +1,157 @@
+.stack,
+.memberGrid {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.toolbar {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.toolbar form {
+  display: grid;
+  grid-template-columns: minmax(12rem, 24rem) auto;
+  gap: var(--space-2);
+}
+
+.toolbar label {
+  grid-column: 1 / -1;
+  color: var(--club-green-dark);
+  font-size: 0.85rem;
+  font-weight: 750;
+}
+
+.toolbar input,
+.toolbar button,
+.sportForm select,
+.sportForm button {
+  min-height: 2.8rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  background: var(--surface);
+  font: inherit;
+}
+
+.toolbar button,
+.sportForm button {
+  border-color: var(--club-green);
+  color: var(--surface);
+  background: var(--club-green);
+  cursor: pointer;
+  font-weight: 750;
+}
+
+.resultCount {
+  margin: 0;
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+.memberCard {
+  min-width: 0;
+  padding: clamp(1rem, 2.5vw, 1.35rem);
+}
+
+.memberCard > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.memberCard h2,
+.memberCard p,
+.sportForm h3 {
+  margin: 0;
+}
+
+.memberCard h2 {
+  color: var(--club-green-dark);
+  font-size: 1.35rem;
+}
+
+.memberCard p {
+  margin-top: var(--space-1);
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.sports {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.sportForm {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+  padding: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-subtle);
+}
+
+.sportForm h3,
+.sportForm button {
+  grid-column: 1 / -1;
+}
+
+.sportForm h3 {
+  color: var(--club-green-dark);
+  font-size: 1rem;
+}
+
+.sportForm label {
+  display: grid;
+  gap: var(--space-1);
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.toolbar input:focus-visible,
+.toolbar button:focus-visible,
+.sportForm select:focus-visible,
+.sportForm button:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--club-green) 32%, transparent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 48rem) {
+  .toolbar,
+  .memberCard > header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .toolbar form,
+  .sports,
+  .sportForm {
+    grid-template-columns: 1fr;
+  }
+
+  .toolbar button,
+  .toolbar a,
+  .sportForm h3,
+  .sportForm button {
+    grid-column: 1;
+    width: 100%;
+  }
+
+  .badges {
+    justify-content: flex-start;
+  }
+}

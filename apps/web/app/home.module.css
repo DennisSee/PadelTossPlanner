@@ -36,7 +36,7 @@
 
 .intro {
   position: relative;
-  min-height: clamp(24rem, 51vw, 35rem);
+  min-height: clamp(22rem, 46vw, 31rem);
   overflow: hidden;
   padding: clamp(1.5rem, 5vw, 3.25rem);
   border: 0;
@@ -82,11 +82,11 @@
 }
 
 .title {
-  max-width: 12ch;
+  max-width: 11ch;
   margin: 0;
   color: var(--surface);
   font-family: var(--font-display);
-  font-size: clamp(3.1rem, 7.8vw, 6.7rem);
+  font-size: clamp(3rem, 7.1vw, 6.1rem);
   font-weight: 800;
   line-height: 0.86;
   letter-spacing: 0.005em;
@@ -201,7 +201,7 @@
   }
 
   .intro {
-    min-height: 31rem;
+    min-height: 25rem;
     background:
       linear-gradient(160deg, var(--club-green) 0 72%, transparent 72%),
       var(--club-yellow);
@@ -217,7 +217,8 @@
   }
 
   .title {
-    font-size: clamp(3.4rem, 16vw, 5.4rem);
+    font-size: clamp(3.1rem, 14vw, 4.7rem);
+    line-height: 0.9;
   }
 
   .side {
@@ -255,7 +256,7 @@
   }
 
   .intro {
-    min-height: 29rem;
+    min-height: 23rem;
     padding: 1.25rem;
   }
 

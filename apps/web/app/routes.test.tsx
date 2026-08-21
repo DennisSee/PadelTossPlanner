@@ -23,7 +23,7 @@ describe("WEB-2 routes", () => {
   it("links the public homepage to live schedule and the shared login", async () => {
     render(await Home());
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
-      "Jouw TOS-avond in één oogopslag",
+      "Jouw TOS-avond. Live.",
     );
     expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
       "Doe mee met de volgende TOS",

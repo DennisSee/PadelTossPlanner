@@ -40,4 +40,18 @@ describe("self-service registration form", () => {
       expect(container.querySelector(`[name="${name}"]`)).toBeNull();
     }
   });
+
+  it("explains the waitlist action without changing the registration payload", () => {
+    const { container } = render(<RegistrationForm
+      slug="vrijdag-padel"
+      initialResponse="attending"
+      initialFrom="20:00"
+      initialUntil="22:00"
+      existing={false}
+      waitlistExpected
+    />);
+    expect(screen.getByRole("button", { name: "Aanmelden voor wachtlijst" })).toBeVisible();
+    expect([...container.querySelectorAll("[name]")].map((node) => node.getAttribute("name")))
+      .toEqual(["slug", "response", "response", "available_from", "available_until"]);
+  });
 });

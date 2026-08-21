@@ -38,6 +38,7 @@ const validFields = {
   ends_at: "22:00",
   signup_deadline: "2026-08-28T19:00",
   status: "draft",
+  max_participants: "24",
 };
 
 function request(fields: Record<string, string>, origin: string | null = APP_BASE_URL) {
@@ -65,6 +66,7 @@ describe("staff event create POST boundary", () => {
       endsAt: storedWrite.endsAt,
       signupDeadline: storedWrite.signupDeadline,
       status: storedWrite.status,
+      maxParticipants: storedWrite.maxParticipants,
     } : null);
   });
 
@@ -77,7 +79,7 @@ describe("staff event create POST boundary", () => {
     expect(createEvent).toHaveBeenCalledTimes(1);
     const write = createEvent.mock.calls[0][0];
     expect(Object.keys(write).sort()).toEqual([
-      "endsAt", "signupDeadline", "slug", "sport", "startsAt", "status", "title",
+      "endsAt", "maxParticipants", "signupDeadline", "slug", "sport", "startsAt", "status", "title",
     ]);
     expect(write.slug).toMatch(/^padel-tos-20260828-[0-9a-f]{8}$/u);
     expect(eventBySlug).toHaveBeenCalledWith(write.slug);
@@ -120,6 +122,7 @@ describe("staff event create POST boundary", () => {
       id: "11111111-1111-4111-8111-111111111111", slug: "different", title: "Changed",
       sport: "padel", startsAt: "2026-08-28T18:07:00Z", endsAt: "2026-08-28T20:00:00Z",
       signupDeadline: null, status: "draft",
+      maxParticipants: 24,
     });
     const response = await POST(request(validFields));
     expect(response.headers.get("location")).toBe(`${APP_BASE_URL}/beheer?error=temporarily-unavailable`);

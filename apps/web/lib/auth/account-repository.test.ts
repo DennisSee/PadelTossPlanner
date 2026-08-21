@@ -71,6 +71,16 @@ describe("user-scoped account repository", () => {
     expect(AccountContextRepository.toString()).not.toMatch(/service.?role|secret.?key/i);
   });
 
+  it("updates the display name only through the existing self-service RPC", async () => {
+    const rpc = vi.fn(async () => ({ data: [{ display_name: "Dennis Seesing" }], error: null }));
+    const repository = new AccountContextRepository({ rpc } as unknown as SupabaseClient);
+    await expect(repository.updateOwnDisplayName("Dennis Seesing")).resolves.toBeUndefined();
+    expect(rpc).toHaveBeenCalledWith("update_my_display_name", {
+      new_display_name: "Dennis Seesing",
+    });
+    expect(AccountContextRepository.prototype.updateOwnDisplayName).toHaveLength(1);
+  });
+
   it("handles zero rows as a closed missing profile", async () => {
     const fake = repository([]);
     const context = await fake.repository.loadOwn(identity);

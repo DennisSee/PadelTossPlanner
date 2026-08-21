@@ -1,6 +1,10 @@
 import {
+  type EventCapacity,
+  type OwnRegistrationPosition,
   type OwnRegistration,
   type OwnRegistrationWithEvent,
+  type ParticipantAttendance,
+  type RegistrationPlacement,
   type RegistrationResponse,
   type TosEvent,
   type TosEventStatus,
@@ -58,6 +62,19 @@ function nullableOffsetTimestamp(value: unknown): string | null {
   return value === null ? null : parseOffsetTimestamp(value);
 }
 
+function nonNegativeInteger(value: unknown): number {
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0) {
+    throw new InvalidTosDataError();
+  }
+  return value;
+}
+
+function positiveInteger(value: unknown): number {
+  const parsed = nonNegativeInteger(value);
+  if (parsed < 1) throw new InvalidTosDataError();
+  return parsed;
+}
+
 export function rows(value: unknown): Record<string, unknown>[] {
   if (!Array.isArray(value)) throw new InvalidTosDataError();
   return value.map(record);
@@ -82,6 +99,7 @@ export function parseTosEvent(value: unknown): TosEvent {
   const startsAt = parseOffsetTimestamp(row.starts_at);
   const endsAt = parseOffsetTimestamp(row.ends_at);
   const signupDeadline = nullableOffsetTimestamp(row.signup_deadline);
+  const maxParticipants = positiveInteger(row.max_participants);
   if (new Date(endsAt) <= new Date(startsAt)) throw new InvalidTosDataError();
   return Object.freeze({
     id,
@@ -92,6 +110,7 @@ export function parseTosEvent(value: unknown): TosEvent {
     endsAt,
     signupDeadline,
     status,
+    maxParticipants,
   });
 }
 
@@ -105,12 +124,15 @@ export function parseOwnRegistration(value: unknown): OwnRegistration {
   }
   const availableFrom = nullableOffsetTimestamp(row.available_from);
   const availableUntil = nullableOffsetTimestamp(row.available_until);
+  const attendingSince = nullableOffsetTimestamp(row.attending_since);
   if (
     (response === "attending" &&
       (!availableFrom ||
         !availableUntil ||
+        !attendingSince ||
         new Date(availableUntil) <= new Date(availableFrom))) ||
-    (response === "declined" && (availableFrom !== null || availableUntil !== null))
+    (response === "declined" &&
+      (availableFrom !== null || availableUntil !== null || attendingSince !== null))
   ) {
     throw new InvalidTosDataError();
   }
@@ -120,6 +142,7 @@ export function parseOwnRegistration(value: unknown): OwnRegistration {
     response,
     availableFrom,
     availableUntil,
+    attendingSince,
     createdAt: parseOffsetTimestamp(row.created_at),
     updatedAt: parseOffsetTimestamp(row.updated_at),
   });
@@ -153,4 +176,76 @@ export function parseAttendeeNames(value: unknown): string[] {
     }
     return row.display_name.trim();
   });
+}
+
+const PLACEMENTS = new Set<RegistrationPlacement>(["placed", "waitlist", "declined"]);
+
+function placement(value: unknown): RegistrationPlacement {
+  if (typeof value !== "string" || !PLACEMENTS.has(value as RegistrationPlacement)) {
+    throw new InvalidTosDataError();
+  }
+  return value as RegistrationPlacement;
+}
+
+function nullablePosition(value: unknown): number | null {
+  return value === null ? null : positiveInteger(value);
+}
+
+export function parseEventCapacity(value: unknown): EventCapacity {
+  const row = record(value);
+  const expected = ["max_participants", "placed_count", "available_count", "waitlist_count"];
+  if (Object.keys(row).length !== expected.length || expected.some((key) => !(key in row))) {
+    throw new InvalidTosDataError();
+  }
+  const maxParticipants = positiveInteger(row.max_participants);
+  const placedCount = nonNegativeInteger(row.placed_count);
+  const availableCount = nonNegativeInteger(row.available_count);
+  const waitlistCount = nonNegativeInteger(row.waitlist_count);
+  if (
+    placedCount > maxParticipants ||
+    availableCount !== maxParticipants - placedCount
+  ) {
+    throw new InvalidTosDataError();
+  }
+  return Object.freeze({ maxParticipants, placedCount, availableCount, waitlistCount });
+}
+
+export function parseParticipantAttendance(value: unknown): ParticipantAttendance {
+  const row = record(value);
+  const expected = ["display_name", "placement_status", "waitlist_position"];
+  if (Object.keys(row).length !== expected.length || expected.some((key) => !(key in row))) {
+    throw new InvalidTosDataError();
+  }
+  const displayName = stringValue(row.display_name, 120).trim();
+  const placementStatus = placement(row.placement_status);
+  const waitlistPosition = nullablePosition(row.waitlist_position);
+  if (
+    !displayName ||
+    placementStatus === "declined" ||
+    (placementStatus === "placed" && waitlistPosition !== null) ||
+    (placementStatus === "waitlist" && waitlistPosition === null)
+  ) {
+    throw new InvalidTosDataError();
+  }
+  return Object.freeze({ displayName, placementStatus, waitlistPosition });
+}
+
+export function parseOwnRegistrationPosition(value: unknown): OwnRegistrationPosition {
+  const row = record(value);
+  if (
+    Object.keys(row).length !== 2 ||
+    !("placement_status" in row) ||
+    !("waitlist_position" in row)
+  ) {
+    throw new InvalidTosDataError();
+  }
+  const placementStatus = placement(row.placement_status);
+  const waitlistPosition = nullablePosition(row.waitlist_position);
+  if (
+    (placementStatus === "waitlist" && waitlistPosition === null) ||
+    (placementStatus !== "waitlist" && waitlistPosition !== null)
+  ) {
+    throw new InvalidTosDataError();
+  }
+  return Object.freeze({ placementStatus, waitlistPosition });
 }

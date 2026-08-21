@@ -149,7 +149,7 @@ select ok(
     position('event.id = p_event_id' in lower(pg_get_functiondef(
         'public.staff_event_planner_input(uuid)'::regprocedure
     ))) > 0
-    and position('registration.event_id = event.id' in lower(pg_get_functiondef(
+    and position('registration.event_id = p_event_id' in lower(pg_get_functiondef(
         'public.staff_event_planner_input(uuid)'::regprocedure
     ))) > 0,
     'RPC scope is exact p_event_id via de gekoppelde eventrow'
@@ -175,17 +175,17 @@ select ok(
 select ok(
     position('registration.response =' in lower(pg_get_functiondef(
         'public.staff_event_planner_input(uuid)'::regprocedure
-    ))) = 0,
-    'RPC filtert attending of declined niet weg'
+    ))) > 0,
+    'RPC neemt uitsluitend attending-registraties mee'
 );
 select ok(
-    position('registration.created_at asc' in lower(pg_get_functiondef(
+    position('registration.attending_since' in lower(pg_get_functiondef(
         'public.staff_event_planner_input(uuid)'::regprocedure
     ))) > 0
-    and position('registration.id asc' in lower(pg_get_functiondef(
+    and position('registration.id' in lower(pg_get_functiondef(
         'public.staff_event_planner_input(uuid)'::regprocedure
     ))) > 0,
-    'RPC sorteert op created_at met registratie-id als tie-break'
+    'RPC plaatst op attending_since met registratie-id als stabiele tie-break'
 );
 
 -- Bestaande tabelrechten blijven ongewijzigd en RLS blijft de directe
@@ -353,8 +353,8 @@ select is(
     (select count(*) from public.staff_event_planner_input(
         '5d000000-0000-4000-8000-000000000001'
     )),
-    8::bigint,
-    'actieve planner zonder membership leest alle padelregistraties'
+    7::bigint,
+    'actieve planner zonder membership leest alleen geplaatste attending-registraties'
 );
 select is(
     (select count(*) from public.registrations),
@@ -371,7 +371,6 @@ select results_eq(
     $values$
         values
             ('5e000000-0000-4000-8000-000000000001'::uuid),
-            ('5e000000-0000-4000-8000-000000000002'::uuid),
             ('5e000000-0000-4000-8000-000000000003'::uuid),
             ('5e000000-0000-4000-8000-000000000004'::uuid),
             ('5e000000-0000-4000-8000-000000000005'::uuid),
@@ -379,7 +378,7 @@ select results_eq(
             ('5e000000-0000-4000-8000-000000000007'::uuid),
             ('5e000000-0000-4000-8000-000000000008'::uuid)
     $values$,
-    'registraties volgen created_at en daarna id'
+    'plannerinput bevat uitsluitend attending-registraties in plaatsingsvolgorde'
 );
 select results_eq(
     $sql$
@@ -389,8 +388,8 @@ select results_eq(
         )
         order by response
     $sql$,
-    $values$values ('attending'::text), ('declined'::text)$values$,
-    'attending en declined blijven beide zichtbaar'
+    $values$values ('attending'::text)$values$,
+    'declined wordt uitgesloten van plannerinput'
 );
 select results_eq(
     $sql$
@@ -524,7 +523,7 @@ select is(
     (select count(*) from public.staff_event_planner_input(
         '5d000000-0000-4000-8000-000000000001'
     )),
-    8::bigint,
+    7::bigint,
     'actieve admin zonder membership leest dezelfde eventscope'
 );
 

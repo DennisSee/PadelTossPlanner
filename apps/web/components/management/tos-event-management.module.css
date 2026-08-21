@@ -1,8 +1,70 @@
 .layout,
+.eventArea,
 .section,
 .eventGrid {
   display: grid;
   gap: var(--space-4);
+}
+
+.eventArea {
+  min-width: 0;
+}
+
+.managementLinks {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.managementLinks a {
+  color: var(--club-green-dark);
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.filters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(9rem, 1fr)) auto auto auto;
+  align-items: end;
+  gap: var(--space-2);
+  padding: 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.filters label {
+  display: grid;
+  gap: var(--space-1);
+  font-size: 0.8rem;
+  font-weight: 750;
+}
+
+.filters select,
+.filters button {
+  min-height: 2.65rem;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  background: var(--surface);
+  font: inherit;
+}
+
+.filters button {
+  border-color: var(--club-green);
+  color: var(--surface);
+  background: var(--club-green);
+  cursor: pointer;
+  font-weight: 750;
+}
+
+.filters a,
+.filters > span {
+  align-self: center;
+  color: var(--club-green-dark);
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-decoration: none;
 }
 
 .message {
@@ -273,5 +335,15 @@
   .secondaryButton,
   .eventActions > * {
     width: 100%;
+  }
+
+  .filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .filters button,
+  .filters a,
+  .filters > span {
+    grid-column: 1 / -1;
   }
 }

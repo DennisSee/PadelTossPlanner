@@ -46,9 +46,9 @@ test("planner without membership sees event-scoped padel readiness and preview",
   await page.goto("/login?next=/beheer");
   await signIn(page, request, email("planner-no-member"));
   const card = page.getByRole("heading", { name: "WEB-5B1 Padelavond" }).locator("xpath=ancestor::section[1]");
-  await expect(card.getByRole("link", { name: "Deelnemers bekijken" }))
+  await expect(card.getByRole("link", { name: "TOS-avond beheren" }))
     .toHaveAttribute("href", "/beheer/tos/web5b1-padel");
-  await card.getByRole("link", { name: "Deelnemers bekijken" }).click();
+  await card.getByRole("link", { name: "TOS-avond beheren" }).click();
   await expect(page).toHaveURL(/\/beheer\/tos\/web5b1-padel$/u);
 
   await expect(page.getByRole("heading", { name: "WEB-5B1 Padelavond" })).toBeVisible();
@@ -59,7 +59,9 @@ test("planner without membership sees event-scoped padel readiness and preview",
   await expect(page.getByText("Lidmaatschap niet goedgekeurd").first()).toBeVisible();
   await expect(page.getByText("Clublid inactief").first()).toBeVisible();
   await expect(page.getByText("Padelprofiel inactief").first()).toBeVisible();
-  await expect(page.getByText("Padelniveau ontbreekt").first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Wachtlijst" })).toBeVisible();
+  await expect(page.getByText("Wachtlijst · plek 1").first()).toBeVisible();
+  await expect(page.getByText("Ontbreekt").first()).toBeVisible();
 
   const preview = page.getByRole("heading", { name: "Plannerinput" }).locator("xpath=ancestor::section[1]");
   await expect(preview.getByText("Ready Hele Avond")).toBeVisible();
@@ -82,7 +84,7 @@ test("admin sees the event-specific tennis ranking without a planner preview", a
   await page.goto("/login?next=/beheer");
   await signIn(page, request, email("admin-no-member"));
   const card = page.getByRole("heading", { name: "WEB-5B1 Tennisavond" }).locator("xpath=ancestor::section[1]");
-  await card.getByRole("link", { name: "Deelnemers bekijken" }).click();
+  await card.getByRole("link", { name: "TOS-avond beheren" }).click();
   await expect(page.getByRole("heading", { name: "WEB-5B1 Tennisavond" })).toBeVisible();
   await expect(page.getByText("Tennisniveau")).toBeVisible();
   await expect(page.getByText("Gegevens compleet")).toBeVisible();

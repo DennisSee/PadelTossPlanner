@@ -144,8 +144,8 @@ select is(
           and grantee = 'authenticated'
           and privilege_type = 'SELECT'
     ),
-    '["ends_at", "id", "signup_deadline", "slug", "sport", "starts_at", "status", "title"]'::jsonb,
-    'authenticated SELECT blijft exact de publieke eventprojectie'
+    '["ends_at", "id", "max_participants", "signup_deadline", "slug", "sport", "starts_at", "status", "title"]'::jsonb,
+    'authenticated SELECT blijft exact de veilige eventprojectie inclusief capaciteit'
 );
 select is(
     (
@@ -156,8 +156,8 @@ select is(
           and grantee = 'authenticated'
           and privilege_type = 'INSERT'
     ),
-    '["ends_at", "signup_deadline", "slug", "sport", "starts_at", "status", "title"]'::jsonb,
-    'authenticated INSERT is exact tot zeven eventvelden beperkt'
+    '["ends_at", "max_participants", "signup_deadline", "slug", "sport", "starts_at", "status", "title"]'::jsonb,
+    'authenticated INSERT is exact tot de acht eventvelden inclusief capaciteit beperkt'
 );
 select is(
     (
@@ -168,8 +168,8 @@ select is(
           and grantee = 'authenticated'
           and privilege_type = 'UPDATE'
     ),
-    '["signup_deadline", "status", "title"]'::jsonb,
-    'authenticated UPDATE is exact tot titel, deadline en status beperkt'
+    '["max_participants", "signup_deadline", "status", "title"]'::jsonb,
+    'authenticated UPDATE is exact tot titel, deadline, status en capaciteit beperkt'
 );
 select ok(
     not has_table_privilege('authenticated', 'public.tos_events', 'DELETE'),
@@ -193,8 +193,8 @@ select is(
         where conrelid = 'public.tos_events'::regclass
           and conname like 'tos_events_%_check'
     ),
-    '["tos_events_signup_deadline_check", "tos_events_slug_check", "tos_events_sport_check", "tos_events_status_check", "tos_events_time_range_check", "tos_events_title_check"]'::jsonb,
-    'alle bestaande eventconstraints blijven intact'
+    '["tos_events_max_participants_check", "tos_events_signup_deadline_check", "tos_events_slug_check", "tos_events_sport_check", "tos_events_status_check", "tos_events_time_range_check", "tos_events_title_check"]'::jsonb,
+    'alle bestaande eventconstraints plus de capaciteitsconstraint blijven intact'
 );
 select ok(
     exists (

@@ -17,6 +17,7 @@ const base = {
   endsAt: "22:00",
   signupDeadline: "2026-08-28T19:00",
   status: "draft",
+  maxParticipants: "24",
 };
 
 describe("staff event management validation", () => {
@@ -29,6 +30,7 @@ describe("staff event management validation", () => {
       endsAt: "2026-08-28T20:00:00.000Z",
       signupDeadline: "2026-08-28T17:00:00.000Z",
       status: "draft",
+      maxParticipants: 24,
     });
   });
 
@@ -54,6 +56,8 @@ describe("staff event management validation", () => {
     { startsAt: "22:00", endsAt: "20:00", label: "reverse range" },
     { startsAt: "22:00", endsAt: "00:30", label: "midnight range" },
     { signupDeadline: "2026-08-28T20:08", label: "late deadline" },
+    { maxParticipants: "0", label: "zero capacity" },
+    { maxParticipants: "501", label: "excessive capacity" },
   ])("rejects $label", (change) => {
     const values = Object.fromEntries(
       Object.entries(change).filter(([key]) => key !== "label"),
@@ -94,10 +98,11 @@ describe("staff event management validation", () => {
       endsAt: "2026-08-28T20:00:00Z",
       signupDeadline: null,
       status: "draft",
+      maxParticipants: 24,
     };
-    expect(validateUpdateEvent({ title: " New ", signupDeadline: "", status: "open" }, event))
-      .toEqual({ title: "New", signupDeadline: null, status: "open" });
-    expect(() => validateUpdateEvent({ title: "New", signupDeadline: "2026-08-28T20:01", status: "open" }, event))
+    expect(validateUpdateEvent({ title: " New ", signupDeadline: "", status: "open", maxParticipants: "32" }, event))
+      .toEqual({ title: "New", signupDeadline: null, status: "open", maxParticipants: 32 });
+    expect(() => validateUpdateEvent({ title: "New", signupDeadline: "2026-08-28T20:01", status: "open", maxParticipants: "24" }, event))
       .toThrow(InvalidStaffEventRequestError);
   });
 
@@ -108,6 +113,7 @@ describe("staff event management validation", () => {
       startsAt: "20:00",
       endsAt: "22:00",
       status: "draft",
+      maxParticipants: 24,
     });
   });
 });

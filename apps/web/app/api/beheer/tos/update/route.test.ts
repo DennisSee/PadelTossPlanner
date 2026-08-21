@@ -28,8 +28,9 @@ const event = {
   endsAt: "2026-08-28T20:00:00Z",
   signupDeadline: null,
   status: "draft" as const,
+  maxParticipants: 24,
 };
-const fields = { slug: event.slug, title: "New", signup_deadline: "2026-08-28T19:00", status: "open" };
+const fields = { slug: event.slug, title: "New", signup_deadline: "2026-08-28T19:00", status: "open", max_participants: "32" };
 
 function account(role: "participant" | "planner" | "admin" = "planner", active = true) {
   return {
@@ -55,7 +56,7 @@ describe("staff event update POST boundary", () => {
     createServerSupabaseClient.mockResolvedValue(client);
     loadAccountContextWithClient.mockResolvedValue(account());
     eventBySlug.mockResolvedValueOnce(event).mockResolvedValueOnce({
-      ...event, title: "New", signupDeadline: "2026-08-28T17:00:00.000Z", status: "open",
+      ...event, title: "New", signupDeadline: "2026-08-28T17:00:00.000Z", status: "open", maxParticipants: 32,
     });
   });
 
@@ -65,7 +66,7 @@ describe("staff event update POST boundary", () => {
     expect(loadAccountContextWithClient).toHaveBeenCalledWith(client);
     expect(eventBySlug).toHaveBeenNthCalledWith(1, event.slug);
     expect(updateEvent).toHaveBeenCalledWith(event, {
-      title: "New", signupDeadline: "2026-08-28T17:00:00.000Z", status: "open",
+      title: "New", signupDeadline: "2026-08-28T17:00:00.000Z", status: "open", maxParticipants: 32,
     });
     expect(eventBySlug).toHaveBeenNthCalledWith(2, event.slug);
   });
@@ -87,7 +88,7 @@ describe("staff event update POST boundary", () => {
 
   it.each(["draft", "open", "closed", "cancelled"])("does not invent a transition rule for %s", async (status) => {
     eventBySlug.mockReset();
-    eventBySlug.mockResolvedValueOnce(event).mockResolvedValueOnce({ ...event, title: "New", signupDeadline: null, status });
+    eventBySlug.mockResolvedValueOnce(event).mockResolvedValueOnce({ ...event, title: "New", signupDeadline: null, status, maxParticipants: 32 });
     const response = await POST(request({ ...fields, signup_deadline: "", status }));
     expect(response.headers.get("location")).toBe(`${APP_BASE_URL}/beheer?notice=event-updated`);
   });
@@ -102,7 +103,7 @@ describe("staff event update POST boundary", () => {
   it("does not report success if immutable server fields change", async () => {
     eventBySlug.mockReset();
     eventBySlug.mockResolvedValueOnce(event).mockResolvedValueOnce({
-      ...event, sport: "tennis", title: "New", signupDeadline: "2026-08-28T17:00:00Z", status: "open",
+      ...event, sport: "tennis", title: "New", signupDeadline: "2026-08-28T17:00:00Z", status: "open", maxParticipants: 32,
     });
     const response = await POST(request(fields));
     expect(response.headers.get("location")).toBe(`${APP_BASE_URL}/beheer?error=temporarily-unavailable`);

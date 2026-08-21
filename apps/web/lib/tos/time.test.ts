@@ -19,6 +19,7 @@ const BASE_EVENT: TosEvent = Object.freeze({
   endsAt: "2026-08-21T20:00:00Z",
   signupDeadline: "2026-08-21T17:00:00Z",
   status: "open",
+  maxParticipants: 24,
 });
 
 describe("Europe/Amsterdam registration time handling", () => {

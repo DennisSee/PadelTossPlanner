@@ -13,6 +13,7 @@ function event(id: string, startsAt: string): TosEvent {
     endsAt: new Date(new Date(startsAt).getTime() + 7_200_000).toISOString(),
     signupDeadline: null,
     status: "open",
+    maxParticipants: 24,
   };
 }
 
@@ -23,6 +24,7 @@ function registration(eventValue: TosEvent, response: "attending" | "declined"):
     response,
     availableFrom: response === "attending" ? eventValue.startsAt : null,
     availableUntil: response === "attending" ? eventValue.endsAt : null,
+    attendingSince: response === "attending" ? "2026-08-20T10:00:00Z" : null,
     createdAt: "2026-08-20T10:00:00Z",
     updatedAt: "2026-08-20T10:00:00Z",
     event: eventValue,

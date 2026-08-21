@@ -1,9 +1,8 @@
 import {
-  assessStaffPlannerInput,
   availabilityLabel,
+  derivePlannerReadiness,
   PLANNER_READINESS,
   readinessLabel,
-  type AssessedStaffPlannerInput,
   type PlannerReadiness,
 } from "../../lib/tos/planner-readiness";
 import { tosDetailPath } from "../../lib/tos/slug";
@@ -12,10 +11,15 @@ import {
   formatEventClock,
   formatEventDate,
 } from "../../lib/tos/time";
-import type { StaffPlannerInput, TosEvent } from "../../lib/tos/types";
+import type { StaffRegistrationOverview, TosEvent } from "../../lib/tos/types";
 import { Badge, Card, SecondaryLinkButton } from "../ui";
 
 import styles from "./tos-event-participants.module.css";
+
+type AssessedOverview = Readonly<{
+  participant: StaffRegistrationOverview;
+  readiness: PlannerReadiness;
+}>;
 
 function eventStatusTone(event: TosEvent): "success" | "warning" | "danger" | "neutral" {
   if (event.status === "open") return "success";
@@ -47,6 +51,7 @@ function EventContext({ event }: { event: TosEvent }) {
           ? `${formatEventDate(event.signupDeadline)} · ${formatEventClock(event.signupDeadline)}`
           : "geen deadline"}
       </p>
+      <p className={styles.deadline}>Capaciteit: maximaal {event.maxParticipants} deelnemers</p>
       <div className={styles.actions}>
         <SecondaryLinkButton href="/beheer">← Terug naar beheer</SecondaryLinkButton>
         <SecondaryLinkButton href={tosDetailPath(event.slug)}>Eventpagina bekijken</SecondaryLinkButton>
@@ -55,16 +60,18 @@ function EventContext({ event }: { event: TosEvent }) {
   );
 }
 
-function Summary({ event, assessed }: { event: TosEvent; assessed: readonly AssessedStaffPlannerInput[] }) {
-  const attending = assessed.filter(({ participant }) => participant.response === "attending");
-  const declined = assessed.length - attending.length;
-  const ready = attending.filter(({ readiness }) => readiness === PLANNER_READINESS.READY).length;
+function Summary({ event, assessed }: { event: TosEvent; assessed: readonly AssessedOverview[] }) {
+  const placed = assessed.filter(({ participant }) => participant.placementStatus === "placed");
+  const waitlist = assessed.filter(({ participant }) => participant.placementStatus === "waitlist");
+  const declined = assessed.filter(({ participant }) => participant.placementStatus === "declined").length;
+  const ready = placed.filter(({ readiness }) => readiness === PLANNER_READINESS.READY).length;
   const metrics = [
     ["Totaal reacties", assessed.length],
-    ["Doet mee", attending.length],
+    ["Geplaatst", placed.length],
+    ["Wachtlijst", waitlist.length],
     ["Afgemeld", declined],
     ...(event.sport === "padel"
-      ? [["Klaar voor planner", ready], ["Aandacht nodig", attending.length - ready]]
+      ? [["Klaar voor planner", ready], ["Aandacht nodig", placed.length - ready]]
       : []),
   ] as const;
   return (
@@ -79,14 +86,18 @@ function Summary({ event, assessed }: { event: TosEvent; assessed: readonly Asse
   );
 }
 
-function ParticipantRow({ event, item }: { event: TosEvent; item: AssessedStaffPlannerInput }) {
+function ParticipantRow({ event, item }: { event: TosEvent; item: AssessedOverview }) {
   const { participant, readiness } = item;
   const levelLabel = event.sport === "padel" ? "Padelniveau" : "Tennisniveau";
   return (
     <li className={styles.participantRow}>
       <div className={styles.participantHeading}>
         <strong>{participant.displayName}</strong>
-        <Badge tone={readinessTone(readiness)}>{readinessLabel(readiness, event.sport)}</Badge>
+        <Badge tone={participant.placementStatus === "waitlist" ? "warning" : readinessTone(readiness)}>
+          {participant.placementStatus === "waitlist"
+            ? `Wachtlijst · plek ${participant.waitlistPosition}`
+            : readinessLabel(readiness, event.sport)}
+        </Badge>
       </div>
       {participant.response === "attending" ? (
         <dl className={styles.participantDetails}>
@@ -108,7 +119,7 @@ function ParticipantGroup({
 }: {
   event: TosEvent;
   title: string;
-  items: readonly AssessedStaffPlannerInput[];
+  items: readonly AssessedOverview[];
   empty: string;
 }) {
   return (
@@ -130,7 +141,7 @@ function PlannerInputPreview({
   assessed,
 }: {
   event: TosEvent;
-  assessed: readonly AssessedStaffPlannerInput[];
+  assessed: readonly AssessedOverview[];
 }) {
   if (event.sport === "tennis") {
     return (
@@ -141,7 +152,7 @@ function PlannerInputPreview({
     );
   }
   const ready = assessed.filter(({ participant, readiness }) =>
-    participant.response === "attending" && readiness === PLANNER_READINESS.READY);
+    participant.placementStatus === "placed" && readiness === PLANNER_READINESS.READY);
   return (
     <Card className={styles.previewCard}>
       <div>
@@ -168,7 +179,7 @@ export function TosEventParticipants({
   participants,
 }: {
   event: TosEvent;
-  participants: readonly StaffPlannerInput[] | null;
+  participants: readonly StaffRegistrationOverview[] | null;
 }) {
   if (participants === null) {
     return (
@@ -181,15 +192,20 @@ export function TosEventParticipants({
       </div>
     );
   }
-  const assessed = assessStaffPlannerInput(event, participants);
-  const attending = assessed.filter(({ participant }) => participant.response === "attending");
-  const declined = assessed.filter(({ participant }) => participant.response === "declined");
+  const assessed: AssessedOverview[] = participants.map((participant) => Object.freeze({
+    participant,
+    readiness: derivePlannerReadiness(event, participant),
+  }));
+  const placed = assessed.filter(({ participant }) => participant.placementStatus === "placed");
+  const waitlist = assessed.filter(({ participant }) => participant.placementStatus === "waitlist");
+  const declined = assessed.filter(({ participant }) => participant.placementStatus === "declined");
   return (
     <div className={styles.stack}>
       <EventContext event={event} />
       <Summary event={event} assessed={assessed} />
       <div className={styles.groups}>
-        <ParticipantGroup event={event} title="Doet mee" items={attending} empty="Nog niemand heeft zich aangemeld." />
+        <ParticipantGroup event={event} title="Geplaatst" items={placed} empty="Nog niemand is geplaatst." />
+        <ParticipantGroup event={event} title="Wachtlijst" items={waitlist} empty="De wachtlijst is leeg." />
         <ParticipantGroup event={event} title="Afgemeld" items={declined} empty="Niemand heeft zich afgemeld." />
       </div>
       <PlannerInputPreview event={event} assessed={assessed} />

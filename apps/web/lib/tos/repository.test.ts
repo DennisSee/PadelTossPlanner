@@ -24,6 +24,7 @@ const eventRow = {
   ends_at: "2026-08-21T20:00:00Z",
   signup_deadline: null,
   status: "open",
+  max_participants: 24,
 };
 
 const registrationRow = {
@@ -32,6 +33,7 @@ const registrationRow = {
   response: "attending",
   available_from: "2026-08-21T18:07:00Z",
   available_until: "2026-08-21T19:43:00Z",
+  attending_since: "2026-08-20T10:00:00Z",
   created_at: "2026-08-20T10:00:00Z",
   updated_at: "2026-08-20T10:00:00Z",
 };
@@ -41,7 +43,7 @@ type Call = readonly [string, ...unknown[]];
 function fakeClient(result: { data: unknown; error: unknown; status?: number }) {
   const calls: Call[] = [];
   const builder: Record<string, unknown> = {};
-  for (const method of ["select", "eq", "gte", "or", "order", "limit", "insert", "update"]) {
+  for (const method of ["select", "eq", "in", "gte", "or", "order", "limit", "insert", "update"]) {
     builder[method] = (...args: unknown[]) => {
       calls.push([method, ...args]);
       return builder;
@@ -117,6 +119,7 @@ describe("user-scoped TOS repository", () => {
       response: "declined",
       available_from: null,
       available_until: null,
+      attending_since: null,
     }], error: null });
     const own = {
       id: REGISTRATION_ID,
@@ -124,6 +127,7 @@ describe("user-scoped TOS repository", () => {
       response: "attending",
       availableFrom: registrationRow.available_from,
       availableUntil: registrationRow.available_until,
+      attendingSince: registrationRow.attending_since,
       createdAt: registrationRow.created_at,
       updatedAt: registrationRow.updated_at,
     } satisfies OwnRegistration;
@@ -149,6 +153,69 @@ describe("user-scoped TOS repository", () => {
     const onboard = fakeClient({ data: "member-id", error: null });
     await new TosRepository(onboard.client).selfOnboard("Dennis");
     expect(onboard.rpc).toHaveBeenCalledWith("self_onboard_member", { p_display_name: "Dennis" });
+  });
+
+  it("lists only the safe open/closed participant directory projection", async () => {
+    const fake = fakeClient({ data: [eventRow], error: null });
+    await expect(new TosRepository(fake.client).listParticipantEvents(
+      new Date("2026-08-20T12:00:00Z"),
+    )).resolves.toHaveLength(1);
+    expect(fake.calls).toEqual([
+      ["from", "tos_events"],
+      ["select", TOS_EVENT_SELECT],
+      ["in", "status", ["open", "closed"]],
+      ["gte", "ends_at", "2026-08-20T12:00:00.000Z"],
+      ["order", "starts_at", { ascending: true }],
+    ]);
+  });
+
+  it("uses separate narrow RPCs for capacity, attendance and own position", async () => {
+    const capacity = fakeClient({
+      data: [{ max_participants: 2, placed_count: 2, available_count: 0, waitlist_count: 1 }],
+      error: null,
+    });
+    await expect(new TosRepository(capacity.client).eventCapacity(EVENT_ID)).resolves.toEqual({
+      maxParticipants: 2,
+      placedCount: 2,
+      availableCount: 0,
+      waitlistCount: 1,
+    });
+    expect(capacity.rpc).toHaveBeenCalledWith("participant_event_capacity", { p_event_id: EVENT_ID });
+
+    const attendance = fakeClient({
+      data: [{ display_name: "Dennis", placement_status: "waitlist", waitlist_position: 1 }],
+      error: null,
+    });
+    await expect(new TosRepository(attendance.client).eventAttendance(EVENT_ID)).resolves.toEqual([{
+      displayName: "Dennis",
+      placementStatus: "waitlist",
+      waitlistPosition: 1,
+    }]);
+    expect(attendance.rpc).toHaveBeenCalledWith("participant_event_attendance", { p_event_id: EVENT_ID });
+
+    const position = fakeClient({
+      data: [{ placement_status: "placed", waitlist_position: null }],
+      error: null,
+    });
+    await expect(new TosRepository(position.client).ownRegistrationPosition(EVENT_ID)).resolves.toEqual({
+      placementStatus: "placed",
+      waitlistPosition: null,
+    });
+    expect(position.rpc).toHaveBeenCalledWith("participant_own_registration_position", { p_event_id: EVENT_ID });
+  });
+
+  it("fails closed when a narrow RPC leaks extra private fields", async () => {
+    const fake = fakeClient({
+      data: [{
+        display_name: "Dennis",
+        placement_status: "placed",
+        waitlist_position: null,
+        ranking: 4,
+      }],
+      error: null,
+    });
+    await expect(new TosRepository(fake.client).eventAttendance(EVENT_ID))
+      .rejects.toBeInstanceOf(TosDataUnavailableError);
   });
 
   it("fails closed for multiple or malformed rows", async () => {

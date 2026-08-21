@@ -408,8 +408,8 @@ select is(
 );
 select is(
     (select count(*) from public.tos_events where slug = 'other-closed'),
-    0::bigint,
-    'participant ziet geen ander gesloten event'
+    1::bigint,
+    'goedgekeurd actief clublid ziet veilige gesloten events voor de WEB-6-filterdirectory'
 );
 select ok(
     not has_column_privilege('authenticated', 'public.profiles', 'email', 'SELECT'),

@@ -13,6 +13,7 @@ const row = {
   ends_at: "2026-08-28T20:00:00Z",
   signup_deadline: null,
   status: "draft",
+  max_participants: 24,
 };
 
 function fakeClient(result: { data?: unknown; error?: unknown; status?: number }) {
@@ -40,7 +41,26 @@ describe("staff TOS event repository", () => {
     expect(TOS_EVENT_SELECT).not.toMatch(/created_by|created_at|updated_at/u);
   });
 
-  it("creates with exactly seven database-derived-safe columns", async () => {
+  it("loads only derived capacity through the narrow staff RPC", async () => {
+    const rpc = vi.fn(async () => ({ data: [{
+      event_id: row.id,
+      max_participants: 24,
+      placed_count: 20,
+      available_count: 4,
+      waitlist_count: 2,
+    }], error: null }));
+    const client = { rpc } as unknown as SupabaseClient;
+    await expect(new StaffTosEventRepository(client).capacitySummaries()).resolves.toEqual([{
+      eventId: row.id,
+      maxParticipants: 24,
+      placedCount: 20,
+      availableCount: 4,
+      waitlistCount: 2,
+    }]);
+    expect(rpc).toHaveBeenCalledWith("staff_event_capacity_summaries");
+  });
+
+  it("creates with exactly eight database-derived-safe columns", async () => {
     const fake = fakeClient({ data: null, error: null });
     await new StaffTosEventRepository(fake.client).createEvent({
       slug: row.slug,
@@ -50,6 +70,7 @@ describe("staff TOS event repository", () => {
       endsAt: row.ends_at,
       signupDeadline: null,
       status: "draft",
+      maxParticipants: 24,
     });
     expect(fake.calls.find(([method]) => method === "insert")?.[1]).toEqual({
       slug: row.slug,
@@ -59,21 +80,23 @@ describe("staff TOS event repository", () => {
       ends_at: row.ends_at,
       signup_deadline: null,
       status: "draft",
+      max_participants: 24,
     });
   });
 
-  it("updates exactly three fields through server-read id and slug", async () => {
+  it("updates exactly four mutable fields through server-read id and slug", async () => {
     const fake = fakeClient({ data: null, error: null });
     const event = {
       id: row.id, slug: row.slug, title: row.title, sport: "padel", startsAt: row.starts_at,
       endsAt: row.ends_at, signupDeadline: null, status: "draft",
+      maxParticipants: 24,
     } satisfies TosEvent;
     await new StaffTosEventRepository(fake.client).updateEvent(event, {
-      title: "Changed", signupDeadline: null, status: "open",
+      title: "Changed", signupDeadline: null, status: "open", maxParticipants: 32,
     });
     expect(fake.calls).toEqual([
       ["from", "tos_events"],
-      ["update", { title: "Changed", signup_deadline: null, status: "open" }],
+      ["update", { title: "Changed", signup_deadline: null, status: "open", max_participants: 32 }],
       ["eq", "id", row.id],
       ["eq", "slug", row.slug],
     ]);
@@ -91,6 +114,7 @@ describe("staff TOS event repository", () => {
     await expect(new StaffTosEventRepository(conflict.client).createEvent({
       slug: row.slug, title: row.title, sport: "padel", startsAt: row.starts_at,
       endsAt: row.ends_at, signupDeadline: null, status: "draft",
+      maxParticipants: 24,
     })).rejects.toBeInstanceOf(StaffEventConflictError);
   });
 });

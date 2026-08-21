@@ -52,7 +52,7 @@ test("participant doorloopt OTP, persistente sessie, guard en logout", async ({ 
   await expect(page).toHaveURL(/\/login\?next=%2Ftos$/u);
   await signIn(page, request, email);
   await expect(page).toHaveURL(/\/tos$/u);
-  await expect(page.getByRole("heading", { name: "TOS-avonden" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "TOS-avonden", level: 1 })).toBeVisible();
 
   const cookiesAfterLogin = await authCookies(page);
   expect(cookiesAfterLogin.length).toBeGreaterThan(0);
@@ -120,7 +120,10 @@ test("admin-member heeft participant- en beheercontext in één sessie", async (
   await expect(page).toHaveURL(/\/beheer$/u);
   await expect(page.getByText("Admin").first()).toBeVisible();
   await page.goto("/tos");
-  await expect(page.getByText("Clublid goedgekeurd").first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "TOS-avonden", level: 1 })).toBeVisible();
+  await expect(page.getByText("Clublid goedgekeurd")).toHaveCount(0);
+  await openNavigationIfCollapsed(page);
+  await expect(page.locator('a[href="/beheer"]:visible')).toHaveText("Beheer");
 });
 
 test("admin zonder member behoudt beheer en ziet gesloten membershipstatus", async ({ page, request }) => {
@@ -132,7 +135,8 @@ test("admin zonder member behoudt beheer en ziet gesloten membershipstatus", asy
   await openNavigationIfCollapsed(page);
   await page.locator('a[href="/tos"]:visible').click();
   await expect(page).toHaveURL(/\/tos$/u);
-  await expect(page.getByText("Clubprofiel nog niet afgerond").first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Maak je clubprofiel aan" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Clubprofiel aanmaken" })).toBeVisible();
   await openNavigationIfCollapsed(page);
   await expect(page.locator('a[href="/beheer"]:visible')).toHaveText("Beheer");
 });

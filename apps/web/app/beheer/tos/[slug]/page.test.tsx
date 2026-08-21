@@ -57,6 +57,7 @@ const event: TosEvent = Object.freeze({
   endsAt: "2026-08-21T20:00:00Z",
   signupDeadline: null,
   status: "closed",
+  maxParticipants: 24,
 });
 const planner = deriveAccountContext(
   { userId: "user-planner", email: "planner@example.test" },

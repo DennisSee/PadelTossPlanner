@@ -32,7 +32,7 @@ test("homepage toont de publieke stagingingang en navigeert met toetsenbord", as
     await expect(stagingBadge).toBeVisible();
   }
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(
-    "Jouw TOS-avond in één oogopslag",
+    "Jouw TOS-avond. Live.",
   );
   await expect(page.getByRole("heading", { level: 2 })).toHaveText(
     "Doe mee met de volgende TOS",

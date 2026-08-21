@@ -42,6 +42,7 @@ export async function POST(request: NextRequest) {
       title: 160,
       signup_deadline: 16,
       status: 16,
+      max_participants: 3,
     });
     if (!isTosEventSlug(fields.slug)) throw new InvalidStaffEventRequestError();
   } catch {
@@ -62,6 +63,7 @@ export async function POST(request: NextRequest) {
       title: fields.title,
       signupDeadline: fields.signup_deadline,
       status: fields.status,
+      maxParticipants: fields.max_participants,
     }, before);
     await repository.updateEvent(before, write);
     const after = await repository.eventBySlug(fields.slug);

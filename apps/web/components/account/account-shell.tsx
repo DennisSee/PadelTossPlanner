@@ -51,13 +51,15 @@ export function AccountShell({
             <h1>{title}</h1>
             <p>{intro}</p>
           </div>
-          <div className={styles.badges} aria-label="Accountmogelijkheden">
-            <Badge tone={account.capabilities.canParticipate ? "success" : "neutral"}>
-              {membershipLabel(account.membership.state)}
-            </Badge>
-            {account.capabilities.canPlan ? <Badge tone="warning">Planner</Badge> : null}
-            {account.capabilities.canAdminister ? <Badge tone="warning">Admin</Badge> : null}
-          </div>
+          {variant !== "tos" ? (
+            <div className={styles.badges} aria-label="Accountmogelijkheden">
+              <Badge tone={account.capabilities.canParticipate ? "success" : "neutral"}>
+                {membershipLabel(account.membership.state)}
+              </Badge>
+              {account.capabilities.canPlan ? <Badge tone="warning">Planner</Badge> : null}
+              {account.capabilities.canAdminister ? <Badge tone="warning">Admin</Badge> : null}
+            </div>
+          ) : null}
         </header>
         {children}
       </div>

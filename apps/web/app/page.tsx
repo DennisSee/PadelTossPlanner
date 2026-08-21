@@ -34,7 +34,7 @@ export default async function Home() {
             <CourtLines className={styles.heroLines} />
             <div className={styles.introContent}>
               <p className={styles.eyebrow}>Samen spelen, iedere ronde anders</p>
-              <h1 className={styles.title}>Jouw TOS-avond in één oogopslag</h1>
+              <h1 className={styles.title}>Jouw TOS-avond. Live.</h1>
               <p className={styles.lead}>
                 Bekijk de actuele wedstrijden, wie er rust heeft en op welke baan je
                 volgende ronde speelt.

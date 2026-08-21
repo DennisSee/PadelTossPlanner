@@ -46,6 +46,7 @@ export async function POST(request: NextRequest) {
       ends_at: 5,
       signup_deadline: 16,
       status: 16,
+      max_participants: 3,
     });
     write = validateCreateEvent({
       title: fields.title,
@@ -55,6 +56,7 @@ export async function POST(request: NextRequest) {
       endsAt: fields.ends_at,
       signupDeadline: fields.signup_deadline,
       status: fields.status,
+      maxParticipants: fields.max_participants,
     });
   } catch {
     return managementRedirect(appBaseUrl, { error: "invalid-request" });

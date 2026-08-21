@@ -38,8 +38,73 @@
 
 .eventGrid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: var(--space-4);
+}
+
+.filters {
+  display: grid;
+  grid-template-columns: auto minmax(9rem, 0.55fr) minmax(9rem, 0.55fr) auto auto;
+  align-items: end;
+  gap: var(--space-3);
+  padding: clamp(0.85rem, 2vw, 1.1rem);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.filters > strong {
+  align-self: center;
+  color: var(--club-green-dark);
+}
+
+.filters label {
+  display: grid;
+  gap: var(--space-1);
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 750;
+}
+
+.filters select {
+  min-height: 2.75rem;
+  padding: 0.55rem 2.3rem 0.55rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  background: var(--surface);
+  font: inherit;
+}
+
+.filters select:focus-visible,
+.filters a:focus-visible,
+.filterSubmit:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--club-green) 32%, transparent);
+  outline-offset: 2px;
+}
+
+.filters a {
+  align-self: center;
+  color: var(--club-green-dark);
+  font-size: 0.88rem;
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.resultCount {
+  align-self: center;
+  white-space: nowrap;
+  font-size: 0.9rem;
+  font-weight: 750;
+}
+
+.filterSubmit {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
 }
 
 .eventCard,
@@ -83,11 +148,39 @@
 }
 
 .eventBody {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(10rem, 0.55fr) minmax(13rem, 0.7fr);
   min-width: 0;
-  flex-direction: column;
   gap: var(--space-2);
   padding: var(--space-4);
+}
+
+.eventBody > .badges,
+.eventBody > .eventTitle,
+.eventBody > .metadata,
+.eventBody > .deadline,
+.eventBody > .personalStatus,
+.eventBody > .waitlistNotice {
+  grid-column: 1;
+}
+
+.eventBody > .capacityPanel {
+  grid-column: 2;
+  grid-row: 1 / span 6;
+}
+
+.eventBody > .attendeePreview,
+.eventBody > .peopleTrigger,
+.eventBody > .actions {
+  grid-column: 3;
+}
+
+.eventBody > .attendeePreview {
+  align-self: end;
+}
+
+.eventBody > .actions {
+  align-self: end;
 }
 
 .badges,
@@ -132,9 +225,245 @@
   font-weight: 800;
 }
 
+.waitlistNotice {
+  width: fit-content;
+  margin: var(--space-1) 0 0;
+  padding: 0.4rem 0.6rem;
+  border-left: 0.22rem solid var(--club-yellow);
+  color: var(--club-green-dark);
+  background: var(--warning-soft);
+  font-weight: 800;
+}
+
 .actions {
   margin-top: auto;
   padding-top: var(--space-1);
+}
+
+.disabledAction {
+  min-height: 2.8rem;
+  padding: 0.65rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  background: var(--surface-subtle);
+  font: inherit;
+  font-weight: 750;
+}
+
+.capacityPanel {
+  display: grid;
+  grid-template-columns: 3.4rem minmax(0, 1fr);
+  align-content: center;
+  gap: var(--space-2);
+  padding: 0.8rem;
+  border: 1px solid #c9d9cf;
+  border-radius: var(--radius-sm);
+  color: var(--club-green-dark);
+  background: var(--surface-green);
+}
+
+.capacityRing {
+  grid-row: span 2;
+  width: 3.2rem;
+  height: 3.2rem;
+  border-radius: 50%;
+  background: conic-gradient(var(--club-green) var(--occupancy), var(--surface) 0);
+  box-shadow: inset 0 0 0 0.45rem var(--surface-green);
+}
+
+.capacityNumbers {
+  display: grid;
+  align-content: center;
+}
+
+.capacityNumbers strong {
+  font-size: 1.55rem;
+  line-height: 1;
+}
+
+.capacityNumbers span {
+  margin-top: 0.2rem;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.capacityPanel p {
+  grid-column: 1 / -1;
+  margin: 0;
+  text-align: center;
+  font-size: 0.85rem;
+  font-weight: 750;
+}
+
+.capacityFull {
+  border-color: #efc3bd;
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.capacityFull .capacityRing {
+  background: conic-gradient(var(--danger) var(--occupancy), var(--surface) 0);
+  box-shadow: inset 0 0 0 0.45rem var(--danger-soft);
+}
+
+.waitlistCount {
+  padding: 0.35rem;
+  border-radius: 0.35rem;
+  color: var(--club-green-dark) !important;
+  background: var(--club-yellow);
+}
+
+.peopleTrigger {
+  display: flex;
+  min-height: 2.5rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.45rem 0;
+  border: 0;
+  color: var(--club-green-dark);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 750;
+  text-align: left;
+}
+
+.peopleDialog {
+  width: min(36rem, calc(100% - 2rem));
+  max-height: min(80vh, 48rem);
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
+}
+
+.peopleDialog::backdrop {
+  background: rgb(0 25 18 / 56%);
+}
+
+.dialogHandle {
+  display: none;
+}
+
+.dialogHeader,
+.peopleDialog section,
+.dialogClose {
+  padding: 1rem 1.25rem;
+}
+
+.dialogHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  border-bottom: 1px solid var(--border);
+}
+
+.dialogHeader h2,
+.peopleDialog h3,
+.dialogHeader p {
+  margin: 0;
+}
+
+.dialogHeader h2 {
+  color: var(--club-green-dark);
+  font-size: 1.4rem;
+}
+
+.dialogHeader p:not(.dialogEyebrow) {
+  margin-top: var(--space-1);
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.dialogEyebrow {
+  color: var(--club-green);
+  font-size: 0.8rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.dialogHeader button {
+  width: 2.6rem;
+  height: 2.6rem;
+  border: 0;
+  color: var(--club-green-dark);
+  background: transparent;
+  cursor: pointer;
+  font-size: 2rem;
+}
+
+.dialogCapacity {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin: 1rem 1.25rem 0;
+  padding: 0.8rem 1rem;
+  border-radius: var(--radius-sm);
+  color: var(--club-green-dark);
+  background: var(--surface-green);
+}
+
+.dialogCapacity strong {
+  font-size: 1.5rem;
+}
+
+.peopleDialog section h3 {
+  color: var(--club-green-dark);
+  font-size: 1rem;
+}
+
+.peopleList {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.peopleList li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.personAvatar {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--club-green-dark);
+  background: var(--surface-green);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.waitlistSection {
+  border-top: 1px solid var(--border);
+  background: var(--warning-soft);
+}
+
+.waitlistSection .personAvatar {
+  background: var(--club-yellow);
+}
+
+.dialogClose button {
+  width: 100%;
+  min-height: 3rem;
+  border: 1px solid var(--club-green);
+  border-radius: var(--radius-sm);
+  color: var(--surface);
+  background: var(--club-green);
+  font: inherit;
+  font-weight: 750;
 }
 
 .message {
@@ -306,6 +635,59 @@
 
   .eventCard {
     grid-template-columns: 4rem minmax(0, 1fr);
+  }
+
+  .filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .filters > strong,
+  .resultCount,
+  .filters > a {
+    grid-column: 1 / -1;
+  }
+
+  .filters > strong {
+    display: none;
+  }
+
+  .filters > a {
+    justify-self: end;
+  }
+
+  .eventBody {
+    grid-template-columns: 1fr;
+  }
+
+  .eventBody > .badges,
+  .eventBody > .eventTitle,
+  .eventBody > .metadata,
+  .eventBody > .deadline,
+  .eventBody > .personalStatus,
+  .eventBody > .waitlistNotice,
+  .eventBody > .capacityPanel,
+  .eventBody > .attendeePreview,
+  .eventBody > .peopleTrigger,
+  .eventBody > .actions {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .peopleDialog {
+    width: 100%;
+    max-width: none;
+    max-height: 86vh;
+    margin: auto 0 0;
+    border-radius: 1rem 1rem 0 0;
+  }
+
+  .dialogHandle {
+    display: block;
+    width: 3rem;
+    height: 0.3rem;
+    margin: 0.55rem auto 0;
+    border-radius: 999px;
+    background: var(--border-strong);
   }
 }
 
