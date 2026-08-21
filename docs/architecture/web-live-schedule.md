@@ -7,7 +7,7 @@ WEB-2 migreert uitsluitend de openbare scheduleweergave naar Next.js. De bestaan
 - `/` is de publieke T.C. Zuid-startpagina en verwijst naar `/live`.
 - `/live` is dynamisch server-rendered en haalt bij iedere gewone paginarequest maximaal één gepubliceerd schema op.
 - `/api/health` blijft een Supabase-onafhankelijke livenesscheck.
-- `/api/planner/health` blijft via Caddy naar FastAPI `/health` gaan.
+- FastAPI heeft geen publieke Caddy-route; alleen de Next.js-server bereikt de interne planneradapter.
 
 De server-only repository gebruikt `@supabase/supabase-js` met uitsluitend `SUPABASE_URL` en `SUPABASE_PUBLISHABLE_KEY`. Auth-sessionopslag, tokenrefresh en browserstorage staan uit. De browser ontvangt alleen de reeds veilig geprojecteerde scheduledata als serialiseerbare props.
 

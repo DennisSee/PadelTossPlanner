@@ -49,6 +49,8 @@ const OWN_REGISTRATION_SELECT = OWN_REGISTRATION_COLUMNS.join(",");
 const OWN_REGISTRATION_WITH_EVENT_SELECT =
   `${OWN_REGISTRATION_SELECT},tos_events!inner(${TOS_EVENT_COLUMNS.join(",")})`;
 const registrations = new Map();
+const plannerDrafts = new Map();
+const staffSchedules = new Map();
 
 function relativeIso(hours) {
   const value = new Date();
@@ -738,10 +740,40 @@ const server = createServer(async (request, response) => {
     otpCodes.clear();
     oauthCodes.clear();
     registrations.clear();
+    plannerDrafts.clear();
+    staffSchedules.clear();
     nextOAuthAttempt = null;
     attendeeFailureEventId = null;
     response.writeHead(204);
     response.end();
+    return;
+  }
+  if (request.method === "POST" && requestUrl.pathname === "/generate") {
+    const body = await requestJson(request);
+    const expected = ["players","courts","start_time","end_time","match_minutes","rest_minutes","search_profile","allow_repeat_partners","level_mix","tolerance","generation_seed"];
+    const validPlayers = Array.isArray(body.players) && body.players.length >= 4 && body.players.every((player) =>
+      exactKeys(player, ["name","ranking","available_from","available_until"]) &&
+      typeof player.name === "string" && Number.isInteger(player.ranking) &&
+      /^(?:[01]\d|2[0-3]):[0-5]\d$/u.test(player.available_from) &&
+      /^(?:[01]\d|2[0-3]):[0-5]\d$/u.test(player.available_until));
+    if (!exactKeys(body, expected) || !validPlayers || !Array.isArray(body.courts) || body.courts.length < 1 ||
+        !Number.isSafeInteger(body.generation_seed)) {
+      json(response, 422, { error: "invalid-input" });
+      return;
+    }
+    const names = body.players.map(({ name }) => String(name));
+    json(response, 200, {
+      seed: body.generation_seed,
+      schedule: body.courts.map((court, index) => ({
+        Ronde: 1, Tijd: `${body.start_time} - ${body.end_time}`, Baan: court,
+        "Team 1": `${names[index * 4]} & ${names[index * 4 + 1]}`, "Niveau T1": 3,
+        "Team 2": `${names[index * 4 + 2]} & ${names[index * 4 + 3]}`, "Niveau T2": 3,
+        Teamverschil: 0, Rust: "Niemand", "Nog niet aanwezig": "Niemand",
+        "Niet meer beschikbaar": "Niemand",
+      })),
+      statistics: names.map((name) => ({ Speler: name, Ranking: 3, Wedstrijden: 1 })),
+      diagnostics: { rounds: 1, unused_minutes: 0, courts_used: body.courts.length },
+    });
     return;
   }
   if (request.method === "GET" && requestUrl.pathname === "/auth/v1/authorize") {
@@ -1005,6 +1037,131 @@ const server = createServer(async (request, response) => {
       .map((fixture) => Object.fromEntries(
         Object.entries(fixture).filter(([key]) => key !== "event_id"),
       )));
+    return;
+  }
+  if (request.method === "POST" && requestUrl.pathname === "/rest/v1/rpc/staff_event_planner_draft") {
+    const user = bearerUser(request);
+    const body = await requestJson(request);
+    if (!user || !exactKeys(body, ["p_event_id"])) {
+      json(response, user ? 400 : 401, { code: "42501", message: "draft read rejected" });
+      return;
+    }
+    const eventId = String(body.p_event_id ?? "");
+    const event = eventById(eventId);
+    const draft = plannerDrafts.get(eventId);
+    json(response, 200, validStaff(user) && event?.sport === "padel" && draft ? [draft] : []);
+    return;
+  }
+  if (request.method === "POST" && requestUrl.pathname === "/rest/v1/rpc/staff_save_event_planner_draft") {
+    const user = bearerUser(request);
+    const body = await requestJson(request);
+    const expected = ["p_event_id","p_expected_revision","p_players","p_selected_courts","p_match_minutes","p_rest_minutes","p_search_profile","p_allow_repeat_partners","p_level_mix","p_team_difference_tolerance"];
+    const event = eventById(String(body.p_event_id ?? ""));
+    const current = plannerDrafts.get(body.p_event_id);
+    const allowedPlayerKeys = new Set(["row_id","name","ranking","included","available_from","available_until","member_id","user_id","registration_id","registration_updated_at","source_event_id"]);
+    const validPlayers = Array.isArray(body.p_players) && body.p_players.every((player) =>
+      player && typeof player === "object" && !Array.isArray(player) &&
+      Object.keys(player).every((key) => allowedPlayerKeys.has(key)) &&
+      ["row_id","name","ranking","included","available_from","available_until"].every((key) => Object.hasOwn(player, key)));
+    if (!user || !validStaff(user) || !exactKeys(body, expected) || !validPlayers || event?.sport !== "padel" || event.status === "cancelled") {
+      json(response, 403, { code: "42501", message: "draft save rejected" });
+      return;
+    }
+    if ((current?.revision ?? 0) !== body.p_expected_revision) {
+      json(response, 409, { code: "40001", message: "draft changed" });
+      return;
+    }
+    const revision = (current?.revision ?? 0) + 1;
+    const now = new Date().toISOString();
+    plannerDrafts.set(body.p_event_id, {
+      event_id: body.p_event_id, players: body.p_players, selected_courts: body.p_selected_courts,
+      match_minutes: body.p_match_minutes, rest_minutes: body.p_rest_minutes,
+      search_profile: body.p_search_profile, allow_repeat_partners: body.p_allow_repeat_partners,
+      level_mix: body.p_level_mix, team_difference_tolerance: body.p_team_difference_tolerance,
+      revision, updated_by: user.id, updated_by_name: user.role === "admin" ? "Admin" : "Planner",
+      updated_at: now, created_at: current?.created_at ?? now,
+    });
+    json(response, 200, revision);
+    return;
+  }
+  if (request.method === "POST" && requestUrl.pathname === "/rest/v1/rpc/staff_event_schedule_summaries") {
+    const user = bearerUser(request);
+    const body = await requestJson(request);
+    if (!user || !exactKeys(body, ["p_event_id"])) {
+      json(response, 401, { code: "42501", message: "schedule read rejected" });
+      return;
+    }
+    const values = validStaff(user) ? [...staffSchedules.values()]
+      .filter(({ event_id }) => event_id === body.p_event_id)
+      .map((item) => ({
+        id: item.id, event_id: item.event_id, created_by: item.created_by,
+        created_by_name: item.created_by_name, is_published: item.is_published,
+        generation_seed: item.generation_seed, planner_draft_revision: item.planner_draft_revision,
+        created_at: item.created_at,
+      })) : [];
+    json(response, 200, values);
+    return;
+  }
+  if (request.method === "POST" && requestUrl.pathname === "/rest/v1/rpc/staff_save_event_schedule") {
+    const user = bearerUser(request);
+    const body = await requestJson(request);
+    const expected = ["p_event_id","p_planner_draft_revision","p_generation_seed","p_schedule_private","p_statistics_private","p_diagnostics"];
+    const event = eventById(String(body.p_event_id ?? ""));
+    const draft = plannerDrafts.get(body.p_event_id);
+    const scheduleKeys = ["Ronde","Tijd","Baan","Team 1","Niveau T1","Team 2","Niveau T2","Teamverschil","Rust","Nog niet aanwezig","Niet meer beschikbaar"];
+    const validSchedule = Array.isArray(body.p_schedule_private) && body.p_schedule_private.length > 0 &&
+      body.p_schedule_private.every((row) => exactKeys(row, scheduleKeys));
+    if (!user || !validStaff(user) || !exactKeys(body, expected) || !validSchedule || event?.sport !== "padel" || !draft || draft.revision !== body.p_planner_draft_revision) {
+      json(response, 403, { code: "42501", message: "schedule save rejected" });
+      return;
+    }
+    const id = randomUUID();
+    staffSchedules.set(id, {
+      id, event_id: event.id, created_by: user.id, created_by_name: user.role === "admin" ? "Admin" : "Planner",
+      title: event.title, event_date: event.starts_at.slice(0, 10), start_time: "20:00", end_time: "22:00",
+      match_minutes: draft.match_minutes, courts: draft.selected_courts, players_private: draft.players,
+      participants_public: draft.players.filter(({ included }) => included).map(({ name }) => name),
+      schedule_public: body.p_schedule_private.map((row) => Object.fromEntries([
+        "Ronde", "Tijd", "Baan", "Team 1", "Team 2", "Rust", "Nog niet aanwezig", "Niet meer beschikbaar",
+      ].map((key) => [key, row[key]]))),
+      schedule_private: body.p_schedule_private, statistics_private: body.p_statistics_private,
+      diagnostics: body.p_diagnostics, is_published: false, generation_seed: body.p_generation_seed,
+      planner_draft_revision: body.p_planner_draft_revision, created_at: new Date().toISOString(),
+    });
+    json(response, 200, id);
+    return;
+  }
+  if (request.method === "POST" && requestUrl.pathname === "/rest/v1/rpc/staff_event_schedule") {
+    const user = bearerUser(request);
+    const body = await requestJson(request);
+    const schedule = staffSchedules.get(body.p_schedule_id);
+    if (!user || !exactKeys(body, ["p_event_id","p_schedule_id"])) {
+      json(response, 401, { code: "42501", message: "schedule detail rejected" });
+      return;
+    }
+    json(response, 200, validStaff(user) && schedule?.event_id === body.p_event_id ? [{
+      id: schedule.id, event_id: schedule.event_id, created_by: schedule.created_by,
+      created_by_name: schedule.created_by_name, title: schedule.title, event_date: schedule.event_date,
+      start_time: schedule.start_time, end_time: schedule.end_time, match_minutes: schedule.match_minutes,
+      courts: schedule.courts, players_private: schedule.players_private,
+      schedule_private: schedule.schedule_private, statistics_private: schedule.statistics_private,
+      diagnostics: schedule.diagnostics, is_published: schedule.is_published,
+      generation_seed: schedule.generation_seed, planner_draft_revision: schedule.planner_draft_revision,
+      created_at: schedule.created_at,
+    }] : []);
+    return;
+  }
+  if (request.method === "POST" && requestUrl.pathname === "/rest/v1/rpc/staff_set_schedule_published") {
+    const user = bearerUser(request);
+    const body = await requestJson(request);
+    const schedule = staffSchedules.get(body.p_schedule_id);
+    if (!user || !exactKeys(body, ["p_schedule_id","p_published"]) || !validStaff(user) || !schedule || (schedule.created_by !== user.id && user.role !== "admin")) {
+      json(response, 403, { code: "42501", message: "publish rejected" });
+      return;
+    }
+    if (body.p_published) for (const candidate of staffSchedules.values()) if (candidate.event_id === schedule.event_id) candidate.is_published = false;
+    schedule.is_published = body.p_published;
+    json(response, 200, true);
     return;
   }
   if (request.method === "GET" && requestUrl.pathname === "/rest/v1/tos_events") {
@@ -1305,7 +1462,21 @@ const server = createServer(async (request, response) => {
   if (delay > 0) {
     await new Promise((resolve) => setTimeout(resolve, delay));
   }
-  json(response, 200, [scheduleFixture()]);
+  const eventSchedule = [...staffSchedules.values()]
+    .filter(({ is_published }) => is_published)
+    .sort((left, right) => new Date(right.created_at) - new Date(left.created_at))[0];
+  json(response, 200, [eventSchedule ? {
+    id: eventSchedule.id,
+    event_date: eventSchedule.event_date,
+    created_by_name: eventSchedule.created_by_name,
+    start_time: eventSchedule.start_time,
+    end_time: eventSchedule.end_time,
+    courts: eventSchedule.courts,
+    participants_public: eventSchedule.participants_public,
+    schedule_public: eventSchedule.schedule_public,
+    is_published: true,
+    created_at: eventSchedule.created_at,
+  } : scheduleFixture()]);
 });
 
 server.listen(port, "127.0.0.1", () => {

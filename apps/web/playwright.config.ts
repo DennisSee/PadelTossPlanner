@@ -49,6 +49,7 @@ export default defineConfig({
         APP_BASE_URL: BASE_URL,
         SUPABASE_URL: `http://127.0.0.1:${MOCK_PORT}`,
         SUPABASE_PUBLISHABLE_KEY: "sb_publishable_e2e_only",
+        PLANNER_API_BASE_URL: `http://127.0.0.1:${MOCK_PORT}`,
         HOSTNAME: "127.0.0.1",
         PORT: String(WEB_PORT),
       },

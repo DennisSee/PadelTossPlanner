@@ -88,11 +88,13 @@ describe("WEB-2 routes", () => {
     expect(source).toContain('dynamic = "force-dynamic"');
   });
 
-  it("keeps FastAPI health routing and network boundaries intact", () => {
+  it("keeps FastAPI internal-only behind the Next.js server boundary", () => {
     const caddy = readFileSync(resolve(process.cwd(), "../../deploy/staging/Caddyfile"), "utf8");
     const compose = readFileSync(resolve(process.cwd(), "../../deploy/staging/compose.yml"), "utf8");
-    expect(caddy).toContain("handle_path /api/planner/*");
-    expect(caddy).toContain("reverse_proxy planner-api:8000");
+    expect(caddy).not.toContain("/api/planner/");
+    expect(caddy).not.toContain("planner-api:8000");
+    expect(compose).toContain("PLANNER_API_BASE_URL: http://planner-api:8000");
+    expect(compose).toContain("dockerfile: services/planner-api/Dockerfile");
     expect(compose).toContain("web-egress");
     expect(compose).toContain("internal: true");
   });

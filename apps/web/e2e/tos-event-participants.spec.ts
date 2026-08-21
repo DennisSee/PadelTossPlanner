@@ -54,12 +54,12 @@ test("planner without membership sees event-scoped padel readiness and preview",
   await expect(page.getByRole("heading", { name: "WEB-5B1 Padelavond" })).toBeVisible();
   await expect(page.getByText("Ready Partieel").first()).toBeVisible();
   await expect(page.getByText("20:07–21:43").first()).toBeVisible();
-  await expect(page.getByText("Afgemelde Speler")).toBeVisible();
-  await expect(page.getByText("Goedkeuring in behandeling")).toBeVisible();
-  await expect(page.getByText("Lidmaatschap niet goedgekeurd")).toBeVisible();
-  await expect(page.getByText("Clublid inactief")).toBeVisible();
-  await expect(page.getByText("Padelprofiel inactief")).toBeVisible();
-  await expect(page.getByText("Padelniveau ontbreekt")).toBeVisible();
+  await expect(page.getByText("Afgemelde Speler").first()).toBeVisible();
+  await expect(page.getByText("Goedkeuring in behandeling").first()).toBeVisible();
+  await expect(page.getByText("Lidmaatschap niet goedgekeurd").first()).toBeVisible();
+  await expect(page.getByText("Clublid inactief").first()).toBeVisible();
+  await expect(page.getByText("Padelprofiel inactief").first()).toBeVisible();
+  await expect(page.getByText("Padelniveau ontbreekt").first()).toBeVisible();
 
   const preview = page.getByRole("heading", { name: "Plannerinput" }).locator("xpath=ancestor::section[1]");
   await expect(preview.getByText("Ready Hele Avond")).toBeVisible();
@@ -69,7 +69,8 @@ test("planner without membership sees event-scoped padel readiness and preview",
 
   const body = await page.locator("body").innerText();
   expect(body).not.toMatch(/5[bce]100000-|example\.test|registration_id|member_id|user_id/u);
-  await expect(page.locator('main input, main select, main textarea, main button[type="submit"]')).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Planneropzet" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Aanmeldingen verwerken" })).toBeVisible();
   const widths = await page.evaluate(() => ({
     client: document.documentElement.clientWidth,
     scroll: document.documentElement.scrollWidth,
@@ -88,4 +89,5 @@ test("admin sees the event-specific tennis ranking without a planner preview", a
   await expect(page.getByText("Tennisplanner wordt in een volgende stap toegevoegd.")).toBeVisible();
   await expect(page.getByText("Padelniveau 4")).toHaveCount(0);
   await expect(page.getByText("Klaar voor planner")).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Planneropzet" })).toHaveCount(0);
 });

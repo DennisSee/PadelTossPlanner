@@ -11,10 +11,11 @@ WORKDIR /app
 RUN groupadd --system --gid 10001 planner-api \
     && useradd --system --uid 10001 --gid planner-api --home-dir /app planner-api
 
-COPY requirements.lock ./
+COPY services/planner-api/requirements.lock ./
 RUN python -m pip install --no-cache-dir --require-hashes --requirement requirements.lock
 
-COPY --chown=planner-api:planner-api app ./app
+COPY --chown=planner-api:planner-api planner.py ./planner.py
+COPY --chown=planner-api:planner-api services/planner-api/app ./app
 
 USER planner-api
 EXPOSE 8000

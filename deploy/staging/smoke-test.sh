@@ -111,10 +111,4 @@ compact_body=$(printf '%s' "$response_body" | tr -d '[:space:]')
 [[ "$compact_body" == '{"status":"ok","service":"web"}' ]] || fail "Web-healthcontract wijkt af."
 ok "Web-healthcontract is exact geldig."
 
-request_path "/api/planner/health"
-assert_no_sensitive_output "/api/planner/health"
-compact_body=$(printf '%s' "$response_body" | tr -d '[:space:]')
-[[ "$compact_body" == '{"status":"ok","service":"planner-api"}' ]] || fail "Planner-healthcontract wijkt af."
-ok "Planner-healthcontract is exact geldig."
-
 ok "Smoke-test is voltooid; geen volledige HTML of configuratie is getoond."

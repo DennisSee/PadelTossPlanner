@@ -42,6 +42,7 @@ services:
       APP_BASE_URL: ${APP_BASE_URL:-}
       SUPABASE_URL: ${SUPABASE_URL:-}
       SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY:-}
+      PLANNER_API_BASE_URL: http://planner-api:8000
     logging:
       driver: json-file
       options:
@@ -61,7 +62,8 @@ services:
 
   planner-api:
     build:
-      context: ../../services/planner-api
+      context: ../..
+      dockerfile: services/planner-api/Dockerfile
     restart: unless-stopped
     logging:
       driver: json-file

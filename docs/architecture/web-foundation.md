@@ -5,22 +5,22 @@ De nieuwe T.C. Zuid TOS-website wordt naast de bestaande Streamlit-app opgebouwd
 ## Onderdelen
 
 - **Next.js** in `apps/web/` is de nieuwe webfrontend en serverlaag. De App Router draait in productie als een compacte standalone Node-service.
-- **FastAPI** in `services/planner-api/` wordt later de HTTP-adapter voor de bestaande Python-planner. `planner.py` blijft nu op zijn huidige plek en ongewijzigd, zodat de bewezen planner-engine en Streamlit-app tijdens de migratie stabiel blijven.
-- **Supabase** blijft later verantwoordelijk voor Auth, PostgreSQL, RLS en RPC's. WEB-1 bevat nog geen Supabase-client of credentials.
-- **Caddy** is de enige container met gepubliceerde hostpoorten. Caddy verzorgt automatische HTTPS en routeert intern naar Next.js en FastAPI.
+- **FastAPI** in `services/planner-api/` is vanaf WEB-5C de interne HTTP-adapter voor de bestaande Python-planner. `planner.py` blijft op zijn huidige plek en ongewijzigd, zodat de bewezen planner-engine en Streamlit-app tijdens de migratie stabiel blijven.
+- **Supabase** is verantwoordelijk voor Auth, PostgreSQL, RLS en begrensde RPC's; de webapp gebruikt daarvoor uitsluitend de publishable key en de eigen gebruikerssessie.
+- **Caddy** is de enige container met gepubliceerde hostpoorten. Caddy verzorgt automatische HTTPS en routeert browserverkeer naar Next.js. Alleen de serverlaag van Next.js bereikt FastAPI intern.
 
 ## Stagingrouting
 
 Staging gebruikt `test-tos.oddbounce.nl`:
 
-- `/api/planner/*` gaat met verwijderde prefix naar FastAPI. Daardoor bereikt `/api/planner/health` intern FastAPI `/health`.
-- alle overige routes gaan naar Next.js. Daardoor blijft `/api/health` de healthroute van de webservice.
+- alle browserroutes gaan naar Next.js. Daardoor blijft `/api/health` de publieke healthroute van de webservice;
+- FastAPI heeft geen publieke Caddy-route. Next.js gebruikt uitsluitend `http://planner-api:8000` op het interne Compose-netwerk.
 
 Next.js en FastAPI publiceren geen hostpoorten en delen het interne Compose-netwerk `application`. Caddy heeft daarnaast `edge` voor internetverkeer en TLS-certificaten. Vanaf WEB-2 heeft uitsluitend Next.js daarnaast `web-egress` voor de server-side openbare Supabase-read. FastAPI blijft volledig intern. Alleen Caddy bewaart infrastructuurdata voor automatische HTTPS; er is geen persistente applicatiedata en geen lokale database.
 
 Voor een lokale end-to-endcontrole kan `SITE_ADDRESS` tijdelijk op `http://:80` worden gezet. De stagingwaarde blijft standaard `test-tos.oddbounce.nl`; er is daarom geen `.env`-bestand nodig.
 
-Beide Docker-buildcontexts zijn beperkt tot hun eigen applicatiemap. Bestanden buiten `apps/web/` respectievelijk `services/planner-api/` worden nooit naar de builder gestuurd. De `.dockerignore`-bestanden sluiten lokale env-bestanden, registryconfiguratie, credentials, private keys, caches en buildoutput expliciet uit. `NEXT_PUBLIC_*`-waarden worden tijdens `next build` permanent in de browserbundle ingebakken en mogen daarom nooit secrets bevatten.
+De web-buildcontext blijft beperkt tot `apps/web/`. De planner-API gebruikt vanaf WEB-5C de repositoryroot als strikt gefilterde buildcontext, omdat uitsluitend de bewezen rootmodule `planner.py`, de servicecode en de productionlock nodig zijn. De root- en applicatiespecifieke `.dockerignore`-bestanden sluiten overige broncode, lokale env-bestanden, registryconfiguratie, credentials, private keys, caches en buildoutput expliciet uit. `NEXT_PUBLIC_*`-waarden worden tijdens `next build` permanent in de browserbundle ingebakken en mogen daarom nooit secrets bevatten.
 
 ## Reproduceerbare Python-dependencies
 
@@ -60,7 +60,9 @@ De bestaande Streamlit-app blijft volledig zelfstandig deploybaar. Nieuwe functi
 9. Start de stack met `docker compose up -d`.
 10. Controleer `docker compose ps` en voer daarna de read-only controle
     `./smoke-test.sh https://test-tos.oddbounce.nl` uit. Deze valideert ook `/`,
-    `/live`, TLS en beide healthcontracten zonder volledige responses te printen.
+    `/live`, TLS, protected redirects en het publieke webhealthcontract zonder
+    volledige responses te printen. De interne FastAPI-healthcheck blijft onderdeel
+    van de containerstatus en is bewust niet publiek via Caddy bereikbaar.
 11. Bekijk bij problemen alleen de relevante logs met `docker compose logs web planner-api caddy`.
 
 Een normale `docker compose down` behoudt de named volumes `caddy_data` en `caddy_config`. `docker compose down --volumes` verwijdert ook Caddy's ACME- en certificaatdata en mag daarom geen standaardonderdeel van deployments zijn. Vanaf WEB-Auth of zodra frontenddependencies merkbaar groeien, bouwen we de images bij voorkeur in CI en trekt de VPS alleen de goedgekeurde images binnen.
