@@ -42,7 +42,17 @@
 }
 
 .pageHeaderManagement {
-  min-height: 10rem;
+  min-height: 8.25rem;
+  margin-bottom: var(--space-3);
+  padding-block: clamp(1.15rem, 3vw, 1.75rem);
+}
+
+.pageHeaderManagement h1 {
+  font-size: clamp(2.5rem, 5vw, 4rem);
+}
+
+.pageHeaderManagement p {
+  line-height: 1.4;
 }
 
 .pageHeaderTos {
@@ -216,6 +226,16 @@
 
   .pageHeader h1 {
     font-size: clamp(2.8rem, 13vw, 4.2rem);
+  }
+
+  .pageHeaderManagement {
+    min-height: 8.5rem;
+    gap: var(--space-2);
+    padding: 0.85rem 1rem;
+  }
+
+  .pageHeaderManagement h1 {
+    font-size: clamp(2.1rem, 10vw, 3rem);
   }
 
   .headerLines {

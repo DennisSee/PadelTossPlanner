@@ -1,6 +1,6 @@
 .stack {
   display: grid;
-  gap: var(--space-4);
+  gap: var(--space-3);
 }
 
 .eventCard,
@@ -8,7 +8,7 @@
 .previewCard,
 .errorCard {
   min-width: 0;
-  padding: clamp(1rem, 3vw, 1.5rem);
+  padding: 1rem;
 }
 
 .eventCard {
@@ -50,12 +50,12 @@
 }
 
 .eventCard h2 {
-  margin-top: var(--space-3);
-  font-size: clamp(2rem, 4vw, 3rem);
+  margin-top: var(--space-2);
+  font-size: clamp(1.8rem, 3vw, 2.35rem);
 }
 
 .eventTime {
-  margin: var(--space-2) 0 0;
+  margin: var(--space-1) 0 0;
   font-weight: 750;
 }
 
@@ -71,7 +71,7 @@
 .actions {
   position: relative;
   z-index: 1;
-  margin-top: var(--space-4);
+  margin-top: var(--space-3);
 }
 
 .eventCard .actions a {
@@ -83,13 +83,13 @@
 .summary {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: var(--space-3);
+  gap: var(--space-2);
 }
 
 .metric {
   min-width: 0;
-  padding: var(--space-3);
-  border-top: 0.22rem solid var(--club-yellow);
+  padding: 0.65rem 0.75rem;
+  border-top: 0.16rem solid var(--club-yellow);
 }
 
 .metric strong,
@@ -100,13 +100,14 @@
 .metric strong {
   color: var(--club-green-dark);
   font-family: var(--font-display);
-  font-size: 2rem;
+  font-size: 1.55rem;
+  line-height: 1;
 }
 
 .metric span {
-  margin-top: var(--space-1);
+  margin-top: 0.25rem;
   color: var(--text-muted);
-  font-size: 0.82rem;
+  font-size: 0.76rem;
   font-weight: 700;
 }
 
@@ -114,14 +115,14 @@
   display: grid;
   grid-template-columns: minmax(0, 1.4fr) minmax(16rem, 0.6fr);
   align-items: start;
-  gap: var(--space-4);
+  gap: var(--space-3);
 }
 
 .participantList,
 .previewList {
   display: grid;
-  gap: var(--space-3);
-  margin: var(--space-4) 0 0;
+  gap: 0;
+  margin: var(--space-3) 0 0;
   padding: 0;
   list-style: none;
 }
@@ -129,10 +130,15 @@
 .participantRow,
 .previewList li {
   min-width: 0;
-  padding: var(--space-3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
+  padding: 0.65rem 0.2rem;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+}
+
+.participantRow:last-child {
+  border-bottom: 0;
 }
 
 .participantHeading {
@@ -147,19 +153,19 @@
 
 .participantHeading strong {
   color: var(--club-green-dark);
-  font-size: 1.02rem;
+  font-size: 0.96rem;
 }
 
 .participantDetails {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: var(--space-1) var(--space-3);
-  margin: var(--space-3) 0 0;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  gap: 0.2rem var(--space-2);
+  margin: 0.4rem 0 0;
 }
 
 .participantDetails dt {
   color: var(--text-muted);
-  font-size: 0.82rem;
+  font-size: 0.76rem;
   font-weight: 700;
 }
 
@@ -174,11 +180,16 @@
 
 .previewList {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
 }
 
 .previewList li {
   display: grid;
   gap: var(--space-1);
+  padding: 0.6rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
 }
 
 .previewList span {
@@ -210,10 +221,27 @@
   .actions > * {
     width: 100%;
   }
+
+  .eventCard .actions > * {
+    flex: 1 1 9rem;
+    width: auto;
+    min-height: 2.55rem;
+    padding-inline: 0.45rem;
+    font-size: 0.78rem;
+    white-space: nowrap;
+  }
+
+  .participantDetails {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
 }
 
 @media (max-width: 26rem) {
   .summary {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .metric {
+    padding: 0.55rem 0.65rem;
   }
 }

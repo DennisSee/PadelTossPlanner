@@ -267,13 +267,13 @@
 .liveGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-3);
+  gap: var(--space-2);
   margin-top: var(--space-3);
 }
 
 .livePanel {
   min-width: 0;
-  padding: var(--space-3);
+  padding: var(--space-2);
   border-radius: var(--radius-sm);
 }
 
@@ -299,8 +299,8 @@
   display: flex;
   justify-content: space-between;
   gap: var(--space-3);
-  padding: 0.15rem var(--space-1) var(--space-3);
-  font-size: 0.88rem;
+  padding: 0.1rem var(--space-1) var(--space-2);
+  font-size: 0.82rem;
   font-weight: 750;
 }
 
@@ -314,9 +314,9 @@
 .roundCard {
   position: relative;
   min-width: 0;
-  min-height: 7.25rem;
+  min-height: 5.8rem;
   overflow: hidden;
-  padding: var(--space-3) var(--space-3) var(--space-3) 5rem;
+  padding: 0.75rem 0.8rem 0.7rem 4.1rem;
   border-radius: var(--radius-sm);
   box-shadow: none;
 }
@@ -325,13 +325,13 @@
   position: absolute;
   inset: 0 auto 0 0;
   display: grid;
-  width: 4rem;
+  width: 3.25rem;
   place-items: center;
   content: attr(data-round-number);
   color: var(--surface);
   background: var(--club-green-dark);
   font-family: var(--font-display);
-  font-size: 2.7rem;
+  font-size: 2.35rem;
   line-height: 1;
 }
 
@@ -363,7 +363,7 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
-  margin-bottom: 0.65rem;
+  margin-bottom: 0.4rem;
 }
 
 .roundMeta {
@@ -376,7 +376,7 @@
   margin: 0;
   color: var(--club-green-dark);
   font-family: var(--font-display);
-  font-size: 1.08rem;
+  font-size: 1rem;
   font-weight: 800;
   letter-spacing: 0.025em;
   text-transform: uppercase;
@@ -384,7 +384,7 @@
 
 .roundTime {
   color: var(--text-muted);
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   font-weight: 650;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -392,19 +392,19 @@
 
 .matches {
   display: grid;
-  gap: 0.65rem;
+  gap: 0.4rem;
 }
 
 .match {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.4rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  gap: 0.25rem;
   min-width: 0;
 }
 
 .match + .match {
-  padding-top: 0.65rem;
+  padding-top: 0.45rem;
   border-top: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
 }
 
@@ -419,13 +419,13 @@
   gap: 0.4rem;
   width: fit-content;
   max-width: 100%;
-  min-height: 1.9rem;
-  padding: 0.28rem 0.65rem;
+  min-height: 1.65rem;
+  padding: 0.2rem 0.5rem;
   border: 1px solid color-mix(in srgb, var(--court-accent) 35%, var(--border));
   border-radius: 999px;
   color: #173b31;
   background: color-mix(in srgb, var(--court-accent) 14%, white);
-  font-size: 0.75rem;
+  font-size: 0.69rem;
   font-weight: 700;
   line-height: 1.25;
   overflow-wrap: anywhere;
@@ -447,18 +447,26 @@
 .matchup {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  gap: 0.35rem;
+  gap: 0.45rem;
   align-items: center;
   width: 100%;
   min-width: 0;
-  padding: 0.55rem 0.65rem;
-  border: 1px solid var(--border);
-  border-radius: 0.25rem;
-  background: var(--surface);
-  font-size: 0.86rem;
+  padding: 0.15rem 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font-size: 0.79rem;
   font-weight: 620;
-  text-align: center;
+  line-height: 1.3;
   overflow-wrap: anywhere;
+}
+
+.matchup > :first-child {
+  text-align: right;
+}
+
+.matchup > :last-child {
+  text-align: left;
 }
 
 .teamNames {
@@ -498,17 +506,17 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
-  margin-top: var(--space-2);
-  padding-top: var(--space-2);
+  margin-top: 0.4rem;
+  padding-top: 0.4rem;
   border-top: 1px solid var(--border);
 }
 
 .footerChip {
-  padding: 0.24rem 0.5rem;
+  padding: 0.18rem 0.45rem;
   border-radius: 999px;
   color: var(--text-muted);
   background: var(--surface-subtle);
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   line-height: 1.3;
 }
 
@@ -518,8 +526,8 @@
 }
 
 .personalStateCard {
-  min-height: 5.5rem;
-  padding-block: 0.75rem;
+  min-height: 4.5rem;
+  padding-block: 0.6rem;
 }
 
 .personalBody {
@@ -557,7 +565,7 @@
 
 .allRounds {
   margin-top: var(--space-3);
-  padding: var(--space-3);
+  padding: var(--space-2) var(--space-3);
   box-shadow: none;
 }
 
@@ -626,7 +634,6 @@
   }
 
   .eventCard,
-  .roundCard,
   .controlSurface {
     padding: 0.9rem;
   }
@@ -678,26 +685,24 @@
   }
 
   .roundCard {
-    min-height: 6.5rem;
-    padding-left: 4.25rem;
+    min-height: 5.25rem;
+    padding: 0.65rem 0.65rem 0.6rem 3.35rem;
   }
 
   .roundCard::before {
-    width: 3.4rem;
-    font-size: 2.2rem;
+    width: 2.7rem;
+    font-size: 1.9rem;
+  }
+
+  .match {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.25rem;
   }
 
   .matchup {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 0.3rem;
-    text-align: left;
-  }
-
-  .versus {
-    justify-self: start;
-    padding: 0.1rem 0.4rem;
-    border-radius: 999px;
-    background: var(--surface-subtle);
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    gap: 0.35rem;
+    font-size: 0.76rem;
   }
 
   .personalBody {
