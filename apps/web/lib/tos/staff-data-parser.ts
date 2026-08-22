@@ -58,6 +58,21 @@ function name(value: unknown): string {
   return value.trim();
 }
 
+function nullableEmail(value: unknown): string | null {
+  if (value === null) return null;
+  if (
+    typeof value !== "string" ||
+    value.length > 320 ||
+    CONTROL.test(value) ||
+    /\s/u.test(value)
+  ) {
+    throw new InvalidTosDataError();
+  }
+  const normalized = value.trim().toLocaleLowerCase("en-US");
+  if (!normalized || !normalized.includes("@")) throw new InvalidTosDataError();
+  return normalized;
+}
+
 export function parseStaffEventCapacityRows(value: unknown): StaffEventCapacity[] {
   return rows(value).map((row) => {
     exact(row, ["event_id", "max_participants", "placed_count", "available_count", "waitlist_count"]);
@@ -114,7 +129,7 @@ export function parseStaffRegistrationOverviewRows(value: unknown): StaffRegistr
 export function parseStaffMemberDirectoryRows(value: unknown): StaffMemberDirectoryItem[] {
   return rows(value).map((row) => {
     exact(row, [
-      "member_id", "display_name", "approval_status", "member_active", "account_linked",
+      "member_id", "display_name", "login_email", "approval_status", "member_active", "account_linked",
       "padel_profile_active", "padel_ranking", "tennis_profile_active", "tennis_ranking",
     ]);
     const approval = row.approval_status;
@@ -124,6 +139,7 @@ export function parseStaffMemberDirectoryRows(value: unknown): StaffMemberDirect
     return Object.freeze({
       memberId: uuid(row.member_id),
       displayName: name(row.display_name),
+      loginEmail: nullableEmail(row.login_email),
       approvalStatus: approval as MemberApprovalStatus,
       memberActive: bool(row.member_active),
       accountLinked: bool(row.account_linked),

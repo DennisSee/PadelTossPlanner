@@ -77,6 +77,7 @@ describe("WEB-6 staff RPC parsers", () => {
     const row = {
       member_id: MEMBER_ID,
       display_name: "Dennis",
+      login_email: "Dennis@Example.Test",
       approval_status: "approved",
       member_active: true,
       account_linked: true,
@@ -88,6 +89,7 @@ describe("WEB-6 staff RPC parsers", () => {
     expect(parseStaffMemberDirectoryRows([row])[0]).toEqual({
       memberId: MEMBER_ID,
       displayName: "Dennis",
+      loginEmail: "dennis@example.test",
       approvalStatus: "approved",
       memberActive: true,
       accountLinked: true,
@@ -96,7 +98,25 @@ describe("WEB-6 staff RPC parsers", () => {
       tennisProfileActive: false,
       tennisRanking: null,
     });
-    expect(() => parseStaffMemberDirectoryRows([{ ...row, email: "private@example.test" }]))
+    expect(() => parseStaffMemberDirectoryRows([{ ...row, user_id: MEMBER_ID }]))
+      .toThrow(InvalidTosDataError);
+  });
+
+  it("accepts an unlinked member without email and rejects malformed login email", () => {
+    const base = {
+      member_id: MEMBER_ID,
+      display_name: "Los lid",
+      login_email: null,
+      approval_status: "pending",
+      member_active: true,
+      account_linked: false,
+      padel_profile_active: false,
+      padel_ranking: null,
+      tennis_profile_active: false,
+      tennis_ranking: null,
+    };
+    expect(parseStaffMemberDirectoryRows([base])[0]?.loginEmail).toBeNull();
+    expect(() => parseStaffMemberDirectoryRows([{ ...base, login_email: "not-an-email" }]))
       .toThrow(InvalidTosDataError);
   });
 

@@ -1,4 +1,4 @@
-import { Badge, Card, EventDateRail, SecondaryLinkButton } from "../ui";
+import { ActionDialog, Badge, Card, EventDateRail, SecondaryLinkButton } from "../ui";
 import { createEventDefaults } from "../../lib/tos/staff-management";
 import { tosDetailPath } from "../../lib/tos/slug";
 import {
@@ -10,6 +10,7 @@ import {
 import type { StaffEventCapacity, TosEvent, TosEventStatus } from "../../lib/tos/types";
 
 import styles from "./tos-event-management.module.css";
+import { ResponsiveCreatePanel } from "./responsive-create-panel";
 
 const STATUS_LABELS: Record<TosEventStatus, string> = {
   draft: "Concept",
@@ -29,8 +30,9 @@ export function CreateTosEventForm({ now = new Date() }: { now?: Date }) {
   const defaults = createEventDefaults(now);
   return (
     <Card className={styles.formCard}>
-      <h2>Nieuwe TOS</h2>
-      <form className={styles.form} action="/api/beheer/tos/create" method="post">
+      <ResponsiveCreatePanel>
+        <h2 className={styles.createTitle}>Nieuwe TOS</h2>
+        <form className={styles.form} action="/api/beheer/tos/create" method="post">
         <label className={styles.field}>
           Titel
           <input name="title" maxLength={160} required defaultValue={defaults.title} />
@@ -74,8 +76,9 @@ export function CreateTosEventForm({ now = new Date() }: { now?: Date }) {
             ))}
           </select>
         </label>
-        <button className={styles.primaryButton} type="submit">TOS-avond aanmaken</button>
-      </form>
+          <button className={styles.primaryButton} type="submit">TOS-avond aanmaken</button>
+        </form>
+      </ResponsiveCreatePanel>
     </Card>
   );
 }
@@ -103,8 +106,6 @@ function EventCard({ event, capacity }: { event: TosEvent; capacity: StaffEventC
             <dd>{event.signupDeadline ? `${formatEventDate(event.signupDeadline)} · ${formatEventClock(event.signupDeadline)}` : "Geen deadline"}</dd>
             <dt>Eventlink</dt>
             <dd><code>{tosDetailPath(event.slug)}</code></dd>
-            <dt>Capaciteit</dt>
-            <dd>{capacity.placedCount} / {capacity.maxParticipants} bezet · {capacity.availableCount} vrij{capacity.waitlistCount ? ` · ${capacity.waitlistCount} wachtend` : ""}</dd>
           </dl>
           <p className={styles.publicNote}>{publicNote}</p>
           {presentation !== STATUS_LABELS[event.status] ? (
@@ -113,41 +114,54 @@ function EventCard({ event, capacity }: { event: TosEvent; capacity: StaffEventC
           <div className={styles.eventActions}>
             <SecondaryLinkButton href={`/beheer/tos/${event.slug}`}>TOS-avond beheren</SecondaryLinkButton>
             <SecondaryLinkButton href={tosDetailPath(event.slug)}>Eventpagina bekijken</SecondaryLinkButton>
+            <ActionDialog
+              triggerLabel="Eventgegevens wijzigen"
+              title="Eventgegevens wijzigen"
+              description={`${event.title} · ${formatEventDate(event.startsAt)}`}
+              triggerClassName={styles.editTrigger}
+            >
+              <form className={styles.editForm} action="/api/beheer/tos/update" method="post">
+                <input type="hidden" name="slug" value={event.slug} />
+                <label className={styles.field}>
+                  Titel
+                  <input name="title" maxLength={160} required defaultValue={event.title} data-dialog-initial />
+                </label>
+                <label className={styles.field}>
+                  Inschrijfdeadline <span className={styles.optional}>(leeg = geen deadline)</span>
+                  <input
+                    name="signup_deadline"
+                    type="datetime-local"
+                    step={60}
+                    defaultValue={event.signupDeadline ? formatEventDateTimeInput(event.signupDeadline) : ""}
+                  />
+                </label>
+                <label className={styles.field}>
+                  Maximaal aantal deelnemers
+                  <input name="max_participants" type="number" min={1} max={500} step={1} required defaultValue={event.maxParticipants} />
+                </label>
+                <label className={styles.field}>
+                  Status
+                  <select name="status" defaultValue={event.status}>
+                    {Object.entries(STATUS_LABELS).map(([value, label]) => (
+                      <option key={value} value={value}>{label}</option>
+                    ))}
+                  </select>
+                </label>
+                <p className={styles.immutableNote}>
+                  Sport, datum, tijden en slug blijven na aanmaken ongewijzigd.
+                </p>
+                <button className={styles.primaryEditButton} type="submit">Wijzigingen opslaan</button>
+              </form>
+            </ActionDialog>
           </div>
         </div>
+        <div className={`${styles.capacitySummary} ${capacity.availableCount === 0 ? styles.capacityFull : ""}`}>
+          <strong>{capacity.placedCount} / {capacity.maxParticipants}</strong>
+          <span>plekken bezet</span>
+          <p>{capacity.availableCount} {capacity.availableCount === 1 ? "plek" : "plekken"} vrij</p>
+          {capacity.waitlistCount ? <small>{capacity.waitlistCount} op wachtlijst</small> : null}
+        </div>
       </div>
-      <form className={styles.form} action="/api/beheer/tos/update" method="post">
-        <input type="hidden" name="slug" value={event.slug} />
-        <label className={styles.field}>
-          Titel
-          <input name="title" maxLength={160} required defaultValue={event.title} />
-        </label>
-        <label className={styles.field}>
-          Inschrijfdeadline <span className={styles.optional}>(leeg = geen deadline)</span>
-          <input
-            name="signup_deadline"
-            type="datetime-local"
-            step={60}
-            defaultValue={event.signupDeadline ? formatEventDateTimeInput(event.signupDeadline) : ""}
-          />
-        </label>
-        <label className={styles.field}>
-          Maximaal aantal deelnemers
-          <input name="max_participants" type="number" min={1} max={500} step={1} required defaultValue={event.maxParticipants} />
-        </label>
-        <label className={styles.field}>
-          Status
-          <select name="status" defaultValue={event.status}>
-            {Object.entries(STATUS_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>{label}</option>
-            ))}
-          </select>
-        </label>
-        <p className={styles.immutableNote}>
-          Sport, datum, tijden en slug blijven na aanmaken ongewijzigd.
-        </p>
-        <button className={styles.secondaryButton} type="submit">Wijzigingen opslaan</button>
-      </form>
     </Card>
   );
 }

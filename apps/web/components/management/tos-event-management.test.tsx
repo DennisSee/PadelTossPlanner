@@ -56,6 +56,7 @@ describe("TOS event management UI", () => {
       .toHaveAttribute("href", "/tos/padel-tos-20260828-a1b2c3d4");
     expect(screen.getAllByRole("link", { name: "TOS-avond beheren" })[0])
       .toHaveAttribute("href", "/beheer/tos/padel-tos-20260828-a1b2c3d4");
+    expect(screen.getAllByRole("button", { name: "Eventgegevens wijzigen" })).toHaveLength(2);
     const update = container.querySelector<HTMLFormElement>('form[action="/api/beheer/tos/update"]')!;
     expect([...update.querySelectorAll("[name]")].map((node) => node.getAttribute("name"))).toEqual([
       "slug", "title", "signup_deadline", "max_participants", "status",

@@ -6,6 +6,7 @@ import { MemberManagement } from "./member-management";
 const member = {
   memberId: "44444444-4444-4444-8444-444444444444",
   displayName: "Dennis Seesing",
+  loginEmail: "dennis@example.test",
   approvalStatus: "approved" as const,
   memberActive: true,
   accountLinked: true,
@@ -19,6 +20,7 @@ describe("member and sport-profile management UI", () => {
   it("shows read-only membership context and independent sport forms", () => {
     const { container } = render(<MemberManagement members={[member]} query="Dennis" />);
     expect(screen.getByRole("heading", { name: "Dennis Seesing" })).toBeVisible();
+    expect(screen.getByText("dennis@example.test")).toBeVisible();
     expect(screen.getByText("Goedgekeurd")).toBeVisible();
     expect(screen.getByText("Lid actief")).toBeVisible();
     const forms = container.querySelectorAll<HTMLFormElement>('form[action="/api/beheer/leden/sport-profile"]');
@@ -32,6 +34,18 @@ describe("member and sport-profile management UI", () => {
     expect(container.querySelector('[name="approval_status"]')).toBeNull();
     expect(container.querySelector('[name="member_active"]')).toBeNull();
     expect(container.querySelector('[name="role"]')).toBeNull();
+  });
+
+  it("disambiguates equal display names with staff-only login email and has a controlled fallback", () => {
+    render(<MemberManagement members={[
+      member,
+      { ...member, memberId: "55555555-5555-4555-8555-555555555555", loginEmail: "dennis.two@example.test" },
+      { ...member, memberId: "66666666-6666-4666-8666-666666666666", displayName: "Los lid", loginEmail: null, accountLinked: false },
+    ]} query="" />);
+    expect(screen.getAllByRole("heading", { name: "Dennis Seesing" })).toHaveLength(2);
+    expect(screen.getByText("dennis@example.test")).toBeVisible();
+    expect(screen.getByText("dennis.two@example.test")).toBeVisible();
+    expect(screen.getAllByText("Geen gekoppeld account").length).toBeGreaterThanOrEqual(1);
   });
 
   it("renders a compact empty search result", () => {

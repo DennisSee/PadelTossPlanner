@@ -361,6 +361,114 @@
   line-height: 1.55;
 }
 
+.dialogTrigger {
+  min-height: 2.75rem;
+  padding: 0.65rem 1rem;
+  border: 1px solid var(--club-green);
+  border-radius: var(--radius-sm);
+  color: var(--club-green-dark);
+  background: var(--surface);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+}
+
+.dialogTrigger:hover {
+  background: var(--surface-green);
+}
+
+.actionDialog {
+  width: min(36rem, calc(100% - 2rem));
+  max-height: min(86vh, 48rem);
+  padding: 0;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
+}
+
+.actionDialog::backdrop {
+  background: rgb(0 25 18 / 56%);
+}
+
+.dialogHandle {
+  display: none;
+}
+
+.actionDialogHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.actionDialogHeader h2,
+.actionDialogHeader p {
+  margin: 0;
+}
+
+.actionDialogHeader h2 {
+  color: var(--club-green-dark);
+  font-family: var(--font-interface);
+  font-size: 1.4rem;
+  line-height: 1.2;
+}
+
+.actionDialogHeader p {
+  margin-top: var(--space-1);
+  color: var(--text-muted);
+  font-size: 0.88rem;
+}
+
+.dialogIconClose {
+  display: grid;
+  width: 2.75rem;
+  min-height: 2.75rem;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--club-green-dark);
+  background: transparent;
+  cursor: pointer;
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.dialogIconClose:hover {
+  background: var(--surface-subtle);
+}
+
+.actionDialogBody {
+  padding: 1.25rem;
+}
+
+.actionDialogCancel {
+  padding: 0 1.25rem 1.25rem;
+}
+
+.actionDialogCancel button {
+  width: 100%;
+  min-height: 2.85rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--club-green-dark);
+  background: var(--surface);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+}
+
+.dialogTrigger:focus-visible,
+.dialogIconClose:focus-visible,
+.actionDialogCancel button:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--club-green) 32%, transparent);
+  outline-offset: 2px;
+}
+
 @media (max-width: 30rem) {
   .logo {
     width: 2.75rem;
@@ -379,5 +487,33 @@
 
   .mobileNavigation {
     display: block;
+  }
+}
+
+@media (max-width: 42rem) {
+  .actionDialog {
+    width: 100%;
+    max-width: none;
+    max-height: 88vh;
+    margin: auto 0 0;
+    border-radius: 1rem 1rem 0 0;
+  }
+
+  .dialogHandle {
+    display: block;
+    width: 3rem;
+    height: 0.3rem;
+    margin: 0.55rem auto 0;
+    border-radius: 999px;
+    background: var(--border-strong);
+  }
+
+  .actionDialogHeader,
+  .actionDialogBody {
+    padding-inline: 1rem;
+  }
+
+  .actionDialogCancel {
+    padding-inline: 1rem;
   }
 }

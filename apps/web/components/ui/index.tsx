@@ -4,6 +4,8 @@ import type { HTMLAttributes, ReactNode } from "react";
 
 import styles from "./ui.module.css";
 
+export { ActionDialog } from "./action-dialog";
+
 export {
   ANONYMOUS_NAVIGATION,
   navigationModelFromAccount,

@@ -47,7 +47,7 @@ export function MemberManagement({
     <div className={styles.stack}>
       <div className={styles.toolbar}>
         <form method="get">
-          <label htmlFor="member-search">Zoeken op naam</label>
+          <label htmlFor="member-search">Zoeken op naam of e-mailadres</label>
           <input id="member-search" name="q" maxLength={80} defaultValue={query} type="search" />
           <button type="submit">Zoeken</button>
         </form>
@@ -61,7 +61,10 @@ export function MemberManagement({
               <header>
                 <div>
                   <h2>{member.displayName}</h2>
-                  <p>{member.accountLinked ? "Account gekoppeld" : "Geen account gekoppeld"}</p>
+                  <p className={styles.loginEmail}>
+                    {member.loginEmail ?? (member.accountLinked ? "Geen login-e-mailadres beschikbaar" : "Geen gekoppeld account")}
+                  </p>
+                  <p className={styles.accountState}>{member.accountLinked ? "Account gekoppeld" : "Geen gekoppeld account"}</p>
                 </div>
                 <div className={styles.badges}>
                   <Badge tone={member.approvalStatus === "approved" ? "success" : member.approvalStatus === "pending" ? "warning" : "danger"}>

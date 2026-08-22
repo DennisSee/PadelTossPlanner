@@ -382,6 +382,7 @@ function staffMemberDirectory() {
     const existing = members.get(fixture.member_id) ?? {
       member_id: fixture.member_id,
       display_name: fixture.display_name,
+      login_email: null,
       approval_status: fixture.approval_status,
       member_active: fixture.member_active,
       account_linked: true,
@@ -402,19 +403,21 @@ function staffMemberDirectory() {
   }
   for (const user of authUsers.values()) {
     if (!user.membership) continue;
-    if (!members.has(user.membership.id)) {
-      members.set(user.membership.id, {
+    const existing = members.get(user.membership.id) ?? {
         member_id: user.membership.id,
         display_name: user.membership.display_name,
+        login_email: null,
         approval_status: user.membership.approval_status,
         member_active: user.membership.active,
-        account_linked: true,
+        account_linked: false,
         padel_profile_active: false,
         padel_ranking: null,
         tennis_profile_active: false,
         tennis_ranking: null,
-      });
-    }
+      };
+    existing.login_email = user.email;
+    existing.account_linked = true;
+    members.set(user.membership.id, existing);
   }
   for (const [key, override] of sportProfileOverrides) {
     const [memberId, sport] = key.split(":");

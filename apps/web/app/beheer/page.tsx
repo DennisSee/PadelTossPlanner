@@ -4,7 +4,7 @@ import {
   TosEventList,
 } from "../../components/management/tos-event-management";
 import { ManagementEventFilters } from "../../components/management/management-event-filters";
-import { StateMessage } from "../../components/ui";
+import { SecondaryLinkButton, StateMessage } from "../../components/ui";
 import { requirePlannerAccount } from "../../lib/auth/route-guard";
 import { createServerSupabaseClient } from "../../lib/supabase/server";
 import { managementMessage } from "../../lib/tos/management-request";
@@ -62,12 +62,12 @@ export default async function ManagementPage({ searchParams }: PageProps) {
           {message.text}
         </p>
       ) : null}
+      <div className={styles.managementLinks}>
+        <SecondaryLinkButton href="/beheer/leden">Ledenbeheer</SecondaryLinkButton>
+      </div>
       <div className={styles.layout}>
         <CreateTosEventForm />
         <div className={styles.eventArea}>
-          <div className={styles.managementLinks}>
-            <a href="/beheer/leden">Leden en sportprofielen beheren →</a>
-          </div>
           <ManagementEventFilters
             status={filters.status}
             sport={filters.sport}

@@ -1,5 +1,5 @@
 import { AccountShell, displayInitials, LogoutForm, membershipLabel } from "../../components/account/account-shell";
-import { Card } from "../../components/ui";
+import { ActionDialog, Card } from "../../components/ui";
 import { requireAccount } from "../../lib/auth/route-guard";
 import { accountMessage } from "../../lib/auth/account-request";
 
@@ -41,7 +41,10 @@ export default async function AccountPage({ searchParams }: PageProps) {
           <h2>Accountgegevens</h2>
           <div className={styles.identityBanner}>
             <span className={styles.initials} aria-hidden="true">{displayInitials(displayName)}</span>
-            <span className={styles.identityName}>{displayName}</span>
+            <span className={styles.identityCopy}>
+              <strong className={styles.identityName}>{displayName}</strong>
+              <span>Lid van T.C. Zuid TOS</span>
+            </span>
           </div>
           <dl className={styles.details}>
             <dt>Naam</dt>
@@ -50,20 +53,33 @@ export default async function AccountPage({ searchParams }: PageProps) {
             <dd>{account.identity.email}</dd>
             <dt>Clubstatus</dt>
             <dd>{membershipLabel(account.membership.state)}</dd>
+            <dt>Zichtbare naam</dt>
+            <dd>{displayName}</dd>
           </dl>
           {account.profile?.active && account.profile.memberId ? (
-            <form className={styles.nameForm} action="/api/account/display-name" method="post">
-              <label htmlFor="account-display-name">Zichtbare naam</label>
-              <input
-                id="account-display-name"
-                name="display_name"
-                maxLength={120}
-                required
-                defaultValue={displayName}
-                autoComplete="name"
-              />
-              <button type="submit">Naam opslaan</button>
-            </form>
+            <div className={styles.nameAction}>
+              <ActionDialog
+                triggerLabel="✎ Zichtbare naam wijzigen"
+                title="Zichtbare naam wijzigen"
+                description="Deze naam is zichtbaar voor andere deelnemers."
+                triggerClassName={styles.nameTrigger}
+              >
+                <form className={styles.nameForm} action="/api/account/display-name" method="post">
+                  <label htmlFor="account-display-name">Zichtbare naam</label>
+                  <input
+                    id="account-display-name"
+                    name="display_name"
+                    maxLength={120}
+                    required
+                    defaultValue={displayName}
+                    autoComplete="name"
+                    data-dialog-initial
+                  />
+                  <button type="submit">Naam opslaan</button>
+                </form>
+              </ActionDialog>
+              <p className={styles.nameHint}>Deze naam is zichtbaar voor andere deelnemers.</p>
+            </div>
           ) : (
             <p>Maak eerst je clubprofiel af om je zichtbare naam te wijzigen.</p>
           )}
@@ -71,6 +87,10 @@ export default async function AccountPage({ searchParams }: PageProps) {
         <Card className={styles.contentCard}>
           <h2>Sessie</h2>
           <p>Je gebruikt één veilige sessie voor deelnemen en eventuele beheertaken.</p>
+          <div className={styles.sessionStatus} role="status">
+            <span aria-hidden="true" />
+            <div><strong>Actieve sessie</strong><p>Je bent momenteel ingelogd.</p></div>
+          </div>
           <div className={styles.logoutWrap}><LogoutForm /></div>
         </Card>
       </div>

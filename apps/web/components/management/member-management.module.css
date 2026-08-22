@@ -81,6 +81,17 @@
   font-size: 0.85rem;
 }
 
+.memberCard .loginEmail {
+  color: var(--text);
+  font-size: 0.92rem;
+  overflow-wrap: anywhere;
+}
+
+.memberCard .accountState {
+  margin-top: 0.15rem;
+  font-size: 0.78rem;
+}
+
 .badges {
   display: flex;
   flex-wrap: wrap;
@@ -103,6 +114,10 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--surface-subtle);
+}
+
+.sportForm button {
+  align-self: end;
 }
 
 .sportForm h3,

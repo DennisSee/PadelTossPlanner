@@ -87,6 +87,7 @@ export type StaffEventCapacity = EventCapacity & Readonly<{ eventId: string }>;
 export type StaffMemberDirectoryItem = Readonly<{
   memberId: string;
   displayName: string;
+  loginEmail: string | null;
   approvalStatus: MemberApprovalStatus;
   memberActive: boolean;
   accountLinked: boolean;

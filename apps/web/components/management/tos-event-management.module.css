@@ -13,12 +13,11 @@
 .managementLinks {
   display: flex;
   justify-content: flex-end;
+  margin-bottom: var(--space-3);
 }
 
 .managementLinks a {
-  color: var(--club-green-dark);
-  font-weight: 750;
-  text-decoration: none;
+  min-width: min(100%, 15rem);
 }
 
 .filters {
@@ -88,7 +87,7 @@
 }
 
 .layout {
-  grid-template-columns: minmax(17rem, 0.72fr) minmax(0, 1.7fr);
+  grid-template-columns: minmax(20rem, 22rem) minmax(0, 1fr);
   align-items: start;
 }
 
@@ -102,6 +101,14 @@
   position: sticky;
   top: var(--space-4);
   border-top: 0.25rem solid var(--club-yellow);
+}
+
+.createDisclosure > summary {
+  display: none;
+}
+
+.createDisclosureBody {
+  min-width: 0;
 }
 
 .formCard h2,
@@ -124,7 +131,8 @@
 }
 
 .form,
-.eventCard {
+.eventCard,
+.editForm {
   display: grid;
   gap: var(--space-3);
 }
@@ -229,8 +237,7 @@
 
 .eventSummary {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  border-bottom: 1px solid var(--border);
+  grid-template-columns: auto minmax(0, 1fr) minmax(8.5rem, 10rem);
 }
 
 .eventMain {
@@ -238,24 +245,6 @@
   min-width: 0;
   gap: var(--space-2);
   padding: var(--space-4);
-}
-
-.eventCard > .form {
-  display: grid;
-  grid-template-columns: minmax(10rem, 1fr) minmax(12rem, 1.1fr) minmax(10rem, 0.8fr) auto;
-  align-items: end;
-  margin-top: 0;
-  padding: var(--space-4);
-  background: var(--surface-subtle);
-}
-
-.eventCard > .form .immutableNote {
-  grid-column: 1 / -1;
-  order: 2;
-}
-
-.eventCard > .form .secondaryButton {
-  white-space: nowrap;
 }
 
 .badges {
@@ -268,6 +257,82 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
+}
+
+.editTrigger {
+  min-height: 2.75rem;
+}
+
+.editForm {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.editForm > input[type="hidden"],
+.editForm > .immutableNote,
+.editForm > .primaryEditButton {
+  grid-column: 1 / -1;
+}
+
+.primaryEditButton {
+  min-height: 3rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--club-green);
+  border-radius: var(--radius-sm);
+  color: var(--surface);
+  background: var(--club-green);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+}
+
+.capacitySummary {
+  align-self: center;
+  margin: var(--space-4) var(--space-4) var(--space-4) 0;
+  padding: 0.8rem;
+  border: 1px solid #c9d9cf;
+  border-radius: var(--radius-sm);
+  color: var(--club-green-dark);
+  background: var(--surface-green);
+  text-align: center;
+}
+
+.capacitySummary strong,
+.capacitySummary span,
+.capacitySummary small {
+  display: block;
+}
+
+.capacitySummary strong {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.capacitySummary span {
+  margin-top: var(--space-1);
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.capacitySummary p {
+  margin: var(--space-2) 0 0;
+  font-size: 0.82rem;
+  font-weight: 750;
+}
+
+.capacitySummary small {
+  margin-top: var(--space-2);
+  padding: 0.3rem;
+  border-radius: 0.3rem;
+  background: var(--club-yellow);
+  font-weight: 800;
+}
+
+.capacityFull {
+  border-color: #efc3bd;
+  color: var(--danger);
+  background: var(--danger-soft);
 }
 
 .eventCard h3,
@@ -303,18 +368,47 @@
   font-weight: 750;
 }
 
-@media (max-width: 64rem) {
+@media (max-width: 70rem) {
   .layout {
     grid-template-columns: 1fr;
   }
 
   .formCard {
     position: static;
+    padding: 0;
   }
 
-  .eventCard > .form {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .createDisclosure > summary {
+    display: flex;
+    min-height: 3.4rem;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: 0.85rem 1rem;
+    color: var(--club-green-dark);
+    cursor: pointer;
+    font-size: 1.2rem;
+    font-weight: 800;
+    list-style: none;
   }
+
+  .createDisclosure > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .createDisclosure[open] > summary span {
+    transform: rotate(180deg);
+  }
+
+  .createDisclosureBody {
+    padding: 0 1rem 1rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .createTitle {
+    display: none;
+  }
+
 }
 
 @media (max-width: 46rem) {
@@ -327,8 +421,20 @@
     grid-template-columns: 4rem minmax(0, 1fr);
   }
 
-  .eventCard > .form {
+  .capacitySummary {
+    grid-column: 2;
+    margin: 0 var(--space-4) var(--space-4);
+    text-align: left;
+  }
+
+  .editForm {
     grid-template-columns: 1fr;
+  }
+
+  .editForm > input[type="hidden"],
+  .editForm > .immutableNote,
+  .editForm > .primaryEditButton {
+    grid-column: 1;
   }
 
   .primaryButton,

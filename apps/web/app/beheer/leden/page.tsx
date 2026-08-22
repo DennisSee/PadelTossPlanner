@@ -32,7 +32,9 @@ export default async function MemberManagementPage({ searchParams }: PageProps) 
     const allMembers = await new StaffMemberRepository(client).list();
     const folded = query.toLocaleLowerCase("nl-NL");
     members = folded
-      ? allMembers.filter((member) => member.displayName.toLocaleLowerCase("nl-NL").includes(folded))
+      ? allMembers.filter((member) =>
+          member.displayName.toLocaleLowerCase("nl-NL").includes(folded) ||
+          member.loginEmail?.toLocaleLowerCase("en-US").includes(folded))
       : allMembers;
   } catch {
     return (

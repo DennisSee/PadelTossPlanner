@@ -15,6 +15,7 @@ describe("staff member repository", () => {
     const fake = client({ data: [{
       member_id: MEMBER_ID,
       display_name: "Dennis",
+      login_email: "dennis@example.test",
       approval_status: "approved",
       member_active: true,
       account_linked: true,
@@ -56,6 +57,7 @@ describe("staff member repository", () => {
     const leaked = client({ data: [{
       member_id: MEMBER_ID,
       display_name: "Dennis",
+      login_email: "dennis@example.test",
       approval_status: "approved",
       member_active: true,
       account_linked: true,
@@ -63,7 +65,7 @@ describe("staff member repository", () => {
       padel_ranking: 4,
       tennis_profile_active: false,
       tennis_ranking: null,
-      email: "private@example.test",
+      user_id: "private",
     }], error: null });
     await expect(new StaffMemberRepository(leaked.value).list())
       .rejects.toBeInstanceOf(StaffMemberDataError);

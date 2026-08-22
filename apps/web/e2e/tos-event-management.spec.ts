@@ -80,6 +80,11 @@ test("lists all statuses and creates, opens and cancels a server-slugged event",
 
   const unique = randomUUID().slice(0, 8);
   const title = `TOS vrijdag ${unique}`;
+  const createSummary = page.locator("details summary").filter({ hasText: "Nieuwe TOS" }).first();
+  const createDisclosure = createSummary.locator("xpath=ancestor::details[1]");
+  if ((await createDisclosure.getAttribute("open")) === null) {
+    await createSummary.click();
+  }
   await page.getByLabel("Titel").first().fill(title);
   await page.getByRole("button", { name: "TOS-avond aanmaken" }).click();
   await expect(page).toHaveURL(/\/beheer\?notice=event-created$/u);
@@ -89,9 +94,11 @@ test("lists all statuses and creates, opens and cancels a server-slugged event",
   const href = await detailLink.getAttribute("href");
   expect(href).toMatch(/^\/tos\/padel-tos-\d{8}-[0-9a-f]{8}$/u);
 
-  await card.getByLabel("Titel").fill(`${title} open`);
-  await card.getByLabel("Status").selectOption("open");
-  await card.getByRole("button", { name: "Wijzigingen opslaan" }).click();
+  await card.getByRole("button", { name: "Eventgegevens wijzigen" }).click();
+  let editDialog = page.getByRole("dialog", { name: "Eventgegevens wijzigen" });
+  await editDialog.getByLabel("Titel").fill(`${title} open`);
+  await editDialog.getByLabel("Status").selectOption("open");
+  await editDialog.getByRole("button", { name: "Wijzigingen opslaan" }).click();
   await expect(page).toHaveURL(/\/beheer\?notice=event-updated$/u);
   await expect(page.getByRole("heading", { name: `${title} open` })).toBeVisible();
 
@@ -100,8 +107,10 @@ test("lists all statuses and creates, opens and cancels a server-slugged event",
   expect(await publicResponse.text()).toContain(`${title} open`);
 
   const updatedCard = page.getByRole("heading", { name: `${title} open`, exact: true }).locator("xpath=ancestor::section[1]");
-  await updatedCard.getByLabel("Status").selectOption("cancelled");
-  await updatedCard.getByRole("button", { name: "Wijzigingen opslaan" }).click();
+  await updatedCard.getByRole("button", { name: "Eventgegevens wijzigen" }).click();
+  editDialog = page.getByRole("dialog", { name: "Eventgegevens wijzigen" });
+  await editDialog.getByLabel("Status").selectOption("cancelled");
+  await editDialog.getByRole("button", { name: "Wijzigingen opslaan" }).click();
   const hidden = await request.get(`http://127.0.0.1:31000${href}`);
   expect(hidden.status()).toBe(404);
 });
