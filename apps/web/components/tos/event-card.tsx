@@ -92,38 +92,42 @@ export function TosEventCard({
           </p>
         ) : null}
         <EventCapacityPanel capacity={capacity} sport={event.sport} />
-        {!socialDataUnavailable ? (
-          <>
-            <p className={styles.attendeePreview}>
-              {placedNames.length} {placedNames.length === 1 ? "deelnemer" : "deelnemers"}
-              {placedNames.length ? ` · ${attendeeNamesPreview(placedNames)}` : ""}
-            </p>
-            <ParticipantsSheet event={event} capacity={capacity} attendance={attendance} />
-          </>
-        ) : (
-          <p className={styles.attendeePreview}>De deelnemerslijst is tijdelijk niet beschikbaar.</p>
-        )}
-        <div className={styles.actions}>
-          {registration && !canChange ? (
+        <div className={styles.participantColumn}>
+          {!socialDataUnavailable ? (
             <>
-              <SecondaryLinkButton href={`/tos/${event.slug}`}>
-                Aanmelding bekijken
-              </SecondaryLinkButton>
-              <p className={styles.muted}>Deze aanmelding kan niet meer worden gewijzigd.</p>
+              <p className={styles.attendeePreview}>
+                {placedNames.length} {placedNames.length === 1 ? "deelnemer" : "deelnemers"}
+                {placedNames.length ? ` · ${attendeeNamesPreview(placedNames)}` : ""}
+              </p>
+              <ParticipantsSheet event={event} capacity={capacity} attendance={attendance} />
             </>
-          ) : canChange ? (
-            <LinkButton href={`/tos/${event.slug}`}>
-              {registration
-                ? "Aanmelding wijzigen"
-                : capacity.availableCount === 0
-                  ? "Op wachtlijst"
-                  : "Aanmelden"}
-            </LinkButton>
           ) : (
-            <button className={styles.disabledAction} type="button" disabled>
-              Inschrijving gesloten
-            </button>
+            <p className={styles.attendeePreview}>
+              De deelnemerslijst is tijdelijk niet beschikbaar.
+            </p>
           )}
+          <div className={styles.actions}>
+            {registration && !canChange ? (
+              <>
+                <SecondaryLinkButton href={`/tos/${event.slug}`}>
+                  Aanmelding bekijken
+                </SecondaryLinkButton>
+                <p className={styles.muted}>Deze aanmelding kan niet meer worden gewijzigd.</p>
+              </>
+            ) : canChange ? (
+              <LinkButton href={`/tos/${event.slug}`}>
+                {registration
+                  ? "Aanmelding wijzigen"
+                  : capacity.availableCount === 0
+                    ? "Op wachtlijst"
+                    : "Aanmelden"}
+              </LinkButton>
+            ) : (
+              <button className={styles.disabledAction} type="button" disabled>
+                Inschrijving gesloten
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </Card>

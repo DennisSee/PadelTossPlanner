@@ -28,6 +28,23 @@ const declined: OwnRegistration = {
 };
 
 describe("participant TOS cards", () => {
+  it("groups participant information and the primary action in one column", () => {
+    render(
+      <TosEventCard
+        event={event}
+        capacity={{ maxParticipants: 24, placedCount: 2, availableCount: 22, waitlistCount: 0 }}
+        attendance={[
+          { displayName: "Dennis", placementStatus: "placed", waitlistPosition: null },
+          { displayName: "Jeroen", placementStatus: "placed", waitlistPosition: null },
+        ]}
+        now={new Date("2026-08-20T12:00:00Z")}
+      />,
+    );
+    const preview = screen.getByText(/^2 deelnemers/u);
+    const action = screen.getByRole("link", { name: /aanmelden/i });
+    expect(preview.parentElement).toBe(action.parentElement?.parentElement);
+  });
+
   it("renders structured event information and escaped social names", () => {
     const { container } = render(
       <TosEventCard

@@ -5,6 +5,7 @@ import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import Home from "./page";
+import { metadata } from "./layout";
 import { GET } from "./api/health/route";
 import { deriveAccountContext } from "../lib/auth/account-context";
 
@@ -35,6 +36,13 @@ describe("WEB-2 routes", () => {
     expect(screen.getAllByRole("link", { name: "Inloggen / aanmelden" })[0])
       .toHaveAttribute("href", "/login?next=%2Ftos");
     expect(screen.getByText(/Google of een e-mailcode/i)).toBeVisible();
+  });
+
+  it("publishes the existing club logo as the browser icon", () => {
+    expect(metadata.icons).toEqual({
+      icon: [{ url: "/tc-zuid-favicon.png", sizes: "329x329", type: "image/png" }],
+      apple: [{ url: "/tc-zuid-favicon.png", sizes: "329x329", type: "image/png" }],
+    });
   });
 
   it("replaces the anonymous login card with the authenticated TOS entry", async () => {
