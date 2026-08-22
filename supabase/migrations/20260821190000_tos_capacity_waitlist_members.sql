@@ -9,6 +9,13 @@ alter table public.tos_events
 alter table public.registrations
     add column attending_since timestamptz;
 
+-- Eenmalige technische initialisatie voor rows die vóór WEB-6 zijn ontstaan.
+-- created_at is verplicht en stabiel; declined rows blijven volledig ongemoeid.
+update public.registrations
+set attending_since = created_at
+where response = 'attending'
+  and attending_since is null;
+
 alter table public.registrations
     add constraint registrations_attending_since_check
         check (

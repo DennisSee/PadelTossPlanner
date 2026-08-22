@@ -182,12 +182,20 @@ insert into public.registrations (
 values
     ('d6100000-0000-4000-8000-000000000001', 'c6100000-0000-4000-8000-000000000001', 'a6100000-0000-4000-8000-000000000001', 'b6100000-0000-4000-8000-000000000001', 'attending', now() + interval '10 days', now() + interval '10 days 2 hours', 'admin'),
     ('d6100000-0000-4000-8000-000000000002', 'c6100000-0000-4000-8000-000000000001', 'a6100000-0000-4000-8000-000000000002', 'b6100000-0000-4000-8000-000000000002', 'attending', now() + interval '10 days', now() + interval '10 days 2 hours', 'admin'),
-    ('d6100000-0000-4000-8000-000000000003', 'c6100000-0000-4000-8000-000000000001', 'a6100000-0000-4000-8000-000000000003', 'b6100000-0000-4000-8000-000000000003', 'attending', now() + interval '10 days', now() + interval '10 days 2 hours', 'admin');
+    ('d6100000-0000-4000-8000-000000000003', 'c6100000-0000-4000-8000-000000000001', 'a6100000-0000-4000-8000-000000000003', 'b6100000-0000-4000-8000-000000000003', 'attending', now() + interval '10 days', now() + interval '10 days 2 hours', 'admin'),
+    ('d6100000-0000-4000-8000-000000000004', 'c6100000-0000-4000-8000-000000000002', 'a6100000-0000-4000-8000-000000000001', 'b6100000-0000-4000-8000-000000000001', 'declined', null, null, 'admin');
 
 select is(
-    (select count(*) from public.registrations where attending_since is not null),
-    3::bigint,
-    'server vult attending_since voor iedere nieuwe attending-registratie'
+    (select count(*) from public.registrations
+     where response = 'attending' and attending_since is null),
+    0::bigint,
+    'iedere attending-registratie voldoet na de migration aan de tijdvolgorde-invariant'
+);
+select is(
+    (select count(*) from public.registrations
+     where response = 'declined' and attending_since is not null),
+    0::bigint,
+    'declined registrations houden attending_since leeg'
 );
 select results_eq(
     $sql$
@@ -204,6 +212,27 @@ select results_eq(
     $values$,
     'gelijke aanmeldtijd gebruikt registratie-id als stabiele tie-break'
 );
+
+-- De echte triggersemantiek is hierboven bewezen; schakel alleen voor deze
+-- constrainttest de normaliserende trigger tijdelijk uit.
+alter table public.registrations disable trigger registrations_validate_self_signup;
+select throws_ok(
+    $$update public.registrations
+      set attending_since = null
+      where id = 'd6100000-0000-4000-8000-000000000001'$$,
+    '23514',
+    'new row for relation "registrations" violates check constraint "registrations_attending_since_check"',
+    'de constraint weigert attending zonder attending_since'
+);
+select throws_ok(
+    $$update public.registrations
+      set attending_since = created_at
+      where id = 'd6100000-0000-4000-8000-000000000004'$$,
+    '23514',
+    'new row for relation "registrations" violates check constraint "registrations_attending_since_check"',
+    'de constraint weigert attending_since voor declined'
+);
+alter table public.registrations enable trigger registrations_validate_self_signup;
 
 -- Participantmatrix.
 set local role authenticated;
