@@ -7,8 +7,8 @@ select no_plan();
 
 select is(
     pg_get_function_result('public.staff_member_directory()'::regprocedure),
-    'TABLE(member_id uuid, display_name text, login_email text, approval_status text, member_active boolean, account_linked boolean, padel_profile_active boolean, padel_ranking smallint, tennis_profile_active boolean, tennis_ranking smallint)',
-    'staffdirectory voegt uitsluitend nullable login-email aan het bestaande readmodel toe'
+    'TABLE(member_id uuid, display_name text, profile_id uuid, account_role text, login_email text, approval_status text, member_active boolean, account_linked boolean, padel_profile_active boolean, padel_ranking smallint, tennis_profile_active boolean, tennis_ranking smallint)',
+    'staffdirectory bevat de smalle accountidentiteit en rol naast nullable login-email'
 );
 select ok(
     (select procedure.prosecdef

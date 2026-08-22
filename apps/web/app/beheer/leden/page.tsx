@@ -50,7 +50,7 @@ export default async function MemberManagementPage({ searchParams }: PageProps) 
           {message.text}
         </p>
       ) : null}
-      <MemberManagement members={members} query={query} />
+      <MemberManagement members={members} query={query} canAdminister={account.capabilities.canAdminister} currentProfileId={account.identity.userId} />
     </AccountShell>
   );
 }

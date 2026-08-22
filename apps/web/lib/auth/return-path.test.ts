@@ -54,5 +54,6 @@ describe("safe Auth return paths", () => {
     expect(loginPathFor("/tos/vrijdag-padel")).toBe(
       "/login?next=%2Ftos%2Fvrijdag-padel",
     );
+    expect(loginPathFor("/historie")).toBe("/login?next=%2Fhistorie");
   });
 });

@@ -5,6 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { PlannerGeneration } from "../planner-api/types";
 import { parsePlannerGeneration } from "../planner-api/client";
 import { isUuid, parseOffsetTimestamp } from "./parser";
+import { buildScheduleHistoryIdentity } from "./schedule-history";
 import type { PlannerDraft, StaffScheduleDetail, StaffScheduleSummary, TosEvent } from "./types";
 
 type RpcResult = Readonly<{ data?: unknown; error?: unknown }>;
@@ -99,11 +100,18 @@ export class StaffScheduleRepository {
   }
 
   async save(event: TosEvent, draft: PlannerDraft, generation: PlannerGeneration): Promise<string> {
+    let historyIdentity;
+    try {
+      historyIdentity = buildScheduleHistoryIdentity(draft, generation);
+    } catch {
+      throw new StaffScheduleDataError();
+    }
     const result = await this.client.rpc("staff_save_event_schedule", {
       p_event_id: event.id,
       p_planner_draft_revision: draft.revision,
       p_generation_seed: generation.seed,
       p_schedule_private: generation.schedule,
+      p_history_identity_private: historyIdentity,
       p_statistics_private: generation.statistics,
       p_diagnostics: generation.diagnostics,
     }) as RpcResult;

@@ -32,8 +32,10 @@ it("parses event-scoped private detail without exposing the players snapshot", a
 });
 
 it("maps database concurrency and publication denials to finite errors", async () => {
+  const draft = { revision: 2, players: [{ rowId: "row-a", name: "Ada", included: true }] } as never;
+  const generation = { seed: 7, schedule: [{ Ronde: 1, Tijd: "20:00 - 20:20", Baan: "Kremer Baan", "Team 1": "Niemand", "Team 2": "Niemand", Rust: "Ada", "Nog niet aanwezig": "Niemand", "Niet meer beschikbaar": "Niemand" }], statistics: [], diagnostics: {} } as never;
   const conflict = new StaffScheduleRepository({ rpc: vi.fn().mockResolvedValue({ data: null, error: { code: "40001", message: "private" } }) } as unknown as SupabaseClient);
-  await expect(conflict.save({ id: eventId } as never, { revision: 2 } as never, { seed: 7 } as never)).rejects.toBeInstanceOf(StaffScheduleConflictError);
+  await expect(conflict.save({ id: eventId } as never, draft, generation)).rejects.toBeInstanceOf(StaffScheduleConflictError);
   const denied = new StaffScheduleRepository({ rpc: vi.fn().mockResolvedValue({ data: null, error: { code: "42501", message: "private" } }) } as unknown as SupabaseClient);
   await expect(denied.setPublished(scheduleId, true)).rejects.toBeInstanceOf(StaffSchedulePublicationError);
 });

@@ -1,5 +1,5 @@
 import type { StaffMemberDirectoryItem, TosSport } from "../../lib/tos/types";
-import { Badge, Card, SecondaryLinkButton } from "../ui";
+import { ActionDialog, Badge, Card, SecondaryLinkButton } from "../ui";
 
 import styles from "./member-management.module.css";
 
@@ -8,6 +8,27 @@ const APPROVAL_LABELS = {
   pending: "In behandeling",
   rejected: "Afgewezen",
 } as const;
+const ROLE_LABELS = { participant: "Deelnemer", planner: "Planner", admin: "Beheerder" } as const;
+
+function RoleManagement({ member, canAdminister, currentProfileId }: { member: StaffMemberDirectoryItem; canAdminister: boolean; currentProfileId: string }) {
+  if (!member.profileId || !member.accountRole) return <p className={styles.roleState}><strong>Accountrol</strong> Geen gekoppeld account</p>;
+  const ownAccount = member.profileId === currentProfileId;
+  return (
+    <div className={styles.roleState}>
+      <p><strong>Accountrol</strong> <Badge tone={member.accountRole === "participant" ? "neutral" : "warning"}>{ROLE_LABELS[member.accountRole]}</Badge></p>
+      {canAdminister && !ownAccount ? (
+        <ActionDialog triggerLabel="Accountrol wijzigen" title={`Accountrol van ${member.displayName}`} description="Clublidmaatschap en sportprofielen blijven ongewijzigd." triggerClassName={styles.roleTrigger}>
+          <form className={styles.roleForm} action="/api/beheer/leden/role" method="post">
+            <input type="hidden" name="profile_id" value={member.profileId} />
+            <label>Nieuwe accountrol<select name="role" defaultValue={member.accountRole}><option value="participant">Deelnemer</option><option value="planner">Planner</option><option value="admin">Beheerder</option></select></label>
+            <p>Je wijzigt alleen de staffrol. De toegang als clublid blijft apart bepaald.</p>
+            <button type="submit">Rolwijziging bevestigen</button>
+          </form>
+        </ActionDialog>
+      ) : <span className={styles.roleHint}>{ownAccount ? "Je kunt je eigen rol niet wijzigen." : "Alleen een admin kan accountrollen wijzigen."}</span>}
+    </div>
+  );
+}
 
 function SportProfileForm({ member, sport }: { member: StaffMemberDirectoryItem; sport: TosSport }) {
   const active = sport === "padel" ? member.padelProfileActive : member.tennisProfileActive;
@@ -39,9 +60,13 @@ function SportProfileForm({ member, sport }: { member: StaffMemberDirectoryItem;
 export function MemberManagement({
   members,
   query,
+  canAdminister,
+  currentProfileId,
 }: {
   members: readonly StaffMemberDirectoryItem[];
   query: string;
+  canAdminister: boolean;
+  currentProfileId: string;
 }) {
   return (
     <div className={styles.stack}>
@@ -79,6 +104,7 @@ export function MemberManagement({
                 <SportProfileForm member={member} sport="padel" />
                 <SportProfileForm member={member} sport="tennis" />
               </div>
+              <RoleManagement member={member} canAdminister={canAdminister} currentProfileId={currentProfileId} />
             </Card>
           ))}
         </div>

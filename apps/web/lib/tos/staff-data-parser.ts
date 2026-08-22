@@ -7,10 +7,12 @@ import type {
   StaffMemberDirectoryItem,
   StaffRegistrationOverview,
 } from "./types";
+import type { AccountRole } from "../auth/account-context";
 
 const CONTROL = /[\u0000-\u001f\u007f]/u;
 const APPROVALS = new Set<MemberApprovalStatus>(["pending", "approved", "rejected"]);
 const PLACEMENTS = new Set<RegistrationPlacement>(["placed", "waitlist", "declined"]);
+const ROLES = new Set<AccountRole>(["participant", "planner", "admin"]);
 
 function record(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -129,15 +131,25 @@ export function parseStaffRegistrationOverviewRows(value: unknown): StaffRegistr
 export function parseStaffMemberDirectoryRows(value: unknown): StaffMemberDirectoryItem[] {
   return rows(value).map((row) => {
     exact(row, [
-      "member_id", "display_name", "login_email", "approval_status", "member_active", "account_linked",
+      "member_id", "display_name", "profile_id", "account_role", "login_email", "approval_status", "member_active", "account_linked",
       "padel_profile_active", "padel_ranking", "tennis_profile_active", "tennis_ranking",
     ]);
     const approval = row.approval_status;
     if (typeof approval !== "string" || !APPROVALS.has(approval as MemberApprovalStatus)) {
       throw new InvalidTosDataError();
     }
+    const accountRole = row.account_role;
+    if (accountRole !== null && (typeof accountRole !== "string" || !ROLES.has(accountRole as AccountRole))) {
+      throw new InvalidTosDataError();
+    }
+    const profileId = row.profile_id === null ? null : uuid(row.profile_id);
+    if ((profileId !== null) !== bool(row.account_linked) || (profileId === null) !== (accountRole === null)) {
+      throw new InvalidTosDataError();
+    }
     return Object.freeze({
       memberId: uuid(row.member_id),
+      profileId,
+      accountRole: accountRole as AccountRole | null,
       displayName: name(row.display_name),
       loginEmail: nullableEmail(row.login_email),
       approvalStatus: approval as MemberApprovalStatus,
@@ -164,4 +176,15 @@ export function parseStaffSportProfileWriteResult(value: unknown) {
     active: bool(row.active),
     ranking: nullableRanking(row.ranking),
   });
+}
+
+export function parseStaffRoleWriteResult(value: unknown) {
+  const result = rows(value);
+  if (result.length !== 1) throw new InvalidTosDataError();
+  const row = record(result[0]);
+  exact(row, ["profile_id", "role"]);
+  if (typeof row.role !== "string" || !ROLES.has(row.role as AccountRole)) {
+    throw new InvalidTosDataError();
+  }
+  return Object.freeze({ profileId: uuid(row.profile_id), role: row.role as AccountRole });
 }

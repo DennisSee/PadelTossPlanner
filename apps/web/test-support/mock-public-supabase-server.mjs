@@ -54,6 +54,9 @@ const registrations = new Map();
 const plannerDrafts = new Map();
 const staffSchedules = new Map();
 const sportProfileOverrides = new Map();
+const historyContactRequests = new Map();
+const HISTORY_CLUBMATE_ID = "5c100000-0000-4000-8000-000000000001";
+const HISTORY_EVENT_ID = "7a100000-0000-4000-8000-000000000001";
 
 function relativeIso(hours) {
   const value = new Date();
@@ -381,6 +384,8 @@ function staffMemberDirectory() {
   for (const fixture of staffPlannerInputFixtures) {
     const existing = members.get(fixture.member_id) ?? {
       member_id: fixture.member_id,
+      profile_id: fixture.user_id,
+      account_role: "participant",
       display_name: fixture.display_name,
       login_email: null,
       approval_status: fixture.approval_status,
@@ -405,6 +410,8 @@ function staffMemberDirectory() {
     if (!user.membership) continue;
     const existing = members.get(user.membership.id) ?? {
         member_id: user.membership.id,
+        profile_id: user.id,
+        account_role: user.role,
         display_name: user.membership.display_name,
         login_email: null,
         approval_status: user.membership.approval_status,
@@ -417,6 +424,8 @@ function staffMemberDirectory() {
       };
     existing.login_email = user.email;
     existing.account_linked = true;
+    existing.profile_id = user.id;
+    existing.account_role = user.role;
     members.set(user.membership.id, existing);
   }
   for (const [key, override] of sportProfileOverrides) {
@@ -867,6 +876,31 @@ const server = createServer(async (request, response) => {
     json(response, 200, { status: "ok" });
     return;
   }
+  if (request.method === "POST" && requestUrl.pathname === "/__test/history-contact") {
+    const body = await requestJson(request);
+    const email = String(body.email ?? "").trim().toLowerCase();
+    const status = String(body.status ?? "");
+    if (!email.includes("@") || !new Set(["incoming", "accepted"]).has(status)) {
+      json(response, 400, { error: "invalid history contact fixture" });
+      return;
+    }
+    const user = authUser(email);
+    if (!validParticipant(user)) {
+      json(response, 400, { error: "invalid history member fixture" });
+      return;
+    }
+    const id = randomUUID();
+    historyContactRequests.set(id, {
+      id,
+      requester: status === "incoming" ? HISTORY_CLUBMATE_ID : user.membership.id,
+      recipient: status === "incoming" ? user.membership.id : HISTORY_CLUBMATE_ID,
+      status: status === "accepted" ? "accepted" : "pending",
+      created_at: new Date().toISOString(),
+      responded_at: status === "accepted" ? new Date().toISOString() : null,
+    });
+    json(response, 200, { status: "ok" });
+    return;
+  }
   if (request.method === "POST" && requestUrl.pathname === "/__test/reset-state") {
     tosEvents.splice(0, tosEvents.length, ...initialTosEvents.map((event) => ({ ...event })));
     authUsers.clear();
@@ -877,6 +911,7 @@ const server = createServer(async (request, response) => {
     plannerDrafts.clear();
     staffSchedules.clear();
     sportProfileOverrides.clear();
+    historyContactRequests.clear();
     nextOAuthAttempt = null;
     attendeeFailureEventId = null;
     response.writeHead(204);
@@ -1289,6 +1324,82 @@ const server = createServer(async (request, response) => {
     json(response, 200, [{ member_id: memberId, sport, active: body.p_active, ranking }]);
     return;
   }
+  if (request.method === "POST" && requestUrl.pathname === "/rest/v1/rpc/admin_set_profile_role") {
+    const user = bearerUser(request);
+    const body = await requestJson(request);
+    const target = [...authUsers.values()].find(({ id }) => id === body.p_target_profile_id);
+    if (!user || !exactKeys(body, ["p_target_profile_id", "p_role"]) || user.role !== "admin" || !user.active || !target?.membership || target.id === user.id || !new Set(["participant", "planner", "admin"]).has(body.p_role)) {
+      json(response, 403, { code: "42501", message: "role update rejected" });
+      return;
+    }
+    target.role = body.p_role;
+    json(response, 200, [{ profile_id: target.id, role: target.role }]);
+    return;
+  }
+  if (request.method === "POST" && requestUrl.pathname === "/rest/v1/rpc/my_tos_history") {
+    const user = bearerUser(request);
+    const body = await requestJson(request);
+    if (!user || !exactKeys(body, [])) { json(response, user ? 400 : 401, { code: "42501", message: "history rejected" }); return; }
+    json(response, 200, validParticipant(user) && !user.email.startsWith("empty-history") ? [{
+      event_id: HISTORY_EVENT_ID, title: "Zomeravond TOS", sport: "padel",
+      starts_at: "2026-07-17T18:00:00.000Z", ends_at: "2026-07-17T20:00:00.000Z",
+      match_count: 1, rest_count: 1, rounds: [
+        { round_number: 1, starts_at: "2026-07-17T18:00:00.000Z", ends_at: "2026-07-17T18:20:00.000Z", state: "playing", court_name: "Kremer Baan", partners: [{ member_id: HISTORY_CLUBMATE_ID, display_name: "Ready Hele Avond" }], opponents: [{ member_id: null, display_name: "Gastspeler" }] },
+        { round_number: 2, starts_at: "2026-07-17T18:20:00.000Z", ends_at: "2026-07-17T18:40:00.000Z", state: "rest", court_name: null, partners: [], opponents: [] },
+      ],
+    }] : []);
+    return;
+  }
+  if (request.method === "POST" && requestUrl.pathname === "/rest/v1/rpc/my_tos_clubmates") {
+    const user = bearerUser(request); const body = await requestJson(request);
+    if (!user || !exactKeys(body, [])) { json(response, user ? 400 : 401, { code: "42501", message: "clubmates rejected" }); return; }
+    json(response, 200, validParticipant(user) && !user.email.startsWith("empty-history") ? [{ member_id: HISTORY_CLUBMATE_ID, display_name: "Ready Hele Avond", shared_matches: 1, shared_events: 1, last_shared_at: "2026-07-17T20:00:00.000Z" }] : []);
+    return;
+  }
+  if (request.method === "POST" && requestUrl.pathname === "/rest/v1/rpc/my_shared_tos_history") {
+    const user = bearerUser(request); const body = await requestJson(request);
+    if (!user || !exactKeys(body, ["p_other_member_id"])) { json(response, user ? 400 : 401, { code: "42501", message: "shared history rejected" }); return; }
+    json(response, 200, validParticipant(user) && !user.email.startsWith("empty-history") && body.p_other_member_id === HISTORY_CLUBMATE_ID ? [{ event_id: HISTORY_EVENT_ID, title: "Zomeravond TOS", sport: "padel", starts_at: "2026-07-17T18:00:00.000Z", shared_matches: 1 }] : []);
+    return;
+  }
+  if (request.method === "POST" && requestUrl.pathname === "/rest/v1/rpc/my_history_contact_requests") {
+    const user = bearerUser(request); const body = await requestJson(request);
+    if (!user || !exactKeys(body, [])) { json(response, user ? 400 : 401, { code: "42501", message: "contacts rejected" }); return; }
+    const ownMemberId = user.membership?.id;
+    const values = validParticipant(user) ? [...historyContactRequests.values()].filter((item) => item.requester === ownMemberId || item.recipient === ownMemberId).map((item) => ({
+      request_id: item.id,
+      other_member_id: item.requester === ownMemberId ? item.recipient : item.requester,
+      display_name: "Ready Hele Avond", status: item.status,
+      direction: item.requester === ownMemberId ? "outgoing" : "incoming",
+      created_at: item.created_at, responded_at: item.responded_at,
+    })) : [];
+    json(response, 200, values); return;
+  }
+  if (request.method === "POST" && requestUrl.pathname === "/rest/v1/rpc/request_history_contact") {
+    const user = bearerUser(request); const body = await requestJson(request);
+    if (!validParticipant(user) || !exactKeys(body, ["p_other_member_id"]) || body.p_other_member_id !== HISTORY_CLUBMATE_ID || body.p_other_member_id === user.membership.id) { json(response, 403, { code: "42501", message: "contact rejected" }); return; }
+    const id = randomUUID(); historyContactRequests.set(id, { id, requester: user.membership.id, recipient: HISTORY_CLUBMATE_ID, status: "pending", created_at: new Date().toISOString(), responded_at: null }); json(response, 200, id); return;
+  }
+  if (request.method === "POST" && new Set(["/rest/v1/rpc/respond_history_contact", "/rest/v1/rpc/cancel_history_contact", "/rest/v1/rpc/revoke_history_contact"]).has(requestUrl.pathname)) {
+    const user = bearerUser(request); const body = await requestJson(request); const requestId = body.p_request_id; const item = historyContactRequests.get(requestId);
+    const expected = requestUrl.pathname.endsWith("respond_history_contact") ? ["p_request_id", "p_accept"] : ["p_request_id"];
+    const isRespond = requestUrl.pathname.endsWith("respond_history_contact");
+    const isCancel = requestUrl.pathname.endsWith("cancel_history_contact");
+    const allowed = item && (
+      (isRespond && item.status === "pending" && item.recipient === user?.membership?.id) ||
+      (isCancel && item.status === "pending" && item.requester === user?.membership?.id) ||
+      (!isRespond && !isCancel && item.status === "accepted" && [item.requester, item.recipient].includes(user?.membership?.id))
+    );
+    if (!validParticipant(user) || !exactKeys(body, expected) || !allowed) { json(response, 403, { code: "42501", message: "contact mutation rejected" }); return; }
+    item.status = isRespond ? (body.p_accept ? "accepted" : "declined") : "revoked";
+    item.responded_at = new Date().toISOString(); json(response, 200, true); return;
+  }
+  if (request.method === "POST" && requestUrl.pathname === "/rest/v1/rpc/my_accepted_history_contact") {
+    const user = bearerUser(request); const body = await requestJson(request);
+    if (!validParticipant(user) || !exactKeys(body, ["p_other_member_id"])) { json(response, user ? 400 : 401, { code: "42501", message: "contact detail rejected" }); return; }
+    const accepted = [...historyContactRequests.values()].some((item) => item.status === "accepted" && [item.requester, item.recipient].includes(user.membership.id) && [item.requester, item.recipient].includes(body.p_other_member_id));
+    json(response, 200, accepted ? [{ contact_email: "clubgenoot@example.test" }] : []); return;
+  }
   if (
     request.method === "POST" &&
     requestUrl.pathname === "/rest/v1/rpc/staff_event_planner_input"
@@ -1384,7 +1495,7 @@ const server = createServer(async (request, response) => {
   if (request.method === "POST" && requestUrl.pathname === "/rest/v1/rpc/staff_save_event_schedule") {
     const user = bearerUser(request);
     const body = await requestJson(request);
-    const expected = ["p_event_id","p_planner_draft_revision","p_generation_seed","p_schedule_private","p_statistics_private","p_diagnostics"];
+    const expected = ["p_event_id","p_planner_draft_revision","p_generation_seed","p_schedule_private","p_history_identity_private","p_statistics_private","p_diagnostics"];
     const event = eventById(String(body.p_event_id ?? ""));
     const draft = plannerDrafts.get(body.p_event_id);
     const scheduleKeys = ["Ronde","Tijd","Baan","Team 1","Niveau T1","Team 2","Niveau T2","Teamverschil","Rust","Nog niet aanwezig","Niet meer beschikbaar"];
@@ -1404,6 +1515,7 @@ const server = createServer(async (request, response) => {
         "Ronde", "Tijd", "Baan", "Team 1", "Team 2", "Rust", "Nog niet aanwezig", "Niet meer beschikbaar",
       ].map((key) => [key, row[key]]))),
       schedule_private: body.p_schedule_private, statistics_private: body.p_statistics_private,
+      history_identity_private: body.p_history_identity_private,
       diagnostics: body.p_diagnostics, is_published: false, generation_seed: body.p_generation_seed,
       planner_draft_revision: body.p_planner_draft_revision, created_at: new Date().toISOString(),
     });

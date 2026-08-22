@@ -5,11 +5,13 @@ import styles from "./ui.module.css";
 
 export type NavigationModel = Readonly<{
   authenticated: boolean;
+  canParticipate: boolean;
   canPlan: boolean;
 }>;
 
 export const ANONYMOUS_NAVIGATION: NavigationModel = Object.freeze({
   authenticated: false,
+  canParticipate: false,
   canPlan: false,
 });
 
@@ -18,6 +20,7 @@ export function navigationModelFromAccount(
 ): NavigationModel {
   return Object.freeze({
     authenticated: Boolean(account),
+    canParticipate: Boolean(account?.capabilities.canParticipate),
     canPlan: Boolean(account?.capabilities.canPlan),
   });
 }
@@ -52,6 +55,7 @@ function NavigationLinks({ model, currentPath }: { model: NavigationModel; curre
     <>
       <NavigationLink href="/live" currentPath={currentPath}>Live TOS-schema</NavigationLink>
       <NavigationLink href="/tos" currentPath={currentPath}>TOS-avonden</NavigationLink>
+      {model.canParticipate ? <NavigationLink href="/historie" currentPath={currentPath}>Mijn historie</NavigationLink> : null}
       <NavigationLink href="/account" currentPath={currentPath}>Mijn account</NavigationLink>
       {model.canPlan ? <NavigationLink href="/beheer" currentPath={currentPath}>Beheer</NavigationLink> : null}
     </>

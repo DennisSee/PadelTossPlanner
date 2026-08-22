@@ -14,6 +14,8 @@ describe("staff member repository", () => {
   it("uses only the narrow directory RPC", async () => {
     const fake = client({ data: [{
       member_id: MEMBER_ID,
+      profile_id: "33333333-3333-4333-8333-333333333333",
+      account_role: "participant",
       display_name: "Dennis",
       login_email: "dennis@example.test",
       approval_status: "approved",
@@ -26,6 +28,14 @@ describe("staff member repository", () => {
     }], error: null });
     await expect(new StaffMemberRepository(fake.value).list()).resolves.toHaveLength(1);
     expect(fake.rpc).toHaveBeenCalledWith("staff_member_directory");
+  });
+
+  it("changes only a linked profile role through the admin RPC", async () => {
+    const profileId = "33333333-3333-4333-8333-333333333333";
+    const fake = client({ data: [{ profile_id: profileId, role: "planner" }], error: null });
+    await expect(new StaffMemberRepository(fake.value).updateRole({ profileId, role: "planner" }))
+      .resolves.toEqual({ profileId, role: "planner" });
+    expect(fake.rpc).toHaveBeenCalledWith("admin_set_profile_role", { p_target_profile_id: profileId, p_role: "planner" });
   });
 
   it("writes exactly one member/sport profile through the JWT-scoped RPC", async () => {
@@ -56,6 +66,8 @@ describe("staff member repository", () => {
 
     const leaked = client({ data: [{
       member_id: MEMBER_ID,
+      profile_id: "33333333-3333-4333-8333-333333333333",
+      account_role: "participant",
       display_name: "Dennis",
       login_email: "dennis@example.test",
       approval_status: "approved",

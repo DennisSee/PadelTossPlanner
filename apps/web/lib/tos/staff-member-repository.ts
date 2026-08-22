@@ -6,10 +6,12 @@ import { isUuid } from "./parser";
 import {
   parseStaffMemberDirectoryRows,
   parseStaffSportProfileWriteResult,
+  parseStaffRoleWriteResult,
 } from "./staff-data-parser";
 import type {
   StaffMemberDirectoryItem,
   StaffSportProfileWrite,
+  StaffRoleWrite,
 } from "./types";
 
 export class StaffMemberDataError extends Error {
@@ -43,6 +45,20 @@ export class StaffMemberRepository {
     if (result.error) throw new StaffMemberDataError();
     try {
       return parseStaffSportProfileWriteResult(result.data);
+    } catch {
+      throw new StaffMemberDataError();
+    }
+  }
+
+  async updateRole(write: StaffRoleWrite) {
+    if (!isUuid(write.profileId)) throw new StaffMemberDataError();
+    const result = await this.client.rpc("admin_set_profile_role", {
+      p_target_profile_id: write.profileId,
+      p_role: write.role,
+    });
+    if (result.error) throw new StaffMemberDataError();
+    try {
+      return parseStaffRoleWriteResult(result.data);
     } catch {
       throw new StaffMemberDataError();
     }

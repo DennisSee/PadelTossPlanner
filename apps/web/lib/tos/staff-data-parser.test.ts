@@ -76,6 +76,8 @@ describe("WEB-6 staff RPC parsers", () => {
   it("parses a minimal member directory and rejects private extras", () => {
     const row = {
       member_id: MEMBER_ID,
+      profile_id: USER_ID,
+      account_role: "participant",
       display_name: "Dennis",
       login_email: "Dennis@Example.Test",
       approval_status: "approved",
@@ -88,6 +90,8 @@ describe("WEB-6 staff RPC parsers", () => {
     };
     expect(parseStaffMemberDirectoryRows([row])[0]).toEqual({
       memberId: MEMBER_ID,
+      profileId: USER_ID,
+      accountRole: "participant",
       displayName: "Dennis",
       loginEmail: "dennis@example.test",
       approvalStatus: "approved",
@@ -105,6 +109,8 @@ describe("WEB-6 staff RPC parsers", () => {
   it("accepts an unlinked member without email and rejects malformed login email", () => {
     const base = {
       member_id: MEMBER_ID,
+      profile_id: null,
+      account_role: null,
       display_name: "Los lid",
       login_email: null,
       approval_status: "pending",

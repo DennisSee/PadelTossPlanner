@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 
-export type MemberNotice = "sport-profile-updated";
+export type MemberNotice = "sport-profile-updated" | "account-role-updated";
 export type MemberError = "invalid-request" | "not-authorized" | "temporarily-unavailable";
 
 const NOTICES: Record<MemberNotice, string> = {
   "sport-profile-updated": "Het sportprofiel is bijgewerkt.",
+  "account-role-updated": "De accountrol is bijgewerkt.",
 };
 const ERRORS: Record<MemberError, string> = {
   "invalid-request": "Controleer het sportprofiel.",

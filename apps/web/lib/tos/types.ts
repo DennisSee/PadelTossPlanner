@@ -86,6 +86,8 @@ export type StaffEventCapacity = EventCapacity & Readonly<{ eventId: string }>;
 
 export type StaffMemberDirectoryItem = Readonly<{
   memberId: string;
+  profileId: string | null;
+  accountRole: import("../auth/account-context").AccountRole | null;
   displayName: string;
   loginEmail: string | null;
   approvalStatus: MemberApprovalStatus;
@@ -102,6 +104,11 @@ export type StaffSportProfileWrite = Readonly<{
   sport: TosSport;
   active: boolean;
   ranking: number | null;
+}>;
+
+export type StaffRoleWrite = Readonly<{
+  profileId: string;
+  role: import("../auth/account-context").AccountRole;
 }>;
 
 export const PLANNER_COURTS = [

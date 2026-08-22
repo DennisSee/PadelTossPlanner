@@ -10,27 +10,27 @@ select has_column('public', 'schedules', 'planner_draft_revision', 'schedules he
 select fk_ok('public', 'schedules', 'event_id', 'public', 'tos_events', 'id', 'event_id verwijst naar tos_events');
 select has_function('public', 'staff_event_schedule_summaries', array['uuid'], 'summary-RPC bestaat');
 select has_function('public', 'staff_event_schedule', array['uuid','uuid'], 'detail-RPC bestaat');
-select has_function('public', 'staff_save_event_schedule', array['uuid','bigint','bigint','jsonb','jsonb','jsonb'], 'save-RPC bestaat');
+select has_function('public', 'staff_save_event_schedule', array['uuid','bigint','bigint','jsonb','jsonb','jsonb','jsonb'], 'save-RPC bestaat');
 select has_function('public', 'staff_set_schedule_published', array['uuid','boolean'], 'publish-RPC bestaat');
 
 select ok(not has_function_privilege('anon', 'public.staff_event_schedule_summaries(uuid)', 'EXECUTE'), 'anon kan staffsummary niet uitvoeren');
 select ok(not has_function_privilege('anon', 'public.staff_event_schedule(uuid,uuid)', 'EXECUTE'), 'anon kan staffdetail niet uitvoeren');
-select ok(not has_function_privilege('anon', 'public.staff_save_event_schedule(uuid,bigint,bigint,jsonb,jsonb,jsonb)', 'EXECUTE'), 'anon kan private save niet uitvoeren');
+select ok(not has_function_privilege('anon', 'public.staff_save_event_schedule(uuid,bigint,bigint,jsonb,jsonb,jsonb,jsonb)', 'EXECUTE'), 'anon kan private save niet uitvoeren');
 select ok(not has_function_privilege('anon', 'public.staff_set_schedule_published(uuid,boolean)', 'EXECUTE'), 'anon kan niet publiceren');
 select ok(has_function_privilege('authenticated', 'public.staff_event_schedule_summaries(uuid)', 'EXECUTE'), 'authenticated heeft begrensde staffsummary-execute');
 select ok(has_function_privilege('authenticated', 'public.staff_event_schedule(uuid,uuid)', 'EXECUTE'), 'authenticated heeft begrensde detail-execute');
-select ok(has_function_privilege('authenticated', 'public.staff_save_event_schedule(uuid,bigint,bigint,jsonb,jsonb,jsonb)', 'EXECUTE'), 'authenticated heeft begrensde save-execute');
+select ok(has_function_privilege('authenticated', 'public.staff_save_event_schedule(uuid,bigint,bigint,jsonb,jsonb,jsonb,jsonb)', 'EXECUTE'), 'authenticated heeft begrensde save-execute');
 select ok(has_function_privilege('authenticated', 'public.staff_set_schedule_published(uuid,boolean)', 'EXECUTE'), 'authenticated heeft begrensde publish-execute');
 
-select is((select proconfig from pg_proc where oid = 'public.staff_save_event_schedule(uuid,bigint,bigint,jsonb,jsonb,jsonb)'::regprocedure), array['search_path=""']::text[], 'save gebruikt lege search_path');
+select is((select proconfig from pg_proc where oid = 'public.staff_save_event_schedule(uuid,bigint,bigint,jsonb,jsonb,jsonb,jsonb)'::regprocedure), array['search_path=""']::text[], 'save gebruikt lege search_path');
 select is((select proconfig from pg_proc where oid = 'public.staff_set_schedule_published(uuid,boolean)'::regprocedure), array['search_path=""']::text[], 'publish gebruikt lege search_path');
-select ok((select prosecdef from pg_proc where oid = 'public.staff_save_event_schedule(uuid,bigint,bigint,jsonb,jsonb,jsonb)'::regprocedure), 'save is SECURITY DEFINER');
+select ok((select prosecdef from pg_proc where oid = 'public.staff_save_event_schedule(uuid,bigint,bigint,jsonb,jsonb,jsonb,jsonb)'::regprocedure), 'save is SECURITY DEFINER');
 select ok((select prosecdef from pg_proc where oid = 'public.staff_set_schedule_published(uuid,boolean)'::regprocedure), 'publish is SECURITY DEFINER');
-select ok(position('service_role' in lower(pg_get_functiondef('public.staff_save_event_schedule(uuid,bigint,bigint,jsonb,jsonb,jsonb)'::regprocedure))) = 0, 'save bevat geen service role');
-select ok(position('auth.uid()' in lower(pg_get_functiondef('public.staff_save_event_schedule(uuid,bigint,bigint,jsonb,jsonb,jsonb)'::regprocedure))) > 0, 'creator komt uit auth.uid()');
-select ok(position('member_id' in lower(pg_get_functiondef('public.staff_save_event_schedule(uuid,bigint,bigint,jsonb,jsonb,jsonb)'::regprocedure))) = 0, 'staffsave vereist geen membership');
-select ok(position('event_row.title' in lower(pg_get_functiondef('public.staff_save_event_schedule(uuid,bigint,bigint,jsonb,jsonb,jsonb)'::regprocedure))) > 0, 'eventmetadata komt database-side uit het event');
-select ok(position('draft_row.players' in lower(pg_get_functiondef('public.staff_save_event_schedule(uuid,bigint,bigint,jsonb,jsonb,jsonb)'::regprocedure))) > 0, 'private spelers komen uit de actuele draft');
+select ok(position('service_role' in lower(pg_get_functiondef('public.staff_save_event_schedule(uuid,bigint,bigint,jsonb,jsonb,jsonb,jsonb)'::regprocedure))) = 0, 'save bevat geen service role');
+select ok(position('auth.uid()' in lower(pg_get_functiondef('public.staff_save_event_schedule(uuid,bigint,bigint,jsonb,jsonb,jsonb,jsonb)'::regprocedure))) > 0, 'creator komt uit auth.uid()');
+select ok(position('profile.role' in lower(pg_get_functiondef('public.staff_save_event_schedule(uuid,bigint,bigint,jsonb,jsonb,jsonb,jsonb)'::regprocedure))) > 0, 'staffsave gebruikt staffrol en vereist geen membership');
+select ok(position('event_row.title' in lower(pg_get_functiondef('public.staff_save_event_schedule(uuid,bigint,bigint,jsonb,jsonb,jsonb,jsonb)'::regprocedure))) > 0, 'eventmetadata komt database-side uit het event');
+select ok(position('draft_row.players' in lower(pg_get_functiondef('public.staff_save_event_schedule(uuid,bigint,bigint,jsonb,jsonb,jsonb,jsonb)'::regprocedure))) > 0, 'private spelers komen uit de actuele draft');
 
 select ok(not has_column_privilege('anon', 'public.schedules', 'event_id', 'SELECT'), 'anon leest event_id niet');
 select ok(not has_column_privilege('authenticated', 'public.schedules', 'generation_seed', 'SELECT'), 'authenticated leest seed niet direct');
@@ -68,27 +68,27 @@ values
 insert into public.tos_event_planner_drafts (event_id,players,selected_courts,revision,updated_by,updated_by_name)
 values
  ('c2200000-0000-4000-8000-000000000001',
-  '[{"row_id":"c2300000-0000-4000-8000-000000000001","name":"Publieke Naam","ranking":4,"included":true,"available_from":"20:00","available_until":"22:00","member_id":"c2400000-0000-4000-8000-000000000001"},{"row_id":"c2300000-0000-4000-8000-000000000002","name":"Niet Meedoen","ranking":3,"included":false,"available_from":"20:00","available_until":"22:00"}]',
+  '[{"row_id":"c2300000-0000-4000-8000-000000000001","name":"Publieke Naam","ranking":4,"included":true,"available_from":"20:00","available_until":"22:00","member_id":"c2400000-0000-4000-8000-000000000001"},{"row_id":"c2300000-0000-4000-8000-000000000002","name":"B","ranking":3,"included":true,"available_from":"20:00","available_until":"22:00"},{"row_id":"c2300000-0000-4000-8000-000000000003","name":"C","ranking":3,"included":true,"available_from":"20:00","available_until":"22:00"},{"row_id":"c2300000-0000-4000-8000-000000000004","name":"D","ranking":3,"included":true,"available_from":"20:00","available_until":"22:00"},{"row_id":"c2300000-0000-4000-8000-000000000005","name":"Niet Meedoen","ranking":3,"included":false,"available_from":"20:00","available_until":"22:00"}]',
   '["Kremer Baan"]',3,'c2100000-0000-4000-8000-000000000002','Planner Owner'),
  ('c2200000-0000-4000-8000-000000000002','[]','["Kremer Baan"]',1,'c2100000-0000-4000-8000-000000000003','Planner Other');
 
 set local role authenticated;
 select set_config('request.jwt.claim.sub','c2100000-0000-4000-8000-000000000001',true);
 select throws_ok(
- $$select public.staff_save_event_schedule('c2200000-0000-4000-8000-000000000001',3,77,'[]','[]','{}')$$,
+ $$select public.staff_save_event_schedule('c2200000-0000-4000-8000-000000000001',3,77,'[]','[]','[]','{}')$$,
  '42501','Schedule access denied.','participant kan geen schema opslaan');
 
 select set_config('request.jwt.claim.sub','c2100000-0000-4000-8000-000000000005',true);
 select throws_ok(
- $$select public.staff_save_event_schedule('c2200000-0000-4000-8000-000000000001',3,77,'[]','[]','{}')$$,
+ $$select public.staff_save_event_schedule('c2200000-0000-4000-8000-000000000001',3,77,'[]','[]','[]','{}')$$,
  '42501','Schedule access denied.','inactieve staff kan geen schema opslaan');
 
 select set_config('request.jwt.claim.sub','c2100000-0000-4000-8000-000000000002',true);
 select throws_ok(
- $$select public.staff_save_event_schedule('c2200000-0000-4000-8000-000000000001',2,77,'[]','[]','{}')$$,
+ $$select public.staff_save_event_schedule('c2200000-0000-4000-8000-000000000001',2,77,'[]','[]','[]','{}')$$,
  '40001','Planner draft changed.','stale draftrevision faalt');
 select throws_ok(
- $$select public.staff_save_event_schedule('c2200000-0000-4000-8000-000000000003',1,77,'[]','[]','{}')$$,
+ $$select public.staff_save_event_schedule('c2200000-0000-4000-8000-000000000003',1,77,'[]','[]','[]','{}')$$,
  '42501','Schedule event unavailable.','tennis kan geen padelschema opslaan');
 
 create temporary table saved_ids (id uuid primary key, label text);
@@ -97,6 +97,7 @@ insert into saved_ids
 select public.staff_save_event_schedule(
  'c2200000-0000-4000-8000-000000000001',3,77,
  '[{"Ronde":1,"Tijd":"20:00 - 20:20","Baan":"Kremer Baan","Team 1":"Publieke Naam & B","Niveau T1":4,"Team 2":"C & D","Niveau T2":3.5,"Teamverschil":0.5,"Rust":"Niemand","Nog niet aanwezig":"Niemand","Niet meer beschikbaar":"Niemand"}]',
+ '[{"Ronde":1,"Tijd":"20:00 - 20:20","Baan":"Kremer Baan","Team 1":[{"row_id":"c2300000-0000-4000-8000-000000000001","name":"Publieke Naam"},{"row_id":"c2300000-0000-4000-8000-000000000002","name":"B"}],"Team 2":[{"row_id":"c2300000-0000-4000-8000-000000000003","name":"C"},{"row_id":"c2300000-0000-4000-8000-000000000004","name":"D"}],"Rust":[],"Nog niet aanwezig":[],"Niet meer beschikbaar":[]}]',
  '[{"Speler":"Publieke Naam","Ranking":4}]',
  '{"rounds":1,"private_marker":"diagnostic"}'
 ), 'first';
@@ -105,6 +106,7 @@ insert into saved_ids
 select public.staff_save_event_schedule(
  'c2200000-0000-4000-8000-000000000001',3,78,
  '[{"Ronde":1,"Tijd":"20:00 - 20:20","Baan":"Kremer Baan","Team 1":"Publieke Naam & B","Niveau T1":4,"Team 2":"C & D","Niveau T2":3.5,"Teamverschil":0.5,"Rust":"Niemand","Nog niet aanwezig":"Niemand","Niet meer beschikbaar":"Niemand"}]',
+ '[{"Ronde":1,"Tijd":"20:00 - 20:20","Baan":"Kremer Baan","Team 1":[{"row_id":"c2300000-0000-4000-8000-000000000001","name":"Publieke Naam"},{"row_id":"c2300000-0000-4000-8000-000000000002","name":"B"}],"Team 2":[{"row_id":"c2300000-0000-4000-8000-000000000003","name":"C"},{"row_id":"c2300000-0000-4000-8000-000000000004","name":"D"}],"Rust":[],"Nog niet aanwezig":[],"Niet meer beschikbaar":[]}]',
  '[]', '{"rounds":1}'
 ), 'second';
 
@@ -114,7 +116,7 @@ select is((select created_by_name from public.schedules where id=(select id from
 select is((select title from public.schedules where id=(select id from saved_ids where label='first')), 'Schema Padel', 'titel is event-derived');
 select is((select event_date from public.schedules where id=(select id from saved_ids where label='first')), '2099-08-21'::date, 'eventdatum gebruikt Europe/Amsterdam');
 select is((select is_published from public.schedules where id=(select id from saved_ids where label='first')), false, 'nieuw schema is privé');
-select is((select participants_public from public.schedules where id=(select id from saved_ids where label='first')), '["Publieke Naam"]'::jsonb, 'publieke namen bevatten alleen included namen');
+select is((select participants_public from public.schedules where id=(select id from saved_ids where label='first')), '["B", "C", "D", "Publieke Naam"]'::jsonb, 'publieke namen bevatten alleen included namen');
 select ok(not ((select schedule_public from public.schedules where id=(select id from saved_ids where label='first'))->0 ? 'Niveau T1'), 'publieke schema bevat geen niveau');
 select ok(not ((select schedule_public from public.schedules where id=(select id from saved_ids where label='first'))->0 ? 'Teamverschil'), 'publieke schema bevat geen teamverschil');
 select ok(position('member_id' in (select schedule_public::text from public.schedules where id=(select id from saved_ids where label='first'))) = 0, 'publieke schema bevat geen identity');

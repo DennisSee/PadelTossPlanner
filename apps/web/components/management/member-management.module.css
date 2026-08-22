@@ -106,6 +106,26 @@
   margin-top: var(--space-4);
 }
 
+.roleState {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  padding: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-subtle);
+}
+
+.roleState p { margin: 0; }
+.roleState p strong { margin-right: var(--space-2); }
+.roleHint { color: var(--text-muted); font-size: 0.78rem; }
+.roleForm { display: grid; gap: var(--space-3); }
+.roleForm label { display: grid; gap: var(--space-1); font-weight: 750; }
+.roleForm select,.roleForm button { min-height: 2.8rem; padding: .6rem .7rem; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); font: inherit; }
+.roleForm button { border-color: var(--club-green); color: var(--surface); background: var(--club-green); cursor: pointer; font-weight: 800; }
+
 .sportForm {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -169,4 +189,7 @@
   .badges {
     justify-content: flex-start;
   }
+
+  .roleState { align-items: stretch; flex-direction: column; }
+  .roleTrigger { width: 100%; }
 }

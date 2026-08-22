@@ -43,11 +43,13 @@ describe("capability navigation", () => {
     const plannerWithoutMember = navigationModelFromAccount(account("planner", false));
     const participantView = render(<SiteNavigation model={participant} />);
     expect(screen.getAllByRole("link", { name: "TOS-avonden" }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("link", { name: "Mijn historie" }).length).toBeGreaterThan(0);
     expect(screen.queryByRole("link", { name: "Beheer" })).not.toBeInTheDocument();
     participantView.unmount();
 
     render(<SiteNavigation model={plannerWithoutMember} />);
     expect(screen.getAllByRole("link", { name: "TOS-avonden" }).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("link", { name: "Mijn historie" })).not.toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: "Beheer" }).length).toBeGreaterThan(0);
   });
 });
