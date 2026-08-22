@@ -82,6 +82,40 @@ export function Badge({
   return <span className={`${styles.badge} ${toneClass}`}>{children}</span>;
 }
 
+export type Sport = "padel" | "tennis";
+
+export function SportIcon({ sport }: { sport: Sport }) {
+  return sport === "padel" ? (
+    <svg className={styles.sportIcon} viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M14.9 3.2c3.2 2 3.9 6.5 1.5 10.3-2.3 3.8-6.8 5.2-10 3.2-3.2-2-3.9-6.5-1.5-10.3 2.3-3.8 6.8-5.2 10-3.2Z" />
+      <path d="m8.2 16.9-2.5 4" />
+      <circle cx="9.2" cy="7.2" r=".7" />
+      <circle cx="12.2" cy="6.7" r=".7" />
+      <circle cx="8.2" cy="10.2" r=".7" />
+      <circle cx="11.2" cy="9.7" r=".7" />
+      <circle cx="7.6" cy="13.3" r=".7" />
+      <circle cx="10.5" cy="12.8" r=".7" />
+    </svg>
+  ) : (
+    <svg className={styles.sportIcon} viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M5.9 6.1c3.8 2.4 5.4 6.4 4.4 11.7M18.1 17.9c-3.8-2.4-5.4-6.4-4.4-11.7" />
+    </svg>
+  );
+}
+
+export function SportBadge({ sport, compact = false }: { sport: Sport; compact?: boolean }) {
+  return (
+    <span
+      className={`${styles.sportBadge} ${sport === "padel" ? styles.sportBadgePadel : styles.sportBadgeTennis} ${compact ? styles.sportBadgeCompact : ""}`.trim()}
+      data-sport={sport}
+    >
+      <SportIcon sport={sport} />
+      <span>{sport === "padel" ? "Padel" : "Tennis"}</span>
+    </span>
+  );
+}
+
 export function LinkButton({ href, children }: { href: string; children: ReactNode }) {
   return (
     <Link className={styles.linkButton} href={href}>

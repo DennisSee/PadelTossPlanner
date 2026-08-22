@@ -22,7 +22,7 @@
 
 .filters {
   display: grid;
-  grid-template-columns: repeat(2, minmax(9rem, 1fr)) auto auto auto;
+  grid-template-columns: repeat(2, minmax(9rem, 1fr)) auto minmax(9rem, auto);
   align-items: end;
   gap: var(--space-2);
   padding: 0.8rem;
@@ -57,13 +57,24 @@
   font-weight: 750;
 }
 
-.filters a,
-.filters > span {
-  align-self: center;
+.filterMeta {
+  display: flex;
+  min-height: 2.65rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.filterMeta a,
+.filterMeta span {
   color: var(--club-green-dark);
   font-size: 0.85rem;
   font-weight: 700;
   text-decoration: none;
+}
+
+.filterMeta span {
+  white-space: nowrap;
 }
 
 .message {
@@ -286,28 +297,33 @@
 }
 
 .capacitySummary {
+  position: relative;
+  display: grid;
+  grid-template-columns: 2.9rem minmax(0, 1fr);
   align-self: center;
+  align-items: center;
+  gap: var(--space-2);
   margin: var(--space-4) var(--space-4) var(--space-4) 0;
   padding: 0.8rem;
   border: 1px solid #c9d9cf;
   border-radius: var(--radius-sm);
   color: var(--club-green-dark);
   background: var(--surface-green);
-  text-align: center;
+  overflow: hidden;
 }
 
-.capacitySummary strong,
-.capacitySummary span,
+.capacityNumbers strong,
+.capacityNumbers span,
 .capacitySummary small {
   display: block;
 }
 
-.capacitySummary strong {
+.capacityNumbers strong {
   font-size: 1.5rem;
   line-height: 1;
 }
 
-.capacitySummary span {
+.capacityNumbers span {
   margin-top: var(--space-1);
   font-size: 0.65rem;
   font-weight: 800;
@@ -315,13 +331,40 @@
   text-transform: uppercase;
 }
 
+.capacityRing {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 50%;
+  background: conic-gradient(var(--club-green) var(--occupancy), var(--surface) 0);
+  box-shadow: inset 0 0 0 0.38rem var(--success-soft);
+}
+
+.capacityPadel {
+  border-color: #b9decf;
+  background: var(--success-soft);
+}
+
+.capacityTennis {
+  border-color: #ead46e;
+  color: #624f00;
+  background: var(--warning-soft);
+}
+
+.capacityTennis .capacityRing {
+  background: conic-gradient(#dca900 var(--occupancy), var(--surface) 0);
+  box-shadow: inset 0 0 0 0.38rem var(--warning-soft);
+}
+
 .capacitySummary p {
+  grid-column: 1 / -1;
   margin: var(--space-2) 0 0;
+  text-align: center;
   font-size: 0.82rem;
   font-weight: 750;
 }
 
 .capacitySummary small {
+  grid-column: 1 / -1;
   margin-top: var(--space-2);
   padding: 0.3rem;
   border-radius: 0.3rem;
@@ -422,9 +465,40 @@
   }
 
   .capacitySummary {
+    grid-template-columns: 2.5rem minmax(0, 1fr) auto;
     grid-column: 2;
-    margin: 0 var(--space-4) var(--space-4);
-    text-align: left;
+    gap: 0.55rem;
+    margin: 0 0.75rem 0.75rem;
+    padding: 0.65rem;
+  }
+
+  .capacitySummary p {
+    grid-column: 3;
+    grid-row: 1;
+    margin: 0;
+    text-align: right;
+  }
+
+  .capacitySummary small {
+    grid-column: 1 / -1;
+  }
+
+  .eventMain {
+    gap: 0.55rem;
+    padding: 0.8rem 0.75rem;
+  }
+
+  .eventCard h3 {
+    font-size: 1.1rem;
+  }
+
+  .eventActions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .eventActions > :last-child {
+    grid-column: 1 / -1;
   }
 
   .editForm {
@@ -438,8 +512,7 @@
   }
 
   .primaryButton,
-  .secondaryButton,
-  .eventActions > * {
+  .secondaryButton {
     width: 100%;
   }
 
@@ -448,8 +521,29 @@
   }
 
   .filters button,
-  .filters a,
-  .filters > span {
+  .filterMeta {
     grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 30rem) {
+  .managementLinks,
+  .managementLinks a {
+    width: 100%;
+  }
+
+  .managementLinks {
+    padding: 0;
+    border: 0;
+  }
+
+  .eventActions {
+    grid-template-columns: 1fr;
+  }
+
+  .eventActions > *,
+  .editTrigger {
+    grid-column: 1;
+    width: 100%;
   }
 }

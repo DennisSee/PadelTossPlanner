@@ -79,6 +79,10 @@
   line-height: 0.9;
   letter-spacing: 0.015em;
   text-transform: uppercase;
+  hyphens: none;
+  overflow-wrap: normal;
+  text-wrap: balance;
+  word-break: normal;
 }
 
 .pageHeader p {
@@ -326,7 +330,7 @@
 
   .pageHeader {
     display: grid;
-    min-height: 14rem;
+    min-height: 11rem;
     margin-top: var(--space-3);
     padding: 1.25rem;
     background:
@@ -335,22 +339,33 @@
   }
 
   .pageHeader h1 {
-    font-size: clamp(2.8rem, 13vw, 4.2rem);
+    font-size: clamp(2.45rem, 11vw, 3.65rem);
+    line-height: 0.98;
   }
 
   .pageHeaderManagement {
-    min-height: 8.5rem;
+    min-height: 7.75rem;
     gap: var(--space-2);
     padding: 0.85rem 1rem;
   }
 
   .pageHeaderManagement h1 {
-    font-size: clamp(2.1rem, 10vw, 3rem);
+    font-size: clamp(1.8rem, 7.8vw, 2.45rem);
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .pageHeaderTos {
+    min-height: 8rem;
+  }
+
+  .pageHeaderManagement .headerCopy {
+    max-width: 78%;
   }
 
   .headerLines {
-    top: 45%;
-    left: 48%;
+    top: 48%;
+    left: 58%;
   }
 
   .badges {
@@ -383,5 +398,11 @@
   .nameTrigger,
   .logoutButton {
     width: 100%;
+  }
+}
+
+@media (max-width: 23rem) {
+  .pageHeaderManagement h1 {
+    font-size: 1.65rem;
   }
 }

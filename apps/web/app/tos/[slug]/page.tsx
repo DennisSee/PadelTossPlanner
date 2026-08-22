@@ -143,7 +143,7 @@ function AttendeeCard({
         <h2 className={styles.formTitle}>Wie doen er mee?</h2>
         {!unavailable ? <Badge tone="success">{placed.length} {placed.length === 1 ? "deelnemer" : "deelnemers"}</Badge> : null}
       </div>
-      <EventCapacityPanel capacity={capacity} />
+      <EventCapacityPanel capacity={capacity} sport={event.sport} />
       {unavailable ? (
         <p className={styles.muted}>De deelnemerslijst is tijdelijk niet beschikbaar.</p>
       ) : placed.length ? (

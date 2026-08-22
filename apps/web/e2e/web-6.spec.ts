@@ -52,12 +52,12 @@ test("participant filters, capaciteit en veilige deelnemerssheet werken samen", 
   await signIn(page, request, email("web6-participant"));
 
   await expect(page.getByLabel("Status")).toHaveValue("open");
-  await expect(page.getByLabel("Sport")).toHaveValue("all");
+  await expect(page.getByRole("radio", { name: "Alles" })).toBeChecked();
   await expect(page.getByText("3 TOS-avonden")).toBeVisible();
-  await page.getByLabel("Sport").selectOption("tennis");
+  await page.getByRole("radio", { name: "Tennis" }).click();
   await expect(page).toHaveURL(/\/tos\?status=open&sport=tennis$/u);
   await expect(page.getByText("1 TOS-avond")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Tennis TOS voor alle clubleden", level: 3 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Tennis TOS-avond", level: 3 })).toBeVisible();
   await expect(page.getByLabel("2 van 2 plaatsen bezet")).toBeVisible();
   await expect(page.getByText("1 op wachtlijst").first()).toBeVisible();
   await expect(page.getByRole("link", { name: "Op wachtlijst" })).toBeVisible();

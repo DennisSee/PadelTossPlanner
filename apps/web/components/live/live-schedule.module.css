@@ -61,7 +61,8 @@
 
 .eventLines {
   z-index: -1;
-  left: 62%;
+  left: 67%;
+  opacity: 0.9;
 }
 
 .eventEyebrow {
@@ -83,6 +84,10 @@
   line-height: 0.9;
   letter-spacing: 0.012em;
   text-transform: uppercase;
+  hyphens: none;
+  overflow-wrap: normal;
+  text-wrap: balance;
+  word-break: normal;
 }
 
 .eventDate {
@@ -643,7 +648,7 @@
   .eventCard {
     grid-template-columns: 1fr;
     gap: 0.65rem;
-    min-height: 14rem;
+    min-height: 11.5rem;
     padding: 1.1rem;
     background:
       linear-gradient(150deg, var(--club-green) 0 78%, transparent 78%),
@@ -651,12 +656,15 @@
   }
 
   .eventLines {
-    top: 45%;
-    left: 42%;
+    top: 52%;
+    left: 58%;
+    opacity: 0.72;
   }
 
   .eventTitle {
-    font-size: clamp(2.9rem, 14vw, 4.25rem);
+    max-width: 8.5ch;
+    font-size: clamp(2.55rem, 11.8vw, 3.35rem);
+    line-height: 0.96;
   }
 
   .eventTitle {
@@ -670,6 +678,7 @@
 
   .eventMeta {
     gap: 0.25rem 0.7rem;
+    max-width: 16rem;
   }
 
   .eventMeta span:not(:last-child)::after {

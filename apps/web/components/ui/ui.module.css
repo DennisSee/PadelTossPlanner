@@ -168,6 +168,58 @@
   background: var(--danger-soft);
 }
 
+.sportBadge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 2.35rem;
+  gap: 0.45rem;
+  padding: 0.38rem 0.65rem;
+  border: 1px solid;
+  border-radius: 0.55rem;
+  font-family: var(--font-interface);
+  font-size: 0.76rem;
+  font-weight: 850;
+  letter-spacing: 0.045em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.sportBadgePadel {
+  border-color: #b9decf;
+  color: var(--club-green-dark);
+  background: var(--success-soft);
+}
+
+.sportBadgeTennis {
+  border-color: #ead46e;
+  color: #624f00;
+  background: var(--warning-soft);
+}
+
+.sportBadgeCompact {
+  min-height: 1.75rem;
+  padding: 0.24rem 0.48rem;
+  border-radius: 0.4rem;
+  font-size: 0.67rem;
+}
+
+.sportIcon {
+  width: 1.2rem;
+  height: 1.2rem;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.sportBadgeCompact .sportIcon {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
 .linkButton {
   display: inline-flex;
   align-items: center;

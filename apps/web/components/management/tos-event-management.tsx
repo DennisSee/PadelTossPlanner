@@ -1,4 +1,6 @@
-import { ActionDialog, Badge, Card, EventDateRail, SecondaryLinkButton } from "../ui";
+import type { CSSProperties } from "react";
+
+import { ActionDialog, Badge, Card, EventDateRail, SecondaryLinkButton, SportBadge } from "../ui";
 import { createEventDefaults } from "../../lib/tos/staff-management";
 import { tosDetailPath } from "../../lib/tos/slug";
 import {
@@ -85,6 +87,8 @@ export function CreateTosEventForm({ now = new Date() }: { now?: Date }) {
 
 function EventCard({ event, capacity }: { event: TosEvent; capacity: StaffEventCapacity }) {
   const presentation = eventPresentationStatus(event);
+  const occupancy = Math.min(100, Math.round((capacity.placedCount / capacity.maxParticipants) * 100));
+  const capacityStyle = { "--occupancy": `${occupancy}%` } as CSSProperties;
   const publicNote = event.status === "open"
     ? "Dit event is publiek zichtbaar via de eventpagina."
     : "Deze status is niet publiek zichtbaar; staff kan de eventpagina wel bekijken.";
@@ -94,7 +98,7 @@ function EventCard({ event, capacity }: { event: TosEvent; capacity: StaffEventC
         <EventDateRail startsAt={event.startsAt} accent={event.status === "draft" ? "yellow" : "green"} />
         <div className={styles.eventMain}>
           <div className={styles.badges}>
-            <Badge tone="neutral">{event.sport.toUpperCase()}</Badge>
+            <SportBadge sport={event.sport} compact />
             <Badge tone={statusTone(event.status)}>{STATUS_LABELS[event.status]}</Badge>
           </div>
           <h3>{event.title}</h3>
@@ -155,9 +159,16 @@ function EventCard({ event, capacity }: { event: TosEvent; capacity: StaffEventC
             </ActionDialog>
           </div>
         </div>
-        <div className={`${styles.capacitySummary} ${capacity.availableCount === 0 ? styles.capacityFull : ""}`}>
-          <strong>{capacity.placedCount} / {capacity.maxParticipants}</strong>
-          <span>plekken bezet</span>
+        <div
+          className={`${styles.capacitySummary} ${event.sport === "padel" ? styles.capacityPadel : styles.capacityTennis} ${capacity.availableCount === 0 ? styles.capacityFull : ""}`.trim()}
+          style={capacityStyle}
+          data-sport={event.sport}
+        >
+          <span className={styles.capacityRing} aria-hidden="true" />
+          <div className={styles.capacityNumbers}>
+            <strong>{capacity.placedCount} / {capacity.maxParticipants}</strong>
+            <span>plekken bezet</span>
+          </div>
           <p>{capacity.availableCount} {capacity.availableCount === 1 ? "plek" : "plekken"} vrij</p>
           {capacity.waitlistCount ? <small>{capacity.waitlistCount} op wachtlijst</small> : null}
         </div>

@@ -123,5 +123,8 @@ describe("WEB-2 routes", () => {
     expect(uiCss).toContain("font-family: var(--font-interface)");
     expect(uiCss).toContain(".courtLines");
     expect(uiCss).toContain(".dateRail");
+    expect(uiCss).toContain(".sportBadgePadel");
+    expect(uiCss).toContain(".sportBadgeTennis");
+    expect(liveCss).toContain("overflow-wrap: normal");
   });
 });

@@ -12,7 +12,7 @@ import {
   formatEventClock,
   formatEventDate,
 } from "../../lib/tos/time";
-import { Badge, Card, EventDateRail, LinkButton, SecondaryLinkButton } from "../ui";
+import { Badge, Card, EventDateRail, LinkButton, SecondaryLinkButton, SportBadge } from "../ui";
 import { EventCapacityPanel } from "./event-capacity";
 import { ParticipantsSheet } from "./participants-sheet";
 
@@ -51,6 +51,8 @@ export function TosEventCard({
   now: Date;
 }) {
   const status = eventPresentationStatus(event, now);
+  const sportTitle = event.sport === "padel" ? "Padel TOS-avond" : "Tennis TOS-avond";
+  const showCustomTitle = event.title.trim().toLocaleLowerCase("nl-NL") !== "tos-avond";
   const canChange = eventAllowsSelfService(event, now);
   const availability = registration?.response === "attending"
     ? `${formatEventClock(registration.availableFrom!)}–${formatEventClock(registration.availableUntil!)}`
@@ -66,11 +68,11 @@ export function TosEventCard({
         ? "Afgemeld"
         : null;
   return (
-    <Card className={`${styles.eventCard} ${cardClass(event, registration)}`}>
+    <Card className={`${styles.eventCard} ${event.sport === "padel" ? styles.eventCardPadel : styles.eventCardTennis} ${cardClass(event, registration)}`}>
       <EventDateRail startsAt={event.startsAt} accent={registration ? "green" : "yellow"} />
       <div className={styles.eventBody}>
         <div className={styles.badges}>
-          <Badge tone="neutral">{event.sport.toUpperCase()}</Badge>
+          <SportBadge sport={event.sport} />
           <Badge tone={statusTone(event, now)}>{status}</Badge>
           {registration ? (
             <Badge tone={registrationPosition?.placementStatus === "waitlist" ? "warning" : registration.response === "attending" ? "success" : "neutral"}>
@@ -78,7 +80,8 @@ export function TosEventCard({
             </Badge>
           ) : null}
         </div>
-        <h3 className={styles.eventTitle}>{event.title}</h3>
+        <h3 className={styles.eventTitle}>{sportTitle}</h3>
+        {showCustomTitle ? <p className={styles.eventCustomTitle}>{event.title}</p> : null}
         <p className={styles.metadata}>
           {formatEventDate(event.startsAt)} · {formatEventClock(event.startsAt)}–{formatEventClock(event.endsAt)}
         </p>
@@ -88,7 +91,7 @@ export function TosEventCard({
             Inschrijven t/m {formatEventDate(event.signupDeadline)} · {formatEventClock(event.signupDeadline)}
           </p>
         ) : null}
-        <EventCapacityPanel capacity={capacity} />
+        <EventCapacityPanel capacity={capacity} sport={event.sport} />
         {!socialDataUnavailable ? (
           <>
             <p className={styles.attendeePreview}>

@@ -49,7 +49,12 @@ describe("TOS event management UI", () => {
       ])}
     />);
     expect(screen.getAllByText("TOS vrijdag", { selector: "h3" })).toHaveLength(2);
-    expect(screen.getAllByText("PADEL")).toHaveLength(1);
+    expect(screen.getAllByText("Padel", { selector: '[data-sport="padel"] span' })).toHaveLength(1);
+    expect(screen.getAllByText("Tennis", { selector: '[data-sport="tennis"] span' })).toHaveLength(1);
+    expect(container.querySelector('[data-sport="padel"] svg[aria-hidden="true"]')).toBeInTheDocument();
+    expect(container.querySelector('[data-sport="tennis"] svg[aria-hidden="true"]')).toBeInTheDocument();
+    expect(container.querySelectorAll('[data-sport="padel"]')).toHaveLength(2);
+    expect(container.querySelectorAll('[data-sport="tennis"]')).toHaveLength(2);
     expect(screen.getByText("Concept", { selector: "span" })).toBeVisible();
     expect(screen.getByText("Geannuleerd", { selector: "span" })).toBeVisible();
     expect(screen.getAllByRole("link", { name: "Eventpagina bekijken" })[0])

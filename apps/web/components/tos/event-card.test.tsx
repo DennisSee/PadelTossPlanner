@@ -40,11 +40,30 @@ describe("participant TOS cards", () => {
         now={new Date("2026-08-20T12:00:00Z")}
       />,
     );
-    expect(screen.getByRole("heading", { name: "Vrijdag TOS" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Padel TOS-avond" })).toBeInTheDocument();
+    expect(screen.getByText("Vrijdag TOS", { selector: "p" })).toBeVisible();
+    expect(screen.getByText("Padel", { selector: '[data-sport="padel"] span' })).toBeVisible();
+    expect(container.querySelector('[data-sport="padel"] svg[aria-hidden="true"]')).toBeInTheDocument();
+    expect(container.querySelector('[aria-label="2 van 24 plaatsen bezet"][data-sport="padel"]')).toBeInTheDocument();
     expect(screen.getByText(/2 deelnemers/u)).toHaveTextContent("Dennis");
     expect(screen.getByText(/2 deelnemers/u)).toHaveTextContent("<img src=x onerror=alert(1)>");
     expect(container.querySelector("img")).toBeNull();
     expect(screen.getByRole("link", { name: "Aanmelden" })).toHaveAttribute("href", "/tos/vrijdag-padel");
+  });
+
+  it("gives tennis its own textual, iconic and capacity identity", () => {
+    const { container } = render(
+      <TosEventCard
+        event={{ ...event, sport: "tennis", slug: "zaterdag-tennis" }}
+        capacity={{ maxParticipants: 24, placedCount: 0, availableCount: 24, waitlistCount: 0 }}
+        attendance={[]}
+        now={new Date("2026-08-20T12:00:00Z")}
+      />,
+    );
+    expect(screen.getByRole("heading", { name: "Tennis TOS-avond" })).toBeVisible();
+    expect(screen.getByText("Tennis", { selector: '[data-sport="tennis"] span' })).toBeVisible();
+    expect(container.querySelector('[data-sport="tennis"] svg[aria-hidden="true"]')).toBeInTheDocument();
+    expect(container.querySelector('[aria-label="0 van 24 plaatsen bezet"][data-sport="tennis"]')).toBeInTheDocument();
   });
 
   it("keeps declined rows visible as an editable own response", () => {

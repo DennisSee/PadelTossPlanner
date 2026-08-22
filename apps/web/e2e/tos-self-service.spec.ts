@@ -106,12 +106,12 @@ test("TOS-filters tonen eigen reacties zonder gesloten en geannuleerde events pu
   await page.goto("/login?next=/tos");
   await signIn(page, request, testEmail("admin-dashboard"));
   await expect(page.getByLabel("Status")).toHaveValue("open");
-  await expect(page.getByRole("heading", { name: "Padel TOS vrijdagavond", level: 3 })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Tennis TOS voor alle clubleden", level: 3 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Padel TOS-avond", level: 3 }).first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Tennis TOS-avond", level: 3 })).toBeVisible();
   await expect(page.getByText("Afgemeld").first()).toBeVisible();
   await expect(page.getByText("Eigen gesloten TOS")).toHaveCount(0);
   await expect(page.getByText("Eigen geannuleerde TOS")).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: /TOS over middernacht/u, level: 3 })).toBeVisible();
+  await expect(page.getByText(/TOS over middernacht/u).first()).toBeVisible();
   await expect(page.getByText(/3 deelnemers/u).first()).toBeVisible();
   await assertNoHorizontalOverflow(page);
 
@@ -133,8 +133,8 @@ test("een geïsoleerde namen-RPC-fout breekt de overige open events niet", async
   expect(fixture.ok()).toBe(true);
   await signIn(page, request, testEmail("attendee-failure"));
   await expect(page).toHaveURL(/\/tos$/u);
-  await expect(page.getByRole("heading", { name: "Padel TOS vrijdagavond", level: 3 })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Tennis TOS voor alle clubleden", level: 3 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Padel TOS-avond", level: 3 }).first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Tennis TOS-avond", level: 3 })).toBeVisible();
   await expect(page.getByText("De deelnemerslijst is tijdelijk niet beschikbaar.")).toHaveCount(1);
   await expect(page.getByText(/3 deelnemers/u).first()).toBeVisible();
 });
@@ -154,7 +154,7 @@ test("aanmelden, minutenavailability, afmelden en opnieuw aanmelden behouden exa
   await page.getByRole("button", { name: "Aanmelden", exact: true }).click();
   await expect(page).toHaveURL(/\/tos\?notice=registration-created$/u);
   await expect(page.getByText("Je aanmelding is opgeslagen.")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Padel TOS vrijdagavond", level: 3 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Padel TOS-avond", level: 3 }).first()).toBeVisible();
   await expect(page.getByText(`Je doet mee · ${customMinute}–${originalUntil}`)).toBeVisible();
 
   await page.getByRole("link", { name: "Aanmelding wijzigen" }).first().click();
@@ -166,7 +166,7 @@ test("aanmelden, minutenavailability, afmelden en opnieuw aanmelden behouden exa
   await expect(page).toHaveURL(/\/tos\?notice=registration-declined$/u);
   await expect(page.getByText("Je hebt je afgemeld.")).toBeVisible();
   await expect(page.getByText("Afgemeld").first()).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Padel TOS vrijdagavond", level: 3 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Padel TOS-avond", level: 3 }).first()).toBeVisible();
 
   await page.getByRole("link", { name: "Aanmelding wijzigen" }).first().click();
   await expect(page.getByLabel("Ik doe niet mee")).toBeChecked();

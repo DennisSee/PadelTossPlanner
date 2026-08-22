@@ -35,8 +35,10 @@ export function ManagementEventFilters({
         </select>
       </label>
       <button type="submit">Filteren</button>
-      <Link href="/beheer">Wissen</Link>
-      <span>{resultCount} {resultCount === 1 ? "event" : "events"}</span>
+      <div className={styles.filterMeta}>
+        <span>{resultCount} {resultCount === 1 ? "event" : "events"}</span>
+        <Link href="/beheer">Filters wissen</Link>
+      </div>
     </form>
   );
 }
