@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 import {
   ANONYMOUS_NAVIGATION,
   AppHeader,
@@ -32,7 +30,6 @@ export function LivePageState({
         <div className={styles.topbar}>
           <AppHeader subtitle="Live TOS-schema" />
           <SiteNavigation model={navigation} currentPath="/live" />
-          <Link className={styles.backLink} href="/">← Terug</Link>
         </div>
         <StateMessage title={copy.title}>{copy.text}</StateMessage>
       </div>

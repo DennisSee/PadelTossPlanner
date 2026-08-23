@@ -54,8 +54,10 @@ describe("live schedule UI", () => {
   it("shows safe empty and load-error states", () => {
     const { rerender } = render(<LivePageState kind="empty" />);
     expect(screen.getByText("Er is nog geen gepubliceerd TOS-schema.")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "← Terug" })).not.toBeInTheDocument();
     rerender(<LivePageState kind="error" />);
     expect(screen.getByText(/kan momenteel niet worden geladen/i)).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "← Terug" })).not.toBeInTheDocument();
     expect(document.body.textContent).not.toContain("SUPABASE_");
   });
 
@@ -70,6 +72,11 @@ describe("live schedule UI", () => {
     expect(screen.getAllByText("Nu").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Hierna").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Rust").length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("link", { name: "Live TOS-schema" })).toHaveLength(2);
+    for (const liveLink of screen.getAllByRole("link", { name: "Live TOS-schema" })) {
+      expect(liveLink).toHaveAttribute("aria-current", "page");
+    }
+    expect(screen.queryByRole("link", { name: "← Terug" })).not.toBeInTheDocument();
   });
 
   it("supports Iedereen and a selected personal schedule", async () => {

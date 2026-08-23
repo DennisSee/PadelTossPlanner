@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import {
@@ -473,7 +472,6 @@ export function LiveSchedule({
         <div className={styles.topbar}>
           <AppHeader subtitle="Live TOS-schema" />
           <SiteNavigation model={navigation} currentPath="/live" />
-          <Link className={styles.backLink} href="/">← Terug</Link>
         </div>
 
         <Card className={styles.eventCard}>

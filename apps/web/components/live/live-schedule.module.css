@@ -23,17 +23,6 @@
   border-bottom: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
 }
 
-.backLink {
-  color: var(--club-green);
-  font-size: 0.9rem;
-  font-weight: 700;
-  text-decoration: none;
-}
-
-.backLink:hover {
-  text-decoration: underline;
-}
-
 .eventCard {
   position: relative;
   display: grid;
