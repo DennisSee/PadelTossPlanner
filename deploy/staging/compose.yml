@@ -65,6 +65,8 @@ services:
       context: ../../apps/web
     command: ["node", "notification-worker.mjs"]
     restart: unless-stopped
+    healthcheck:
+      disable: true
     environment:
       APP_BASE_URL: ${APP_BASE_URL:-}
       SUPABASE_URL: ${SUPABASE_URL:-}

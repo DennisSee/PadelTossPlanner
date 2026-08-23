@@ -169,6 +169,15 @@ describe("WEB-2 routes", () => {
     expect(compose).toContain("internal: true");
   });
 
+  it("disables the inherited HTTP healthcheck only for the background notification worker", () => {
+    const compose = readFileSync(resolve(process.cwd(), "../../deploy/staging/compose.yml"), "utf8");
+    const worker = compose.split("  notification-worker:")[1]?.split("\n  planner-api:")[0] ?? "";
+    expect(worker).toContain('command: ["node", "notification-worker.mjs"]');
+    expect(worker).toContain("healthcheck:\n      disable: true");
+    expect(worker).not.toContain("wget");
+    expect(worker).not.toContain("ports:");
+  });
+
   it("keeps UI hierarchy and keyboard focus structural rather than pixel-bound", () => {
     const globalCss = readFileSync(resolve(process.cwd(), "app/globals.css"), "utf8");
     const uiCss = readFileSync(resolve(process.cwd(), "components/ui/ui.module.css"), "utf8");
