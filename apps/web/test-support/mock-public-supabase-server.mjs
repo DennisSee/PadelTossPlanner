@@ -53,6 +53,7 @@ const OWN_REGISTRATION_WITH_EVENT_SELECT =
 const registrations = new Map();
 const plannerDrafts = new Map();
 const staffSchedules = new Map();
+const staffPlannerInputOverrides = new Map();
 const initialClubCourts = [
   { id: "c9000000-0000-4000-8000-000000000001", sport: "padel", name: "Kremer Baan", active: true, sort_order: 10 },
   { id: "c9000000-0000-4000-8000-000000000002", sport: "padel", name: "ZGA/F&F Baan", active: true, sort_order: 20 },
@@ -62,6 +63,7 @@ const initialClubCourts = [
 const clubCourts = new Map(initialClubCourts.map((court) => [court.id, { ...court }]));
 const sportProfileOverrides = new Map();
 const historyContactRequests = new Map();
+const homeEmptyUsers = new Set();
 const HISTORY_CLUBMATE_ID = "5c100000-0000-4000-8000-000000000001";
 const HISTORY_EVENT_ID = "7a100000-0000-4000-8000-000000000001";
 
@@ -352,10 +354,11 @@ function staffOverview(event) {
   const fixtures = staffPlannerInputFixtures.filter(({ event_id }) => event_id === event.id);
   let attendingPosition = 0;
   return fixtures.map((fixture) => {
+    const effective = { ...fixture, ...staffPlannerInputOverrides.get(fixture.registration_id) };
     const safe = Object.fromEntries(
-      Object.entries(fixture).filter(([key]) => key !== "event_id"),
+      Object.entries(effective).filter(([key]) => key !== "event_id"),
     );
-    if (fixture.response === "declined") {
+    if (effective.response === "declined") {
       return { ...safe, placement_status: "declined", waitlist_position: null };
     }
     attendingPosition += 1;
@@ -883,6 +886,20 @@ const server = createServer(async (request, response) => {
     json(response, 200, { status: "ok" });
     return;
   }
+  if (request.method === "POST" && requestUrl.pathname === "/__test/staff-registration") {
+    const body = await requestJson(request);
+    const fixture = staffPlannerInputFixtures.find(
+      ({ registration_id }) => registration_id === String(body.registration_id ?? ""),
+    );
+    if (!exactKeys(body, ["registration_id", "response"]) ||
+        !fixture || !new Set(["attending", "declined"]).has(body.response)) {
+      json(response, 400, { error: "invalid staff registration fixture" });
+      return;
+    }
+    staffPlannerInputOverrides.set(fixture.registration_id, { response: body.response });
+    json(response, 200, { status: "ok" });
+    return;
+  }
   if (request.method === "POST" && requestUrl.pathname === "/__test/history-contact") {
     const body = await requestJson(request);
     const email = String(body.email ?? "").trim().toLowerCase();
@@ -908,6 +925,31 @@ const server = createServer(async (request, response) => {
     json(response, 200, { status: "ok" });
     return;
   }
+  if (request.method === "POST" && requestUrl.pathname === "/__test/home-state") {
+    const body = await requestJson(request);
+    const email = String(body.email ?? "").trim().toLowerCase();
+    const state = String(body.state ?? "");
+    if (!email.includes("@") || !new Set(["waitlist", "empty"]).has(state)) {
+      json(response, 400, { error: "invalid home state fixture" });
+      return;
+    }
+    const user = authUser(email);
+    if (!validParticipant(user)) {
+      json(response, 400, { error: "invalid home participant fixture" });
+      return;
+    }
+    if (state === "waitlist") {
+      seedRegistration(
+        user,
+        tosEvents.find(({ slug }) => slug === "tennis-avond-2026").id,
+        "attending",
+      );
+    } else {
+      homeEmptyUsers.add(user.id);
+    }
+    json(response, 200, { status: "ok" });
+    return;
+  }
   if (request.method === "POST" && requestUrl.pathname === "/__test/reset-state") {
     tosEvents.splice(0, tosEvents.length, ...initialTosEvents.map((event) => ({ ...event })));
     authUsers.clear();
@@ -917,10 +959,12 @@ const server = createServer(async (request, response) => {
     registrations.clear();
     plannerDrafts.clear();
     staffSchedules.clear();
+    staffPlannerInputOverrides.clear();
     clubCourts.clear();
     for (const court of initialClubCourts) clubCourts.set(court.id, { ...court });
     sportProfileOverrides.clear();
     historyContactRequests.clear();
+    homeEmptyUsers.clear();
     nextOAuthAttempt = null;
     attendeeFailureEventId = null;
     response.writeHead(204);
@@ -1706,7 +1750,7 @@ const server = createServer(async (request, response) => {
       singleQueryValue(requestUrl, "ends_at")?.startsWith("gte.") &&
       singleQueryValue(requestUrl, "order") === "starts_at.asc"
     ) {
-      json(response, 200, tosEvents
+      json(response, 200, homeEmptyUsers.has(user.id) ? [] : tosEvents
         .filter((event) => new Set(["open", "closed"]).has(event.status) && new Date(event.ends_at) >= new Date())
         .sort((left, right) => new Date(left.starts_at) - new Date(right.starts_at)));
       return;
@@ -1827,7 +1871,7 @@ const server = createServer(async (request, response) => {
         rejectMockContract(response, "dashboardregistratiefilter wijkt af");
         return;
       }
-      const result = [...registrations.values()]
+      const result = homeEmptyUsers.has(user.id) ? [] : [...registrations.values()]
         .filter(({ user_id, event_id }) =>
           user_id === user.id && new Date(eventById(event_id)?.ends_at ?? 0) >= new Date())
         .sort((left, right) =>

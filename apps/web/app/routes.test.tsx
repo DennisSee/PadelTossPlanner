@@ -9,16 +9,36 @@ import { metadata } from "./layout";
 import { GET } from "./api/health/route";
 import { deriveAccountContext } from "../lib/auth/account-context";
 
-const loadOptionalAccountContext = vi.hoisted(() => vi.fn());
+const loadAccountContextWithClient = vi.hoisted(() => vi.fn());
+const createServerSupabaseClient = vi.hoisted(() => vi.fn());
+const listParticipantEvents = vi.hoisted(() => vi.fn());
+const listOwnUpcomingRegistrations = vi.hoisted(() => vi.fn());
+const ownRegistrationPosition = vi.hoisted(() => vi.fn());
+const eventCapacity = vi.hoisted(() => vi.fn());
+const eventAttendance = vi.hoisted(() => vi.fn());
 
 vi.mock("../lib/auth/session", () => ({
-  loadOptionalAccountContext,
+  loadAccountContextWithClient,
 }));
+vi.mock("../lib/supabase/server", () => ({ createServerSupabaseClient }));
+vi.mock("../lib/tos/repository", () => ({ TosRepository: class {
+  listParticipantEvents = listParticipantEvents;
+  listOwnUpcomingRegistrations = listOwnUpcomingRegistrations;
+  ownRegistrationPosition = ownRegistrationPosition;
+  eventCapacity = eventCapacity;
+  eventAttendance = eventAttendance;
+} }));
 
 describe("WEB-2 routes", () => {
   beforeEach(() => {
-    loadOptionalAccountContext.mockReset();
-    loadOptionalAccountContext.mockResolvedValue(null);
+    loadAccountContextWithClient.mockReset();
+    loadAccountContextWithClient.mockResolvedValue(null);
+    createServerSupabaseClient.mockResolvedValue({ requestScoped: true });
+    listParticipantEvents.mockResolvedValue([]);
+    listOwnUpcomingRegistrations.mockResolvedValue([]);
+    ownRegistrationPosition.mockReset();
+    eventCapacity.mockReset();
+    eventAttendance.mockReset();
   });
 
   it("links the public homepage to live schedule and the shared login", async () => {
@@ -45,8 +65,8 @@ describe("WEB-2 routes", () => {
     });
   });
 
-  it("replaces the anonymous login card with the authenticated TOS entry", async () => {
-    loadOptionalAccountContext.mockResolvedValueOnce(deriveAccountContext(
+  it("shows a compact participant empty state when no event is relevant", async () => {
+    loadAccountContextWithClient.mockResolvedValueOnce(deriveAccountContext(
       { userId: "user-1", email: "member@example.test" },
       {
         id: "user-1",
@@ -64,12 +84,53 @@ describe("WEB-2 routes", () => {
     ));
     render(await Home());
     expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
-      "Bekijk je TOS-avonden",
+      "Geen aankomende TOS-avonden",
     );
-    expect(screen.getByRole("link", { name: "Naar TOS-avonden" }))
+    expect(screen.getByRole("link", { name: "Bekijk alle TOS-avonden" }))
       .toHaveAttribute("href", "/tos");
     expect(screen.queryByRole("link", { name: "Inloggen / aanmelden" }))
       .not.toBeInTheDocument();
+  });
+
+  it("renders one personalized event with its custom title and placement action", async () => {
+    const event = {
+      id: "10000000-0000-4000-8000-000000000001",
+      slug: "vrijdag-padel",
+      title: "Clubkampioenen TOS",
+      sport: "padel" as const,
+      startsAt: "2099-08-28T18:00:00.000Z",
+      endsAt: "2099-08-28T20:00:00.000Z",
+      signupDeadline: "2099-08-27T17:00:00.000Z",
+      status: "open" as const,
+      maxParticipants: 4,
+    };
+    const registration = {
+      id: "20000000-0000-4000-8000-000000000001",
+      eventId: event.id,
+      response: "attending" as const,
+      availableFrom: event.startsAt,
+      availableUntil: event.endsAt,
+      attendingSince: "2099-08-01T10:00:00.000Z",
+      createdAt: "2099-08-01T10:00:00.000Z",
+      updatedAt: "2099-08-01T10:00:00.000Z",
+      event,
+    };
+    loadAccountContextWithClient.mockResolvedValueOnce(deriveAccountContext(
+      { userId: "user-1", email: "member@example.test" },
+      { id: "user-1", display_name: "Member", role: "participant", active: true, member_id: "member-1" },
+      { id: "member-1", display_name: "Member", approval_status: "approved", active: true },
+    ));
+    listParticipantEvents.mockResolvedValueOnce([event]);
+    listOwnUpcomingRegistrations.mockResolvedValueOnce([registration]);
+    ownRegistrationPosition.mockResolvedValueOnce({ placementStatus: "placed", waitlistPosition: null });
+    eventCapacity.mockResolvedValueOnce({ maxParticipants: 4, placedCount: 1, availableCount: 3, waitlistCount: 0 });
+    eventAttendance.mockResolvedValueOnce([{ displayName: "Member", placementStatus: "placed", waitlistPosition: null }]);
+
+    render(await Home());
+    expect(screen.getByRole("heading", { level: 2, name: "Jouw volgende TOS" })).toBeVisible();
+    expect(screen.getByRole("heading", { level: 3, name: "Clubkampioenen TOS" })).toBeVisible();
+    expect(screen.queryByRole("heading", { name: "Padel TOS-avond" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Aanmelding wijzigen" })).toHaveAttribute("href", "/tos/vrijdag-padel");
   });
 
   it("shows the staging badge from runtime APP_ENV", async () => {

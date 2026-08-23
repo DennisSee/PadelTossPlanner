@@ -60,6 +60,25 @@ services:
       start_period: 10s
       retries: 3
 
+  notification-worker:
+    build:
+      context: ../../apps/web
+    command: ["node", "notification-worker.mjs"]
+    restart: unless-stopped
+    environment:
+      APP_BASE_URL: ${APP_BASE_URL:-}
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      NOTIFICATION_FROM_EMAIL: ${NOTIFICATION_FROM_EMAIL:-}
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - web-egress
+
   planner-api:
     build:
       context: ../..

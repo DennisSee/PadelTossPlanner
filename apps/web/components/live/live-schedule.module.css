@@ -637,8 +637,8 @@
   .eventCard {
     grid-template-columns: 1fr;
     gap: 0.65rem;
-    min-height: 11.5rem;
-    padding: 1.1rem;
+    min-height: 9.25rem;
+    padding: 0.9rem 1rem;
     background:
       linear-gradient(150deg, var(--club-green) 0 78%, transparent 78%),
       var(--club-yellow);
@@ -652,7 +652,7 @@
 
   .eventTitle {
     max-width: 8.5ch;
-    font-size: clamp(2.55rem, 11.8vw, 3.35rem);
+    font-size: clamp(2.2rem, 10vw, 2.9rem);
     line-height: 0.96;
   }
 
@@ -678,6 +678,15 @@
     align-items: flex-start;
     flex-wrap: wrap;
     padding: var(--space-3);
+  }
+
+  .controlSurface {
+    gap: 0.7rem;
+    padding: 0.75rem;
+  }
+
+  .select {
+    min-height: 2.75rem;
   }
 
   .court {

@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import {
   Badge,
   AppHeader,
@@ -8,8 +10,12 @@ import {
   SecondaryLinkButton,
   SiteNavigation,
 } from "../components/ui";
-import { loadOptionalAccountContext } from "../lib/auth/session";
+import { TosEventCard } from "../components/tos/event-card";
+import { loadAccountContextWithClient } from "../lib/auth/session";
 import { readAppEnvironment } from "../lib/config/public-supabase";
+import { createServerSupabaseClient } from "../lib/supabase/server";
+import { selectHomeEvent, type HomeEventSelection } from "../lib/tos/home-event";
+import { TosRepository } from "../lib/tos/repository";
 
 import styles from "./home.module.css";
 
@@ -17,7 +23,51 @@ export const dynamic = "force-dynamic";
 
 export default async function Home() {
   const isStaging = readAppEnvironment() === "staging";
-  const account = await loadOptionalAccountContext();
+  let account = null;
+  let homeSnapshot: Parameters<typeof TosEventCard>[0] | null = null;
+  let homeKind: HomeEventSelection["kind"] | null = null;
+  let participantHomeResolved = false;
+  let client: Awaited<ReturnType<typeof createServerSupabaseClient>> | null = null;
+  try {
+    client = await createServerSupabaseClient();
+    account = await loadAccountContextWithClient(client);
+  } catch {
+    account = null;
+  }
+  if (account?.capabilities.canParticipate && client) {
+    try {
+      const repository = new TosRepository(client);
+      const now = new Date();
+      const [events, registrations] = await Promise.all([
+        repository.listParticipantEvents(now),
+        repository.listOwnUpcomingRegistrations(account.identity.userId, now),
+      ]);
+      const positionEntries = await Promise.all(registrations
+        .filter((registration) => registration.response === "attending")
+        .map(async (registration) => [registration.eventId, await repository.ownRegistrationPosition(registration.eventId)] as const));
+      const selected = selectHomeEvent(events, registrations, new Map(positionEntries), now);
+      participantHomeResolved = true;
+      if (selected) {
+        const [capacity, attendance] = await Promise.all([
+          repository.eventCapacity(selected.event.id),
+          repository.eventAttendance(selected.event.id),
+        ]);
+        homeKind = selected.kind;
+        homeSnapshot = {
+          event: selected.event,
+          registration: selected.registration,
+          capacity,
+          attendance,
+          registrationPosition: selected.position,
+          compact: true,
+          now,
+        };
+      }
+    } catch {
+      homeSnapshot = null;
+      homeKind = null;
+    }
+  }
   const navigation = navigationModelFromAccount(account);
 
   return (
@@ -43,7 +93,7 @@ export default async function Home() {
             </div>
           </Card>
 
-          <Card className={styles.side}>
+          {!homeSnapshot && !participantHomeResolved ? <Card className={styles.side}>
             <div className={styles.ticketIcon} aria-hidden="true">⌗</div>
             <div className={styles.ticketCopy}>
               {account ? (
@@ -72,8 +122,39 @@ export default async function Home() {
               )}
             </div>
             <div className={styles.barcode} aria-hidden="true" />
-          </Card>
+          </Card> : null}
         </div>
+        {homeSnapshot ? (
+          <section className={styles.nextTos} aria-labelledby="next-tos-heading">
+            <div className={styles.nextTosHeading}>
+              <div>
+                <h2 id="next-tos-heading">{homeKind === "live-placed" ? "Jouw TOS is live" : "Jouw volgende TOS"}</h2>
+                <p>{homeKind === "future-waitlist" ? "Je staat op de wachtlijst." : homeKind === "open" ? "Deze TOS staat open voor inschrijving." : "Je staat geplaatst voor deze TOS-avond."}</p>
+              </div>
+              <Link href="/tos">Alle TOS-avonden <span aria-hidden="true">→</span></Link>
+            </div>
+            <TosEventCard
+              {...homeSnapshot}
+              actionOverride={homeKind === "live-placed"
+                ? { href: `/live/${homeSnapshot.event.slug}`, label: "Bekijk live schema" }
+                : homeKind === "future-waitlist"
+                  ? { href: `/tos/${homeSnapshot.event.slug}`, label: "Wachtlijst bekijken" }
+                  : homeKind === "open" && !homeSnapshot.registration
+                    ? { href: `/tos/${homeSnapshot.event.slug}`, label: "Aanmelden" }
+                    : { href: `/tos/${homeSnapshot.event.slug}`, label: "Aanmelding wijzigen" }}
+            />
+          </section>
+        ) : participantHomeResolved ? (
+          <section className={styles.nextTos} aria-labelledby="next-tos-heading">
+            <Card className={styles.emptyTos}>
+              <div>
+                <h2 id="next-tos-heading">Geen aankomende TOS-avonden</h2>
+                <p>Er staat momenteel geen open of geplande TOS voor je klaar.</p>
+              </div>
+              <SecondaryLinkButton href="/tos">Bekijk alle TOS-avonden</SecondaryLinkButton>
+            </Card>
+          </section>
+        ) : null}
       </div>
     </main>
   );

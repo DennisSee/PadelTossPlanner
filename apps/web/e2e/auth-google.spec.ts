@@ -116,8 +116,8 @@ test("Google login gebruikt PKCE, dezelfde sessie en de ingelogde homepage", asy
   await page.reload();
   await expect(page).toHaveURL(/\/tos$/u);
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Bekijk je TOS-avonden" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Naar TOS-avonden" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Jouw volgende TOS" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Aanmelden" })).toHaveAttribute("href", "/tos/vrijdag-padel");
   await expect(page.getByRole("link", { name: "Inloggen / aanmelden" })).toHaveCount(0);
   const width = await page.evaluate(() => ({
     client: document.documentElement.clientWidth,

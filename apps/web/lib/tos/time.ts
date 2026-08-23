@@ -36,6 +36,13 @@ export function formatEventDateTime(value: string): string {
   return `${formatEventDate(value)} · ${formatEventClock(value)}`;
 }
 
+export function eventDisplayTitle(event: TosEvent): string {
+  const title = event.title.trim();
+  return title && title.toLocaleLowerCase("nl-NL") !== "tos-avond"
+    ? title
+    : `${event.sport === "padel" ? "Padel" : "Tennis"} TOS-avond`;
+}
+
 export function formatEventDateTimeInput(value: string): string {
   return formatInTimeZone(date(value), TOS_TIME_ZONE, "yyyy-MM-dd'T'HH:mm");
 }

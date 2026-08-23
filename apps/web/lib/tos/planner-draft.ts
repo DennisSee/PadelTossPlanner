@@ -6,6 +6,7 @@ import {
   type PlannerDraftWrite,
   type PlannerPlayer,
   type StaffPlannerInput,
+  type StaffRegistrationOverview,
   type TosEvent,
 } from "./types";
 import { derivePlannerReadiness, PLANNER_READINESS } from "./planner-readiness";
@@ -271,7 +272,8 @@ export function plannerDraftMatchesWrite(
 
 export type ImportDisposition =
   | "add" | "update" | "unchanged" | "declined" | "approval" | "member"
-  | "sport-profile" | "ranking" | "availability" | "identity-conflict" | "legacy-name-conflict";
+  | "sport-profile" | "ranking" | "availability" | "identity-conflict" | "legacy-name-conflict"
+  | "remove-declined" | "remove-waitlist" | "remove-missing";
 export type ImportPreviewItem = Readonly<{ displayName: string; disposition: ImportDisposition }>;
 export type RegistrationImport = Readonly<{
   players: readonly PlannerPlayer[];
@@ -282,10 +284,32 @@ export function importRegistrations(
   event: TosEvent,
   draft: PlannerDraft,
   registrations: readonly StaffPlannerInput[],
+  overview: readonly StaffRegistrationOverview[],
   createRowId: () => string,
 ): RegistrationImport {
-  const players = [...draft.players];
+  const placedRegistrationIds = new Set(registrations.map((registration) => registration.registrationId));
+  const registrationOverview = new Map(overview.map((registration) => [registration.registrationId, registration]));
+  const preview: ImportPreviewItem[] = [];
+  const players = draft.players.filter((item) => {
+    if (!item.sourceEventId) return true;
+    if (item.sourceEventId !== event.id || !item.registrationId) {
+      preview.push({ displayName: item.name, disposition: "remove-missing" });
+      return false;
+    }
+    if (placedRegistrationIds.has(item.registrationId)) return true;
+    const registration = registrationOverview.get(item.registrationId);
+    preview.push({
+      displayName: item.name,
+      disposition: registration?.placementStatus === "waitlist"
+        ? "remove-waitlist"
+        : registration?.placementStatus === "declined"
+          ? "remove-declined"
+          : "remove-missing",
+    });
+    return false;
+  });
   const linked = new Map<string, number>();
+  const linkedRegistrations = new Map<string, number>();
   const names = new Map<string, PlannerPlayer>();
   const duplicateMembers = new Set<string>();
   players.forEach((item, index) => {
@@ -293,9 +317,11 @@ export function importRegistrations(
       if (linked.has(item.memberId)) duplicateMembers.add(item.memberId);
       else linked.set(item.memberId, index);
     }
+    if (item.registrationId && item.sourceEventId === event.id) {
+      linkedRegistrations.set(item.registrationId, index);
+    }
     names.set(item.name.toLocaleLowerCase("nl-NL"), item);
   });
-  const preview: ImportPreviewItem[] = [];
   for (const registration of registrations) {
     const readiness = derivePlannerReadiness(event, registration);
     if (registration.response === "declined") {
@@ -314,24 +340,11 @@ export function importRegistrations(
       preview.push({ displayName: registration.displayName, disposition: "identity-conflict" });
       continue;
     }
-    const availableFrom = formatEventClock(registration.availableFrom!);
-    const availableUntil = formatEventClock(registration.availableUntil!);
-    const index = linked.get(registration.memberId);
+    const index = linkedRegistrations.get(registration.registrationId) ?? linked.get(registration.memberId);
     if (index !== undefined) {
       const before = players[index];
-      const normalizedName = registration.displayName.toLocaleLowerCase("nl-NL");
-      const conflictingName = names.get(normalizedName);
-      if (conflictingName && conflictingName.rowId !== before.rowId) {
-        preview.push({ displayName: registration.displayName, disposition: "legacy-name-conflict" });
-        continue;
-      }
       const after: PlannerPlayer = Object.freeze({
         ...before,
-        name: registration.displayName,
-        ranking: registration.ranking!,
-        included: true,
-        availableFrom,
-        availableUntil,
         memberId: registration.memberId,
         userId: registration.userId,
         registrationId: registration.registrationId,
@@ -339,10 +352,9 @@ export function importRegistrations(
         sourceEventId: event.id,
       });
       players[index] = after;
-      names.delete(before.name.toLocaleLowerCase("nl-NL"));
-      names.set(normalizedName, after);
+      linkedRegistrations.set(registration.registrationId, index);
       const changed = JSON.stringify(serializePlayer(before)) !== JSON.stringify(serializePlayer(after));
-      preview.push({ displayName: registration.displayName, disposition: changed ? "update" : "unchanged" });
+      preview.push({ displayName: before.name, disposition: changed ? "update" : "unchanged" });
       continue;
     }
     if (names.has(registration.displayName.toLocaleLowerCase("nl-NL"))) {
@@ -351,16 +363,25 @@ export function importRegistrations(
     }
     const added: PlannerPlayer = Object.freeze({
       rowId: createRowId(), name: registration.displayName, ranking: registration.ranking!, included: true,
-      availableFrom, availableUntil, memberId: registration.memberId, userId: registration.userId,
+      availableFrom: formatEventClock(registration.availableFrom!),
+      availableUntil: formatEventClock(registration.availableUntil!), memberId: registration.memberId, userId: registration.userId,
       registrationId: registration.registrationId, registrationUpdatedAt: registration.registrationUpdatedAt,
       sourceEventId: event.id,
     });
     if (!isUuid(added.rowId)) throw new InvalidPlannerDraftError();
     players.push(added);
     linked.set(registration.memberId, players.length - 1);
+    linkedRegistrations.set(registration.registrationId, players.length - 1);
     names.set(registration.displayName.toLocaleLowerCase("nl-NL"), added);
     preview.push({ displayName: registration.displayName, disposition: "add" });
   }
   rows(players.map(serializePlayer));
   return Object.freeze({ players, preview });
+}
+
+export function plannerDraftPlayersMatch(
+  draft: PlannerDraft,
+  players: readonly PlannerPlayer[],
+): boolean {
+  return JSON.stringify(plannerPlayersJson(draft.players)) === JSON.stringify(plannerPlayersJson(players));
 }

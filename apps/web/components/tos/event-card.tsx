@@ -8,6 +8,7 @@ import type {
 } from "../../lib/tos/types";
 import {
   eventAllowsSelfService,
+  eventDisplayTitle,
   eventPresentationStatus,
   formatEventClock,
   formatEventDate,
@@ -40,6 +41,8 @@ export function TosEventCard({
   attendance,
   registrationPosition,
   socialDataUnavailable = false,
+  compact = false,
+  actionOverride,
   now,
 }: {
   event: TosEvent;
@@ -48,11 +51,11 @@ export function TosEventCard({
   attendance: readonly ParticipantAttendance[];
   registrationPosition?: OwnRegistrationPosition | null;
   socialDataUnavailable?: boolean;
+  compact?: boolean;
+  actionOverride?: Readonly<{ href: string; label: string }>;
   now: Date;
 }) {
   const status = eventPresentationStatus(event, now);
-  const sportTitle = event.sport === "padel" ? "Padel TOS-avond" : "Tennis TOS-avond";
-  const showCustomTitle = event.title.trim().toLocaleLowerCase("nl-NL") !== "tos-avond";
   const canChange = eventAllowsSelfService(event, now);
   const availability = registration?.response === "attending"
     ? `${formatEventClock(registration.availableFrom!)}–${formatEventClock(registration.availableUntil!)}`
@@ -68,11 +71,11 @@ export function TosEventCard({
         ? "Afgemeld"
         : null;
   return (
-    <Card className={`${styles.eventCard} ${event.sport === "padel" ? styles.eventCardPadel : styles.eventCardTennis} ${cardClass(event, registration)}`}>
+    <Card className={`${styles.eventCard} ${compact ? styles.eventCardCompact : ""} ${event.sport === "padel" ? styles.eventCardPadel : styles.eventCardTennis} ${cardClass(event, registration)}`}>
       <EventDateRail startsAt={event.startsAt} accent={registration ? "green" : "yellow"} />
       <div className={styles.eventBody}>
         <div className={styles.badges}>
-          <SportBadge sport={event.sport} />
+          <SportBadge sport={event.sport} compact />
           <Badge tone={statusTone(event, now)}>{status}</Badge>
           {registration ? (
             <Badge tone={registrationPosition?.placementStatus === "waitlist" ? "warning" : registration.response === "attending" ? "success" : "neutral"}>
@@ -80,8 +83,7 @@ export function TosEventCard({
             </Badge>
           ) : null}
         </div>
-        <h3 className={styles.eventTitle}>{sportTitle}</h3>
-        {showCustomTitle ? <p className={styles.eventCustomTitle}>{event.title}</p> : null}
+        <h3 className={styles.eventTitle}>{eventDisplayTitle(event)}</h3>
         <p className={styles.metadata}>
           {formatEventDate(event.startsAt)} · {formatEventClock(event.startsAt)}–{formatEventClock(event.endsAt)}
         </p>
@@ -107,7 +109,9 @@ export function TosEventCard({
             </p>
           )}
           <div className={styles.actions}>
-            {registration && !canChange ? (
+            {actionOverride ? (
+              <LinkButton href={actionOverride.href}>{actionOverride.label}</LinkButton>
+            ) : registration && !canChange ? (
               <>
                 <SecondaryLinkButton href={`/tos/${event.slug}`}>
                   Aanmelding bekijken

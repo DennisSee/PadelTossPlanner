@@ -288,6 +288,10 @@
   line-height: 1.35;
 }
 
+.eventCardCompact .eventBody {
+  padding-block: 0.9rem;
+}
+
 .metadata {
   margin: 0;
   color: var(--text);
@@ -752,19 +756,44 @@
   }
 
   .eventCard {
-    grid-template-columns: 4rem minmax(0, 1fr);
+    grid-template-columns: 4.5rem minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .eventCard > time {
+    width: 4rem;
+    min-height: 5.75rem;
+    align-self: start;
+    margin: 0.7rem 0 0 0.35rem;
+    padding: 0.35rem;
+    border-radius: 0.5rem;
+  }
+
+  .eventCard > time strong {
+    margin-block: 0.08rem;
+    font-size: 2rem;
+  }
+
+  .eventCard > time span {
+    font-size: 0.68rem;
+  }
+
+  .eventCard > time small {
+    font-size: 0.6rem;
   }
 
   .filters {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.7rem var(--space-3);
-    padding: 0.8rem;
+    padding: 0.7rem;
   }
 
-  .filters > label,
-  .filters > strong,
+  .filters > label {
+    grid-column: 1;
+  }
+
   .sportFilter {
-    grid-column: 1 / -1;
+    grid-column: 2;
   }
 
   .filters > strong {
@@ -780,8 +809,82 @@
     justify-self: end;
   }
 
+  .sportSegments svg {
+    display: none;
+  }
+
   .eventBody {
     grid-template-columns: 1fr;
+    gap: 0.55rem;
+    padding: 0.75rem 0.75rem 0.85rem;
+  }
+
+  .badges {
+    gap: 0.35rem;
+  }
+
+  .eventTitle {
+    font-size: 1.15rem;
+  }
+
+  .metadata {
+    font-size: 0.88rem;
+    line-height: 1.35;
+  }
+
+  .deadline,
+  .attendeePreview,
+  .muted {
+    font-size: 0.8rem;
+    line-height: 1.35;
+  }
+
+  .personalStatus,
+  .waitlistNotice {
+    margin: 0;
+    padding: 0.28rem 0.45rem;
+    font-size: 0.82rem;
+  }
+
+  .capacityPanel {
+    grid-template-columns: 2.6rem minmax(0, 1fr) auto;
+    min-height: 4.5rem;
+    align-content: center;
+    align-items: center;
+    padding: 0.55rem 0.65rem;
+  }
+
+  .capacityRing {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+
+  .capacityNumbers strong {
+    font-size: 1.25rem;
+  }
+
+  .capacityPanel p {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+    white-space: nowrap;
+    font-size: 0.75rem;
+  }
+
+  .participantColumn {
+    gap: 0.35rem;
+  }
+
+  .peopleTrigger {
+    min-height: 2.75rem;
+  }
+
+  .actions {
+    padding-top: 0.2rem;
+  }
+
+  .actions a,
+  .disabledAction {
+    min-height: 3rem;
   }
 
   .eventBody > .badges,
@@ -818,6 +921,10 @@
   .sportSegments label {
     padding-inline: 0.4rem;
     font-size: 0.78rem;
+  }
+
+  .eventCard {
+    grid-template-columns: 4.1rem minmax(0, 1fr);
   }
 }
 

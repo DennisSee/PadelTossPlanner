@@ -57,7 +57,7 @@ test("participant filters, capaciteit en veilige deelnemerssheet werken samen", 
   await page.getByRole("radio", { name: "Tennis" }).click();
   await expect(page).toHaveURL(/\/tos\?status=open&sport=tennis$/u);
   await expect(page.getByText("1 TOS-avond")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Tennis TOS-avond", level: 3 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Tennis TOS voor alle clubleden", level: 3 })).toBeVisible();
   await expect(page.getByLabel("2 van 2 plaatsen bezet")).toBeVisible();
   await expect(page.getByText("1 op wachtlijst").first()).toBeVisible();
   await expect(page.getByRole("link", { name: "Op wachtlijst" })).toBeVisible();

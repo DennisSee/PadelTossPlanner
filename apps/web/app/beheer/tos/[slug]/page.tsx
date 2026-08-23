@@ -67,7 +67,9 @@ export default async function TosEventParticipantsPage({ params, searchParams = 
         new PlannerDraftRepository(client).load(event),
         new CourtRepository(client).list(event.sport),
       ]);
-      const preview = plannerInput ? importRegistrations(event, draft, plannerInput, randomUUID).preview : [];
+      const preview = plannerInput && participants
+        ? importRegistrations(event, draft, plannerInput, participants, randomUUID).preview
+        : [];
       const scheduleRepository = new StaffScheduleRepository(client);
       const schedules = await scheduleRepository.list(event.id);
       const requestedSchedule = last(query.schedule);

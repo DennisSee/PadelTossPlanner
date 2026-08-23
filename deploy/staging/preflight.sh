@@ -95,11 +95,29 @@ app_base_url=$(read_env_value APP_BASE_URL)
 if [[ ! "$app_base_url" =~ ^https://test-tos\.oddbounce\.nl/?$ ]]; then
   fail "APP_BASE_URL moet de HTTPS-URL van test-tos.oddbounce.nl zijn."
 fi
-if grep -Eqi '^[[:space:]]*(export[[:space:]]+)?SUPABASE_(SERVICE_ROLE|SECRET)_KEY[[:space:]]*=' "$env_file"; then
-  fail "Een verboden Supabase service-/secret-keyvariabele staat in de staging-env."
+if grep -Eqi '^[[:space:]]*(export[[:space:]]+)?SUPABASE_SECRET_KEY[[:space:]]*=' "$env_file"; then
+  fail "De niet-gescopeerde SUPABASE_SECRET_KEY mag niet in de staging-env staan."
 fi
-if [[ -n "${SUPABASE_SERVICE_ROLE_KEY+x}" || -n "${SUPABASE_SECRET_KEY+x}" ]]; then
-  fail "Een verboden Supabase service-/secret-keyvariabele staat in het proces."
+if [[ -n "${SUPABASE_SECRET_KEY+x}" ]]; then
+  fail "De niet-gescopeerde SUPABASE_SECRET_KEY mag niet in het proces staan."
+fi
+notification_variables=(SUPABASE_SERVICE_ROLE_KEY RESEND_API_KEY NOTIFICATION_FROM_EMAIL)
+notification_configured=0
+for variable_name in "${notification_variables[@]}"; do
+  if [[ -v $variable_name ]]; then
+    fail "$variable_name mag het gecontroleerde env-bestand niet via de procesomgeving overschrijven."
+  fi
+  if read_env_value "$variable_name" >/dev/null; then
+    notification_configured=$((notification_configured + 1))
+  fi
+done
+if (( notification_configured != 0 && notification_configured != ${#notification_variables[@]} )); then
+  fail "De notificationworkerconfiguratie moet volledig aanwezig of volledig afwezig zijn."
+fi
+if (( notification_configured == ${#notification_variables[@]} )); then
+  ok "De geïsoleerde waitlist-notificationworker is volledig geconfigureerd; waarden zijn niet getoond."
+else
+  warn "EMAIL_DELIVERY_RUNTIME_CONFIG_REQUIRED: waitlist-promotiemails zijn nog niet ingeschakeld."
 fi
 ok "Stagingvariabelen en veilige app-origin zijn aanwezig; waarden zijn niet getoond."
 
@@ -108,7 +126,7 @@ if ! compose_config=$(docker compose --env-file "$env_file" -f "$compose_file" c
   fail "docker compose config is mislukt."
 fi
 services=$(docker compose --env-file "$env_file" -f "$compose_file" config --services 2>/dev/null)
-for expected_service in caddy web planner-api; do
+for expected_service in caddy web planner-api notification-worker; do
   printf '%s\n' "$services" | grep -Fxq "$expected_service" || fail "Compose-service ontbreekt: $expected_service"
 done
 for service in $services; do
@@ -122,6 +140,10 @@ service_has_network caddy application || fail "Caddy mist application-netwerk."
 service_has_network web application || fail "Web mist application-netwerk."
 service_has_network web web-egress || fail "Web mist web-egress-netwerk."
 service_has_network planner-api application || fail "Planner-API mist application-netwerk."
+service_has_network notification-worker web-egress || fail "Notificationworker mist web-egress-netwerk."
+if service_has_network notification-worker application || service_has_property notification-worker ports; then
+  fail "Notificationworker mag geen application-netwerk of hostpoorten hebben."
+fi
 if service_has_network planner-api web-egress; then
   fail "Planner-API mag geen web-egress hebben."
 fi

@@ -78,6 +78,21 @@ test("staff completes the event-scoped draft, private save and publication workf
   const body = await page.locator("body").innerText();
   expect(body).not.toMatch(/member_id|user_id|registration_id|players_private|schedule_private|statistics_private|diagnostics|Niveau T1|Teamverschil/u);
 
+  const decline = await request.post(`${MOCK_URL}/__test/staff-registration`, {
+    data: {
+      registration_id: "5e100000-0000-4000-8000-000000000001",
+      response: "declined",
+    },
+  });
+  expect(decline.ok()).toBe(true);
+  await page.goto("/beheer/tos/web5b1-padel");
+  await page.getByRole("button", { name: "Aanmeldingen verwerken" }).click();
+  await expect(page.getByText("Aanmeldingen zijn bijgewerkt. Genereer en publiceer het schema opnieuw om de wijzigingen live te zetten.")).toBeVisible();
+  await expect(page.locator('input[value="Ready Hele Avond"]')).toHaveCount(0);
+  await expect(page.locator('input[value="Handmatig Eén"]')).toBeVisible();
+
+  await page.goto("/live");
+  await expect(page.locator("body")).toContainText("Ready Hele Avond");
   await page.goto("/beheer/tos/web5b1-padel");
   await page.getByRole("button", { name: "Publicatie intrekken" }).click();
   await expect(page.getByText("Publicatie ingetrokken.")).toBeVisible();

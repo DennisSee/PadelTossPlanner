@@ -5,6 +5,8 @@ import { isTosEventSlug } from "./slug";
 export type PlannerNotice =
   | "draft-saved"
   | "registrations-imported"
+  | "registrations-imported-regenerate"
+  | "registrations-current"
   | "schedule-saved"
   | "schedule-published"
   | "schedule-unpublished";
@@ -22,6 +24,8 @@ export type PlannerError =
 const NOTICES: Record<PlannerNotice, string> = {
   "draft-saved": "Planneropzet opgeslagen.",
   "registrations-imported": "Geldige aanmeldingen zijn in de planneropzet verwerkt.",
+  "registrations-imported-regenerate": "Aanmeldingen zijn bijgewerkt. Genereer en publiceer het schema opnieuw om de wijzigingen live te zetten.",
+  "registrations-current": "De planneropzet was al gelijk aan de actuele geplaatste deelnemers.",
   "schedule-saved": "Schema privé opgeslagen.",
   "schedule-published": "Schema gepubliceerd.",
   "schedule-unpublished": "Publicatie ingetrokken.",

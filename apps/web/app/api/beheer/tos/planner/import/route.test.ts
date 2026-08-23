@@ -8,6 +8,8 @@ const eventBySlug = vi.hoisted(() => vi.fn());
 const load = vi.hoisted(() => vi.fn());
 const save = vi.hoisted(() => vi.fn());
 const plannerInputForEvent = vi.hoisted(() => vi.fn());
+const registrationOverviewForEvent = vi.hoisted(() => vi.fn());
+const listSchedules = vi.hoisted(() => vi.fn());
 
 vi.mock("../../../../../../lib/config/public-supabase", () => ({ readAppBaseUrl }));
 vi.mock("../../../../../../lib/supabase/server", () => ({ createServerSupabaseClient }));
@@ -18,6 +20,8 @@ vi.mock("../../../../../../lib/tos/planner-draft-repository", async (original) =
   return { ...actual, PlannerDraftRepository: class { load = load; save = save; } };
 });
 vi.mock("../../../../../../lib/tos/staff-planner-input-repository", () => ({ StaffPlannerInputRepository: class { plannerInputForEvent = plannerInputForEvent; } }));
+vi.mock("../../../../../../lib/tos/staff-registration-overview-repository", () => ({ StaffRegistrationOverviewRepository: class { forEvent = registrationOverviewForEvent; } }));
+vi.mock("../../../../../../lib/tos/schedule-repository", () => ({ StaffScheduleRepository: class { list = listSchedules; } }));
 
 import { POST } from "./route";
 
@@ -39,7 +43,10 @@ describe("registration import route", () => {
     loadAccountContextWithClient.mockResolvedValue({ capabilities: { canPlan: true } });
     eventBySlug.mockResolvedValue(event);
     load.mockResolvedValueOnce(draft).mockImplementation(async () => ({ ...draft, ...save.mock.calls[0][2], revision: 1 }));
-    plannerInputForEvent.mockResolvedValue([{ registrationId: "22222222-2222-4222-8222-222222222222", userId: "33333333-3333-4333-8333-333333333333", memberId: "44444444-4444-4444-8444-444444444444", response: "attending", availableFrom: event.startsAt, availableUntil: event.endsAt, registrationUpdatedAt: "2026-08-20T10:00:00Z", displayName: "Ada", approvalStatus: "approved", memberActive: true, sportProfileActive: true, ranking: 4 }]);
+    const placed = { registrationId: "22222222-2222-4222-8222-222222222222", userId: "33333333-3333-4333-8333-333333333333", memberId: "44444444-4444-4444-8444-444444444444", response: "attending", availableFrom: event.startsAt, availableUntil: event.endsAt, registrationUpdatedAt: "2026-08-20T10:00:00Z", displayName: "Ada", approvalStatus: "approved", memberActive: true, sportProfileActive: true, ranking: 4 };
+    plannerInputForEvent.mockResolvedValue([placed]);
+    registrationOverviewForEvent.mockResolvedValue([{ ...placed, placementStatus: "placed", waitlistPosition: null }]);
+    listSchedules.mockResolvedValue([]);
     save.mockResolvedValue(1);
   });
 
@@ -48,6 +55,20 @@ describe("registration import route", () => {
     expect(plannerInputForEvent).toHaveBeenCalledWith(event.id);
     expect(save.mock.calls[0][2].players[0]).toMatchObject({ name: "Ada", memberId: "44444444-4444-4444-8444-444444444444" });
     expect(response.headers.get("location")).toContain("notice=registrations-imported");
+  });
+
+  it("does not bump the draft revision when reconciliation is already current", async () => {
+    const linked = { rowId: "55555555-5555-4555-8555-555555555555", name: "Ada", ranking: 4, included: true, availableFrom: "20:00", availableUntil: "22:00", memberId: "44444444-4444-4444-8444-444444444444", userId: "33333333-3333-4333-8333-333333333333", registrationId: "22222222-2222-4222-8222-222222222222", registrationUpdatedAt: "2026-08-20T10:00:00Z", sourceEventId: event.id };
+    load.mockReset().mockResolvedValue({ ...draft, players: [linked] });
+    const response = await POST(request());
+    expect(save).not.toHaveBeenCalled();
+    expect(response.headers.get("location")).toContain("notice=registrations-current");
+  });
+
+  it("warns that an existing published schedule must be regenerated", async () => {
+    listSchedules.mockResolvedValue([{ isPublished: true }]);
+    const response = await POST(request());
+    expect(response.headers.get("location")).toContain("notice=registrations-imported-regenerate");
   });
 
   it("accepts no browser registration or identity authority", async () => {

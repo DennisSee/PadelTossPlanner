@@ -67,6 +67,9 @@ const DISPOSITION_LABELS: Record<ImportPreviewItem["disposition"], string> = {
   availability: "Beschikbaarheid ongeldig",
   "identity-conflict": "Dubbele ledenkoppeling",
   "legacy-name-conflict": "Naamconflict met handmatige rij",
+  "remove-declined": "Afgemeld — gekoppelde rij verwijderen",
+  "remove-waitlist": "Wachtlijst — gekoppelde rij verwijderen",
+  "remove-missing": "Niet meer actueel — gekoppelde rij verwijderen",
 };
 
 function clientKey(): string {
@@ -172,7 +175,7 @@ export function PlannerWorkspace({
 
       <Card className={styles.card}>
         <h2>Aanmeldingen overnemen</h2>
-        <p className={styles.muted}>Alleen geldige {event.sport === "padel" ? "padel" : "tennis"}aanmeldingen worden toegevoegd of via hun stabiele ledenkoppeling bijgewerkt. Handmatige rijen blijven staan.</p>
+        <p className={styles.muted}>De gekoppelde spelers worden vergeleken met de actuele geplaatste deelnemers. Handmatige rijen en handmatige correcties blijven staan.</p>
         {importPreview.length ? (
           <ul className={styles.previewList}>
             {importPreview.map((item, index) => <li key={`${item.displayName}-${index}`}><strong>{item.displayName}</strong><span>{DISPOSITION_LABELS[item.disposition]}</span></li>)}
