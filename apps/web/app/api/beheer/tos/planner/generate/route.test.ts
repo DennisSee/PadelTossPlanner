@@ -7,6 +7,7 @@ const loadAccountContextWithClient = vi.hoisted(() => vi.fn());
 const eventBySlug = vi.hoisted(() => vi.fn());
 const loadDraft = vi.hoisted(() => vi.fn());
 const generatePlannerSchedule = vi.hoisted(() => vi.fn());
+const listCourts = vi.hoisted(() => vi.fn());
 
 vi.mock("../../../../../../lib/config/public-supabase", () => ({ readAppBaseUrl }));
 vi.mock("../../../../../../lib/supabase/server", () => ({ createServerSupabaseClient }));
@@ -20,6 +21,7 @@ vi.mock("../../../../../../lib/planner-api/client", async (original) => {
   const actual = await original<typeof import("../../../../../../lib/planner-api/client")>();
   return { ...actual, generatePlannerSchedule };
 });
+vi.mock("../../../../../../lib/tos/court-repository", () => ({ CourtRepository: class { list = listCourts; } }));
 
 import { POST } from "./route";
 
@@ -27,7 +29,7 @@ const BASE = "https://app.example";
 const client = Object.freeze({ requestScoped: true });
 const event = Object.freeze({ id: "11111111-1111-4111-8111-111111111111", slug: "vrijdag-padel", title: "Vrijdag", sport: "padel", startsAt: "2026-08-21T18:00:00Z", endsAt: "2026-08-21T20:00:00Z", signupDeadline: null, status: "closed" });
 const draft = Object.freeze({
-  eventId: event.id, revision: 2, selectedCourts: ["Kremer Baan"], matchMinutes: 20,
+  eventId: event.id, revision: 2, selectedCourts: ["c9000000-0000-4000-8000-000000000001"], matchMinutes: 20,
   restMinutes: 0, searchProfile: "Snel", allowRepeatPartners: false, levelMix: 50,
   teamDifferenceTolerance: 0.5, updatedBy: null, updatedByName: null, updatedAt: null, createdAt: null,
   players: ["Ada", "Bea", "Cleo", "Dora"].map((name, index) => ({ rowId: `${index + 1}1111111-1111-4111-8111-111111111111`, name, ranking: index + 1, included: true, availableFrom: null, availableUntil: null })),
@@ -48,6 +50,7 @@ describe("planner generation route", () => {
     loadAccountContextWithClient.mockResolvedValue(staff);
     eventBySlug.mockResolvedValue(event);
     loadDraft.mockResolvedValue(draft);
+    listCourts.mockResolvedValue([{ id: "c9000000-0000-4000-8000-000000000001", sport: "padel", name: "Kremer Baan", active: true, sortOrder: 10 }]);
     generatePlannerSchedule.mockImplementation(async (payload) => ({ seed: payload.generation_seed, schedule: [], statistics: [], diagnostics: {} }));
   });
 

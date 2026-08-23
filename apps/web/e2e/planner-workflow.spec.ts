@@ -47,6 +47,7 @@ test("staff completes the event-scoped draft, private save and publication workf
   await partial.getByLabel("Tot").fill("22:00");
   await addManualPlayer(page, 0, "Handmatig Eén", "3");
   await addManualPlayer(page, 1, "Handmatig Twee", "2");
+  await page.getByLabel("Kremer Baan").check();
   await page.getByLabel("ZGA/F&F Baan").uncheck();
   await expect(page.getByText(/Niet-opgeslagen wijzigingen/u)).toBeVisible();
   await expect(page.getByRole("button", { name: "Schema genereren" })).toBeDisabled();
@@ -87,7 +88,7 @@ test("staff completes the event-scoped draft, private save and publication workf
   expect(widths.scroll).toBeLessThanOrEqual(widths.client + 1);
 });
 
-test("participant and tennis event never expose padel planner controls", async ({ page, request }) => {
+test("participant is denied while staff can prepare a Tennis planner draft", async ({ page, request }) => {
   await page.goto("/login?next=/beheer");
   await signIn(page, request, "participant", /\/tos$/u, "TOS-avonden");
   await page.goto("/beheer/tos/web5b1-padel");
@@ -97,7 +98,21 @@ test("participant and tennis event never expose padel planner controls", async (
   await page.getByRole("button", { name: "Uitloggen" }).click();
   await page.goto("/login?next=/beheer");
   await signIn(page, request, "admin-no-member", /\/beheer$/u, "Beheeromgeving");
+  await page.goto("/beheer/banen");
+  const create = page.getByRole("heading", { name: "Nieuwe baan" }).locator("xpath=ancestor::section[1]");
+  await create.getByLabel("Sport").selectOption("tennis");
+  await create.getByLabel("Naam").fill("Tennisbaan Noord");
+  await create.getByRole("button", { name: "Baan toevoegen" }).click();
+  await expect(page.getByText("Baan opgeslagen.")).toBeVisible();
   await page.goto("/beheer/tos/web5b1-tennis");
-  await expect(page.getByText("Tennisplanner wordt in een volgende stap toegevoegd.")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Planneropzet" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Planneropzet" })).toBeVisible();
+  await page.getByRole("button", { name: "Aanmeldingen verwerken" }).click();
+  await addManualPlayer(page, 0, "Tennis Twee", "3");
+  await addManualPlayer(page, 1, "Tennis Drie", "3");
+  await addManualPlayer(page, 2, "Tennis Vier", "2");
+  await page.getByLabel("Tennisbaan Noord").check();
+  await page.getByRole("button", { name: "Planneropzet opslaan" }).click();
+  await expect(page.getByText("Planneropzet opgeslagen.")).toBeVisible();
+  await page.getByRole("button", { name: "Schema genereren" }).click();
+  await expect(page.getByRole("heading", { name: "Controleer het voorstel" })).toBeVisible();
 });

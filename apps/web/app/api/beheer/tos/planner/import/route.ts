@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
     if (!account) return privateAuthRedirect(loginPathFor("/beheer"), appBaseUrl);
     if (!account.capabilities.canPlan) return privateAuthRedirect("/account", appBaseUrl);
     const event = await new StaffTosEventRepository(client).eventBySlug(parsed.slug);
-    if (!event || event.sport !== "padel") return plannerRedirect(appBaseUrl, parsed.slug, { error: "not-authorized" });
+    if (!event) return plannerRedirect(appBaseUrl, parsed.slug, { error: "not-authorized" });
     const draftRepository = new PlannerDraftRepository(client);
     const current = await draftRepository.load(event);
     if (current.revision !== parsed.expectedRevision) throw new PlannerDraftConflictError();

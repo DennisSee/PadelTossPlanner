@@ -14,6 +14,7 @@ import { hasExactOrigin, noStoreResponse } from "../../../../../../../lib/tos/re
 import { StaffScheduleConflictError, StaffScheduleDataError, StaffScheduleRepository } from "../../../../../../../lib/tos/schedule-repository";
 import { StaffTosEventRepository } from "../../../../../../../lib/tos/staff-repository";
 import { formatEventClock } from "../../../../../../../lib/tos/time";
+import { CourtRepository } from "../../../../../../../lib/tos/court-repository";
 
 export const dynamic = "force-dynamic";
 
@@ -30,17 +31,19 @@ export async function POST(request: NextRequest) {
     if (!account) return privateAuthRedirect(loginPathFor("/beheer"), appBaseUrl);
     if (!account.capabilities.canPlan) return privateAuthRedirect("/account", appBaseUrl);
     const event = await new StaffTosEventRepository(client).eventBySlug(parsed.slug);
-    if (!event || event.sport !== "padel") return plannerRedirect(appBaseUrl, parsed.slug, { error: "not-authorized" });
+    if (!event) return plannerRedirect(appBaseUrl, parsed.slug, { error: "not-authorized" });
     const draft = await new PlannerDraftRepository(client).load(event);
     if (draft.revision !== parsed.expectedRevision) return plannerRedirect(appBaseUrl, parsed.slug, { error: "conflict" });
-    const generated = await generatePlannerSchedule(plannerGenerateRequest(event, draft, parsed.generationSeed));
+    const courts = await new CourtRepository(client).list(event.sport);
+    const selectedCourtNames = draft.selectedCourts.map((id) => courts.find((court) => court.id === id)?.name);
+    const generated = await generatePlannerSchedule(plannerGenerateRequest(event, draft, parsed.generationSeed, courts));
     const repository = new StaffScheduleRepository(client);
     const scheduleId = await repository.save(event, draft, generated);
     const stored = await repository.detail(event.id, scheduleId);
     if (!stored || stored.eventId !== event.id || stored.generationSeed !== generated.seed ||
         stored.plannerDraftRevision !== draft.revision || stored.title !== event.title ||
         stored.startTime !== formatEventClock(event.startsAt) || stored.endTime !== formatEventClock(event.endsAt) ||
-        stored.matchMinutes !== draft.matchMinutes || JSON.stringify(stored.courts) !== JSON.stringify(draft.selectedCourts) ||
+        stored.matchMinutes !== draft.matchMinutes || JSON.stringify(stored.courts) !== JSON.stringify(selectedCourtNames) ||
         JSON.stringify(stored.schedule) !== JSON.stringify(generated.schedule) ||
         JSON.stringify(stored.statistics) !== JSON.stringify(generated.statistics) ||
         JSON.stringify(stored.diagnostics) !== JSON.stringify(generated.diagnostics)) {

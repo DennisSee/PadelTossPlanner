@@ -131,3 +131,29 @@ export function parsePublicSchedule(value: unknown): ParseResult {
     },
   };
 }
+
+export function parseEventPublicSchedule(value: unknown): ParseResult {
+  if (!isRecord(value)) return { ok: false };
+  const normalized = {
+    ...value,
+    id: value.id,
+    event_date: value.event_date,
+    created_by_name: value.created_by_name,
+    start_time: value.start_time,
+    end_time: value.end_time,
+    courts: value.courts,
+    participants_public: value.participants_public,
+    schedule_public: value.schedule_public,
+    is_published: value.is_published,
+    created_at: value.created_at,
+  };
+  const base = parsePublicSchedule(normalized);
+  const slug = requiredText(value.event_slug);
+  const title = requiredText(value.event_title);
+  const startsAt = requiredText(value.event_starts_at);
+  const endsAt = requiredText(value.event_ends_at);
+  if (!base.ok || !slug || !title || (value.event_sport !== "padel" && value.event_sport !== "tennis") ||
+      !startsAt || !endsAt || Number.isNaN(Date.parse(startsAt)) || Number.isNaN(Date.parse(endsAt))) return { ok: false };
+  return { ok: true, value: Object.freeze({ ...base.value, eventSlug: slug, eventTitle: title,
+    eventSport: value.event_sport, eventStartsAt: startsAt, eventEndsAt: endsAt }) };
+}

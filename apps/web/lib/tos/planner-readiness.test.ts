@@ -91,7 +91,7 @@ describe("planner readiness", () => {
 
   it("keeps tennis source completeness separate from planner support", () => {
     expect(readinessLabel(PLANNER_READINESS.READY, "padel")).toBe("Klaar voor planner");
-    expect(readinessLabel(PLANNER_READINESS.READY, "tennis")).toBe("Gegevens compleet");
+    expect(readinessLabel(PLANNER_READINESS.READY, "tennis")).toBe("Klaar voor planner");
     expect(readinessLabel(PLANNER_READINESS.RANKING_MISSING, "tennis"))
       .toBe("Tennisniveau ontbreekt");
   });

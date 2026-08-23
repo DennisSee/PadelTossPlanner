@@ -17,6 +17,7 @@ import { isTosEventSlug } from "../../../../lib/tos/slug";
 import type { StaffPlannerInput, StaffRegistrationOverview } from "../../../../lib/tos/types";
 import { randomUUID } from "node:crypto";
 import { StateMessage } from "../../../../components/ui";
+import { CourtRepository } from "../../../../lib/tos/court-repository";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -60,9 +61,12 @@ export default async function TosEventParticipantsPage({ params, searchParams = 
   const message = plannerMessage(last(query.notice), last(query.error));
   let workspaceProps: Parameters<typeof PlannerWorkspace>[0] | null = null;
   let workspaceUnavailable = false;
-  if (event.sport === "padel") {
+  {
     try {
-      const draft = await new PlannerDraftRepository(client).load(event);
+      const [draft, courts] = await Promise.all([
+        new PlannerDraftRepository(client).load(event),
+        new CourtRepository(client).list(event.sport),
+      ]);
       const preview = plannerInput ? importRegistrations(event, draft, plannerInput, randomUUID).preview : [];
       const scheduleRepository = new StaffScheduleRepository(client);
       const schedules = await scheduleRepository.list(event.id);
@@ -95,6 +99,7 @@ export default async function TosEventParticipantsPage({ params, searchParams = 
             updatedAt: draft.updatedAt,
           },
           importPreview: preview,
+          courts: courts.filter((court) => court.active || draft.selectedCourts.includes(court.id)),
           schedules: schedules.map((schedule) => ({
             id: schedule.id,
             createdByName: schedule.createdByName,
@@ -129,7 +134,7 @@ export default async function TosEventParticipantsPage({ params, searchParams = 
     <AccountShell
       account={account}
       title="TOS-deelnemers"
-      intro="Bekijk aanmeldingen en werk voor padel gecontroleerd verder naar een schema."
+      intro="Bekijk aanmeldingen en werk gecontroleerd verder naar een schema."
       variant="management"
     >
       {message ? <StateMessage title={message.text}><span role={message.tone === "danger" ? "alert" : "status"} /></StateMessage> : null}

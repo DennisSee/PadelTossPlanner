@@ -12,6 +12,7 @@ import { parsePlannerLocatorJson } from "../../../../../../lib/tos/planner-draft
 import { plannerGenerateRequest } from "../../../../../../lib/tos/planner-generation";
 import { hasExactOrigin, noStoreResponse } from "../../../../../../lib/tos/request";
 import { StaffTosEventRepository } from "../../../../../../lib/tos/staff-repository";
+import { CourtRepository } from "../../../../../../lib/tos/court-repository";
 
 export const dynamic = "force-dynamic";
 
@@ -32,11 +33,12 @@ export async function POST(request: NextRequest) {
     if (!account) return privateAuthRedirect(loginPathFor("/beheer"), appBaseUrl);
     if (!account.capabilities.canPlan) return privateAuthRedirect("/account", appBaseUrl);
     const event = await new StaffTosEventRepository(client).eventBySlug(parsed.slug);
-    if (!event || event.sport !== "padel") return jsonError("not-authorized", 403);
+    if (!event) return jsonError("not-authorized", 403);
     const draft = await new PlannerDraftRepository(client).load(event);
     if (draft.revision !== parsed.expectedRevision) return jsonError("conflict", 409);
+    const courts = await new CourtRepository(client).list(event.sport);
     const seed = randomInt(0, 2_147_483_647);
-    const generated = await generatePlannerSchedule(plannerGenerateRequest(event, draft, seed));
+    const generated = await generatePlannerSchedule(plannerGenerateRequest(event, draft, seed, courts));
     return Response.json(generated, { headers: { "Cache-Control": "private, no-store, max-age=0" } });
   } catch {
     return jsonError("generation-failed", 422);

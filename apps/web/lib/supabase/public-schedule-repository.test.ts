@@ -111,4 +111,47 @@ describe("server-only public schedule repository", () => {
       () => malformed.client,
     ).latestPublishedSchedule()).rejects.toEqual(new InvalidPublicScheduleError());
   });
+
+  it("loads a canonical event publication and live candidates through narrow public RPCs", async () => {
+    const rpc = vi.fn()
+      .mockResolvedValueOnce({ data: [{
+        ...payload,
+        event_slug: "padel-live",
+        event_title: "Padel TOS",
+        event_sport: "padel",
+        event_starts_at: "2026-08-21T18:00:00Z",
+        event_ends_at: "2026-08-21T20:00:00Z",
+      }], error: null })
+      .mockResolvedValueOnce({ data: [{ slug: "tennis-live", title: " Tennis TOS ", sport: "tennis", starts_at: "2026-08-22T18:00:00Z", ends_at: "2026-08-22T20:00:00Z" }], error: null });
+    const repository = new PublicScheduleRepository(
+      { url: "https://test.example.test", publishableKey: "sb_publishable_test" },
+      () => ({ rpc } as unknown as SupabaseClient),
+    );
+    await expect(repository.eventPublishedSchedule("padel-live")).resolves.toMatchObject({ eventSlug: "padel-live", eventSport: "padel" });
+    await expect(repository.liveCandidates()).resolves.toEqual([{ slug: "tennis-live", title: "Tennis TOS", sport: "tennis", startsAt: "2026-08-22T18:00:00Z", endsAt: "2026-08-22T20:00:00Z" }]);
+    expect(rpc).toHaveBeenNthCalledWith(1, "public_event_live_schedule", { p_slug: "padel-live" });
+    expect(rpc).toHaveBeenNthCalledWith(2, "public_live_schedule_candidates");
+  });
+
+  it("fails closed for malformed event metadata without exposing backend details", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: [{ ...payload, event_slug: "bad", event_title: "TOS", event_sport: "squash", event_starts_at: "bad", event_ends_at: "bad" }], error: null });
+    const repository = new PublicScheduleRepository(
+      { url: "https://test.example.test", publishableKey: "sb_publishable_test" },
+      () => ({ rpc } as unknown as SupabaseClient),
+    );
+    await expect(repository.eventPublishedSchedule("bad")).rejects.toEqual(new InvalidPublicScheduleError());
+  });
+
+  it.each([
+    { slug: "https://evil.test", title: "TOS", sport: "padel", starts_at: "2026-08-22T18:00:00Z", ends_at: "2026-08-22T20:00:00Z" },
+    { slug: "padel-live", title: "TOS\nprivé", sport: "padel", starts_at: "2026-08-22T18:00:00Z", ends_at: "2026-08-22T20:00:00Z" },
+    { slug: "padel-live", title: "TOS", sport: "padel", starts_at: "2026-08-22T20:00:00Z", ends_at: "2026-08-22T18:00:00Z" },
+  ])("weigert onveilige live-resolvermetadata fail-closed", async (candidate) => {
+    const rpc = vi.fn().mockResolvedValue({ data: [candidate], error: null });
+    const repository = new PublicScheduleRepository(
+      { url: "https://test.example.test", publishableKey: "sb_publishable_test" },
+      () => ({ rpc } as unknown as SupabaseClient),
+    );
+    await expect(repository.liveCandidates()).rejects.toEqual(new InvalidPublicScheduleError());
+  });
 });

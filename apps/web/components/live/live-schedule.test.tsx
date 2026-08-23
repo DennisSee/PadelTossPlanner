@@ -9,6 +9,7 @@ import { LiveSchedule } from "./live-schedule";
 function schedule(participants = ["Zoë", "Anna"]): PublicSchedule {
   return {
     id: "schedule-1",
+    eventSlug: "schedule-event",
     eventDate: "2026-08-21",
     createdByName: "Planner",
     startTime: "20:00",
@@ -91,7 +92,7 @@ describe("live schedule UI", () => {
     expect(select).toHaveValue("Zoë");
     expect(screen.getAllByText("Deze ronde speel je niet.").length).toBeGreaterThan(0);
     expect(document.querySelectorAll('[data-selected-player="true"]').length).toBeGreaterThan(0);
-    expect(window.localStorage.getItem("tc-zuid-tos/preferred-player")).toBe("Zoë");
+    expect(window.localStorage.getItem("tc-zuid-tos/preferred-player:schedule-event")).toBe("Zoë");
   });
 
   it("highlights an exact selected player in both teams without partial matches", async () => {
@@ -114,7 +115,7 @@ describe("live schedule UI", () => {
   });
 
   it("restores canonical casing and highlights case-insensitively", async () => {
-    window.localStorage.setItem("tc-zuid-tos/preferred-player", "zoë");
+    window.localStorage.setItem("tc-zuid-tos/preferred-player:schedule-event", "zoë");
     render(<LiveSchedule schedule={schedule()} initialNowIso="2026-08-21T17:55:00.000Z" />);
     await waitFor(() => expect(screen.getByLabelText("Kies je naam")).toHaveValue("Zoë"));
     expect(document.querySelectorAll('[data-selected-player="true"]').length).toBeGreaterThan(0);
@@ -168,14 +169,14 @@ describe("live schedule UI", () => {
   });
 
   it("restores a valid preference and rejects an obsolete stored player", async () => {
-    window.localStorage.setItem("tc-zuid-tos/preferred-player", "zoë");
+    window.localStorage.setItem("tc-zuid-tos/preferred-player:schedule-event", "zoë");
     const { unmount } = render(
       <LiveSchedule schedule={schedule()} initialNowIso="2026-08-21T17:55:00.000Z" />,
     );
     await waitFor(() => expect(screen.getByLabelText("Kies je naam")).toHaveValue("Zoë"));
     unmount();
 
-    window.localStorage.setItem("tc-zuid-tos/preferred-player", "Oude naam");
+    window.localStorage.setItem("tc-zuid-tos/preferred-player:schedule-event", "Oude naam");
     render(<LiveSchedule schedule={schedule()} initialNowIso="2026-08-21T17:55:00.000Z" />);
     await waitFor(() => expect(screen.getByLabelText("Kies je naam")).toHaveValue("Iedereen"));
   });
@@ -184,7 +185,7 @@ describe("live schedule UI", () => {
     "falls back safely for a stored preference of %j",
     async (stored) => {
       if (stored) {
-        window.localStorage.setItem("tc-zuid-tos/preferred-player", stored);
+        window.localStorage.setItem("tc-zuid-tos/preferred-player:schedule-event", stored);
       }
       render(<LiveSchedule schedule={schedule()} initialNowIso="2026-08-21T17:55:00.000Z" />);
       await waitFor(() => expect(screen.getByLabelText("Kies je naam")).toHaveValue("Iedereen"));
@@ -193,12 +194,23 @@ describe("live schedule UI", () => {
 
   it("responds to a preference storage event from another tab", async () => {
     render(<LiveSchedule schedule={schedule()} initialNowIso="2026-08-21T17:55:00.000Z" />);
-    window.localStorage.setItem("tc-zuid-tos/preferred-player", "Zoë");
+    window.localStorage.setItem("tc-zuid-tos/preferred-player:schedule-event", "Zoë");
     act(() => window.dispatchEvent(new StorageEvent("storage", {
-      key: "tc-zuid-tos/preferred-player",
+      key: "tc-zuid-tos/preferred-player:schedule-event",
       newValue: "Zoë",
     })));
     await waitFor(() => expect(screen.getByLabelText("Kies je naam")).toHaveValue("Zoë"));
+  });
+
+  it("scopes the preferred player independently per event slug", async () => {
+    const first = { ...schedule(), eventSlug: "event-a" };
+    const second = { ...schedule(), eventSlug: "event-b" };
+    const { rerender } = render(<LiveSchedule schedule={first} initialNowIso="2026-08-21T18:05:00.000Z" />);
+    await userEvent.selectOptions(screen.getByLabelText("Kies je naam"), "Zoë");
+    expect(window.localStorage.getItem("tc-zuid-tos/preferred-player:event-a")).toBe("Zoë");
+    rerender(<LiveSchedule schedule={second} initialNowIso="2026-08-21T18:05:00.000Z" />);
+    await waitFor(() => expect(screen.getByLabelText("Kies je naam")).toHaveValue("Iedereen"));
+    expect(window.localStorage.getItem("tc-zuid-tos/preferred-player:event-b")).toBeNull();
   });
 
   it("keeps rendering with Iedereen when localStorage reads throw", () => {

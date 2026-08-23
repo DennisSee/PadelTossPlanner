@@ -17,12 +17,14 @@ const event: TosEvent = Object.freeze({
   signupDeadline: null, status: "closed",
   maxParticipants: 24,
 });
+const KREMER_ID = "c9000000-0000-4000-8000-000000000001";
+const ZGA_ID = "c9000000-0000-4000-8000-000000000002";
 
 function storedRow(overrides: Record<string, unknown> = {}) {
   return {
     event_id: event.id,
     players: [],
-    selected_courts: ["Kremer Baan", "ZGA/F&F Baan"],
+    selected_courts: [KREMER_ID, ZGA_ID],
     match_minutes: 20, rest_minutes: 0, search_profile: "Normaal",
     allow_repeat_partners: false, level_mix: 50, team_difference_tolerance: 0.5,
     revision: 1, updated_by: null, updated_by_name: null,
@@ -34,7 +36,7 @@ function storedRow(overrides: Record<string, unknown> = {}) {
 describe("event-scoped planner drafts", () => {
   it("uses the explicit missing-draft defaults without writing", () => {
     expect(emptyPlannerDraft(event)).toMatchObject({
-      players: [], selectedCourts: ["Kremer Baan", "ZGA/F&F Baan"], matchMinutes: 20,
+      players: [], selectedCourts: [], matchMinutes: 20,
       restMinutes: 0, searchProfile: "Normaal", revision: 0,
     });
   });
@@ -77,7 +79,7 @@ describe("event-scoped planner drafts", () => {
       { rowId: draft.players[0].rowId, name: "Dennis S.", ranking: 4, included: true, availableFrom: "20:07", availableUntil: "22:00" },
       { rowId: "", name: "Handmatig", ranking: 3, included: true, availableFrom: "20:00", availableUntil: "22:00" },
     ], {
-      selectedCourts: ["Kremer Baan"], matchMinutes: 20, restMinutes: 0,
+      selectedCourts: [KREMER_ID], matchMinutes: 20, restMinutes: 0,
       searchProfile: "Snel", allowRepeatPartners: false, levelMix: 40, teamDifferenceTolerance: 0.5,
     }, () => "66666666-6666-4666-8666-666666666666");
     expect(write.players[0].memberId).toBe("33333333-3333-4333-8333-333333333333");

@@ -87,7 +87,8 @@ describe("WEB-2 routes", () => {
   it("keeps live server-rendered through the server-only repository", () => {
     const source = readFileSync(resolve(process.cwd(), "app/live/page.tsx"), "utf8");
     expect(source).toContain('dynamic = "force-dynamic"');
-    expect(source).toContain("loadLatestPublicSchedule");
+    expect(source).toContain("loadPublicLiveCandidates");
+    expect(source).toContain("resolveLiveCandidates");
     expect(source).not.toContain("NEXT_PUBLIC_");
   });
 

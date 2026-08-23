@@ -13,7 +13,7 @@ it("uses only the two event-scoped RPCs and returns explicit defaults for no row
   const draft = await repository.load(event);
   expect(draft).toEqual(emptyPlannerDraft(event));
   await expect(repository.save(event, 0, {
-    players: [], selectedCourts: ["Kremer Baan"], matchMinutes: 20, restMinutes: 0,
+    players: [], selectedCourts: ["c9000000-0000-4000-8000-000000000001"], matchMinutes: 20, restMinutes: 0,
     searchProfile: "Normaal", allowRepeatPartners: false, levelMix: 50, teamDifferenceTolerance: 0.5,
   })).resolves.toBe(1);
   expect(rpc.mock.calls[0]).toEqual(["staff_event_planner_draft", { p_event_id: event.id }]);
@@ -24,7 +24,7 @@ it("uses only the two event-scoped RPCs and returns explicit defaults for no row
 it("maps only SQLSTATE 40001 to the finite conflict", async () => {
   const rpc = vi.fn().mockResolvedValue({ data: null, error: { code: "40001", message: "private detail" } });
   await expect(new PlannerDraftRepository({ rpc } as unknown as SupabaseClient).save(event, 1, {
-    players: [], selectedCourts: ["Kremer Baan"], matchMinutes: 20, restMinutes: 0,
+    players: [], selectedCourts: ["c9000000-0000-4000-8000-000000000001"], matchMinutes: 20, restMinutes: 0,
     searchProfile: "Normaal", allowRepeatPartners: false, levelMix: 50, teamDifferenceTolerance: 0.5,
   })).rejects.toEqual(new PlannerDraftConflictError());
 });

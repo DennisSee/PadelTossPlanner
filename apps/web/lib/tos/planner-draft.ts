@@ -1,5 +1,4 @@
 import {
-  PLANNER_COURTS,
   PLANNER_SEARCH_PROFILES,
   type EditablePlannerPlayer,
   type PlannerCourt,
@@ -100,11 +99,10 @@ function rows(value: unknown): PlannerPlayer[] {
 }
 
 function courts(value: unknown): PlannerCourt[] {
-  if (!Array.isArray(value) || value.length < 1 || value.length > PLANNER_COURTS.length) {
+  if (!Array.isArray(value) || value.length > 12) {
     throw new InvalidPlannerDraftError();
   }
-  const valid = new Set<string>(PLANNER_COURTS);
-  if (value.some((entry) => typeof entry !== "string" || !valid.has(entry)) || new Set(value).size !== value.length) {
+  if (value.some((entry) => typeof entry !== "string" || !isUuid(entry)) || new Set(value).size !== value.length) {
     throw new InvalidPlannerDraftError();
   }
   return value as PlannerCourt[];
@@ -125,7 +123,7 @@ export function emptyPlannerDraft(event: TosEvent): PlannerDraft {
   return Object.freeze({
     eventId: event.id,
     players: [],
-    selectedCourts: PLANNER_COURTS.slice(0, 2),
+    selectedCourts: [],
     matchMinutes: 20,
     restMinutes: 0,
     searchProfile: "Normaal",
@@ -286,7 +284,6 @@ export function importRegistrations(
   registrations: readonly StaffPlannerInput[],
   createRowId: () => string,
 ): RegistrationImport {
-  if (event.sport !== "padel") throw new InvalidPlannerDraftError();
   const players = [...draft.players];
   const linked = new Map<string, number>();
   const names = new Map<string, PlannerPlayer>();

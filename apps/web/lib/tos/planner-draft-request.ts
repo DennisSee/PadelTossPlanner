@@ -1,6 +1,7 @@
 import type { EditablePlannerPlayer, PlannerCourt, PlannerDraftWrite, PlannerSearchProfile } from "./types";
-import { PLANNER_COURTS, PLANNER_SEARCH_PROFILES } from "./types";
+import { PLANNER_SEARCH_PROFILES } from "./types";
 import { InvalidPlannerDraftError } from "./planner-draft";
+import { isUuid } from "./parser";
 import { isTosEventSlug } from "./slug";
 
 const ALLOWED_SAVE_FIELDS = new Set([
@@ -68,8 +69,8 @@ export function parsePlannerDraftSaveRequest(form: FormData): PlannerDraftSaveRe
   const selectedCourtsText = oneText(form, "selected_courts", 500);
   let selectedCourts: unknown;
   try { selectedCourts = JSON.parse(selectedCourtsText); } catch { throw new InvalidPlannerDraftError(); }
-  if (!Array.isArray(selectedCourts) || selectedCourts.length < 1 || selectedCourts.length > 4 ||
-      selectedCourts.some((court) => typeof court !== "string" || !PLANNER_COURTS.includes(court as never)) ||
+  if (!Array.isArray(selectedCourts) || selectedCourts.length > 12 ||
+      selectedCourts.some((court) => typeof court !== "string" || !isUuid(court)) ||
       new Set(selectedCourts).size !== selectedCourts.length) throw new InvalidPlannerDraftError();
   const searchProfile = oneText(form, "search_profile", 20);
   if (!PLANNER_SEARCH_PROFILES.includes(searchProfile as never)) throw new InvalidPlannerDraftError();

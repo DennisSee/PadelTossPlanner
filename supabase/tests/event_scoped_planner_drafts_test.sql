@@ -74,35 +74,38 @@ values
     ('b2200000-0000-4000-8000-000000000003', 'draft-tennis', 'Tennis', 'tennis', '2099-08-23 18:00+00', '2099-08-23 20:00+00', 'closed', 'b2100000-0000-4000-8000-000000000003'),
     ('b2200000-0000-4000-8000-000000000004', 'draft-cancelled', 'Geannuleerd', 'padel', '2099-08-24 18:00+00', '2099-08-24 20:00+00', 'cancelled', 'b2100000-0000-4000-8000-000000000003');
 
+insert into public.club_courts (id,sport,name,active,sort_order)
+values ('c9000000-0000-4000-8000-000000000005','tennis','Tennisbaan 1',true,10);
+
 set local role authenticated;
 select set_config('request.jwt.claim.sub', 'b2100000-0000-4000-8000-000000000001', true);
 select is((select count(*) from public.staff_event_planner_draft('b2200000-0000-4000-8000-000000000001')), 0::bigint, 'participant leest geen staffdraft');
 select throws_ok(
-    $$select public.staff_save_event_planner_draft('b2200000-0000-4000-8000-000000000001',0,'[]','["Kremer Baan"]',20,0,'Normaal',false,50,0.5)$$,
+    $$select public.staff_save_event_planner_draft('b2200000-0000-4000-8000-000000000001',0,'[]','["c9000000-0000-4000-8000-000000000001"]',20,0,'Normaal',false,50,0.5)$$,
     '42501', 'Planner draft access denied.', 'participant kan niet opslaan'
 );
 
 select set_config('request.jwt.claim.sub', 'b2100000-0000-4000-8000-000000000004', true);
 select throws_ok(
-    $$select public.staff_save_event_planner_draft('b2200000-0000-4000-8000-000000000001',0,'[]','["Kremer Baan"]',20,0,'Normaal',false,50,0.5)$$,
+    $$select public.staff_save_event_planner_draft('b2200000-0000-4000-8000-000000000001',0,'[]','["c9000000-0000-4000-8000-000000000001"]',20,0,'Normaal',false,50,0.5)$$,
     '42501', 'Planner draft access denied.', 'inactieve staff kan niet opslaan'
 );
 
 select set_config('request.jwt.claim.sub', 'b2100000-0000-4000-8000-000000000002', true);
 select is((select count(*) from public.staff_event_planner_draft('b2200000-0000-4000-8000-000000000001')), 0::bigint, 'ontbrekende draft retourneert nul rijen');
-select throws_ok(
-    $$select public.staff_save_event_planner_draft('b2200000-0000-4000-8000-000000000003',0,'[]','["Kremer Baan"]',20,0,'Normaal',false,50,0.5)$$,
-    '42501', 'Planner draft event unavailable.', 'tennisevent krijgt geen padeldraft'
+select is(
+    public.staff_save_event_planner_draft('b2200000-0000-4000-8000-000000000003',0,'[]','["c9000000-0000-4000-8000-000000000005"]',20,0,'Normaal',false,50,0.5),
+    1::bigint, 'tennisevent gebruikt een actieve tennisbaan'
 );
 select throws_ok(
-    $$select public.staff_save_event_planner_draft('b2200000-0000-4000-8000-000000000004',0,'[]','["Kremer Baan"]',20,0,'Normaal',false,50,0.5)$$,
+    $$select public.staff_save_event_planner_draft('b2200000-0000-4000-8000-000000000004',0,'[]','["c9000000-0000-4000-8000-000000000001"]',20,0,'Normaal',false,50,0.5)$$,
     '42501', 'Planner draft event unavailable.', 'geannuleerd event is niet wijzigbaar'
 );
 select is(
     public.staff_save_event_planner_draft(
         'b2200000-0000-4000-8000-000000000001', 0,
         '[{"row_id":"b2300000-0000-4000-8000-000000000001","name":"Speler Een","ranking":4,"included":true,"available_from":"20:00","available_until":"22:00"}]',
-        '["Kremer Baan","ZGA/F&F Baan"]', 20, 0, 'Normaal', false, 50, 0.5
+        '["c9000000-0000-4000-8000-000000000001","c9000000-0000-4000-8000-000000000002"]', 20, 0, 'Normaal', false, 50, 0.5
     ),
     1::bigint,
     'eerste save maakt revision 1'
@@ -117,45 +120,45 @@ set local role authenticated;
 select set_config('request.jwt.claim.sub', 'b2100000-0000-4000-8000-000000000002', true);
 select is((select revision from public.staff_event_planner_draft('b2200000-0000-4000-8000-000000000001')), 1::bigint, 'staff leest event-scoped revision');
 select throws_ok(
-    $$select public.staff_save_event_planner_draft('b2200000-0000-4000-8000-000000000001',0,'[]','["Kremer Baan"]',20,0,'Normaal',false,50,0.5)$$,
+    $$select public.staff_save_event_planner_draft('b2200000-0000-4000-8000-000000000001',0,'[]','["c9000000-0000-4000-8000-000000000001"]',20,0,'Normaal',false,50,0.5)$$,
     '40001', 'Planner draft changed.', 'stale create faalt met conflict'
 );
 select is(
     public.staff_save_event_planner_draft(
         'b2200000-0000-4000-8000-000000000001', 1,
         '[{"row_id":"b2300000-0000-4000-8000-000000000001","name":"Speler Een","ranking":4,"included":true,"available_from":"20:07","available_until":"22:00"}]',
-        '["Kremer Baan"]', 25, 5, 'Uitgebreid', true, 70, 1.0
+        '["c9000000-0000-4000-8000-000000000001"]', 25, 5, 'Uitgebreid', true, 70, 1.0
     ),
     2::bigint,
     'exacte revision wordt atomair verhoogd'
 );
 select throws_ok(
-    $$select public.staff_save_event_planner_draft('b2200000-0000-4000-8000-000000000001',2,'[{"name":"Onvolledig"}]','["Kremer Baan"]',20,0,'Normaal',false,50,0.5)$$,
+    $$select public.staff_save_event_planner_draft('b2200000-0000-4000-8000-000000000001',2,'[{"name":"Onvolledig"}]','["c9000000-0000-4000-8000-000000000001"]',20,0,'Normaal',false,50,0.5)$$,
     '22023', 'Invalid planner players.', 'malformed player-JSON wordt geweigerd'
 );
 select throws_ok(
-    $$select public.staff_save_event_planner_draft('b2200000-0000-4000-8000-000000000001',2,'[{"row_id":"b2300000-0000-4000-8000-000000000002","name":"Decimaal","ranking":4.5,"included":true,"available_from":null,"available_until":null}]','["Kremer Baan"]',20,0,'Normaal',false,50,0.5)$$,
+    $$select public.staff_save_event_planner_draft('b2200000-0000-4000-8000-000000000001',2,'[{"row_id":"b2300000-0000-4000-8000-000000000002","name":"Decimaal","ranking":4.5,"included":true,"available_from":null,"available_until":null}]','["c9000000-0000-4000-8000-000000000001"]',20,0,'Normaal',false,50,0.5)$$,
     '22023', 'Invalid planner players.', 'ranking moet een geheel niveau 1 tot en met 5 zijn'
 );
 select is(
     public.staff_save_event_planner_draft(
         'b2200000-0000-4000-8000-000000000001', 2,
         '[{"row_id":"b2300000-0000-4000-8000-000000000001","name":"Speler Een","ranking":4,"included":true,"available_from":null,"available_until":null,"member_id":null,"user_id":null,"registration_id":null,"registration_updated_at":null,"source_event_id":null}]',
-        '["Kremer Baan"]', 20, 0, 'Normaal', false, 50, 0.5
+        '["c9000000-0000-4000-8000-000000000001"]', 20, 0, 'Normaal', false, 50, 0.5
     ),
     3::bigint,
     'null availability en optionele identityvelden bewaren het contract'
 );
 select throws_ok(
-    $$select public.staff_save_event_planner_draft('b2200000-0000-4000-8000-000000000001',3,'[{"row_id":"b2300000-0000-4000-8000-000000000001","name":"Speler Een","ranking":4,"included":true,"available_from":"20:00","available_until":"22:00","registration_updated_at":"2026-08-21Tgeen-tijdstip"}]','["Kremer Baan"]',20,0,'Normaal',false,50,0.5)$$,
+    $$select public.staff_save_event_planner_draft('b2200000-0000-4000-8000-000000000001',3,'[{"row_id":"b2300000-0000-4000-8000-000000000001","name":"Speler Een","ranking":4,"included":true,"available_from":"20:00","available_until":"22:00","registration_updated_at":"2026-08-21Tgeen-tijdstip"}]','["c9000000-0000-4000-8000-000000000001"]',20,0,'Normaal',false,50,0.5)$$,
     '22023', 'Invalid planner players.', 'ongeldige registratietimestamp wordt geweigerd'
 );
 select throws_ok(
-    $$select public.staff_save_event_planner_draft('b2200000-0000-4000-8000-000000000001',2,'[]','["Onbekende Baan"]',20,0,'Normaal',false,50,0.5)$$,
+    $$select public.staff_save_event_planner_draft('b2200000-0000-4000-8000-000000000001',2,'[]','["c9000000-0000-4000-8000-000000000099"]',20,0,'Normaal',false,50,0.5)$$,
     '22023', 'Invalid planner courts.', 'onbekende baan wordt geweigerd'
 );
 select throws_ok(
-    $$select public.staff_save_event_planner_draft('b2200000-0000-4000-8000-000000000001',2,'[]','["Kremer Baan"]',17,0,'Normaal',false,50,0.5)$$,
+    $$select public.staff_save_event_planner_draft('b2200000-0000-4000-8000-000000000001',2,'[]','["c9000000-0000-4000-8000-000000000001"]',17,0,'Normaal',false,50,0.5)$$,
     '22023', 'Invalid planner settings.', 'ongeldige instellingen worden geweigerd'
 );
 
@@ -163,7 +166,7 @@ select set_config('request.jwt.claim.sub', 'b2100000-0000-4000-8000-000000000003
 select is(
     public.staff_save_event_planner_draft(
         'b2200000-0000-4000-8000-000000000002', 0, '[]',
-        '["Kremer Baan"]', 20, 0, 'Snel', false, 25, 0.25
+        '["c9000000-0000-4000-8000-000000000001"]', 20, 0, 'Snel', false, 25, 0.25
     ),
     1::bigint,
     'admin zonder membership kan eigen eventdraft opslaan'

@@ -16,6 +16,8 @@ const listSchedules = vi.hoisted(() => vi.fn());
 const scheduleDetail = vi.hoisted(() => vi.fn());
 const draftConstructor = vi.hoisted(() => vi.fn());
 const scheduleConstructor = vi.hoisted(() => vi.fn());
+const courtConstructor = vi.hoisted(() => vi.fn());
+const listCourts = vi.hoisted(() => vi.fn());
 
 vi.mock("next/navigation", () => ({ notFound }));
 vi.mock("../../../../lib/supabase/server", () => ({ createServerSupabaseClient }));
@@ -43,6 +45,12 @@ vi.mock("../../../../lib/tos/schedule-repository", () => ({
     constructor(client: unknown) { scheduleConstructor(client); }
     list = listSchedules;
     detail = scheduleDetail;
+  },
+}));
+vi.mock("../../../../lib/tos/court-repository", () => ({
+  CourtRepository: class {
+    constructor(client: unknown) { courtConstructor(client); }
+    list = listCourts;
   },
 }));
 
@@ -73,8 +81,9 @@ describe("staff participant detail page", () => {
     requirePlannerAccount.mockResolvedValue(planner);
     eventBySlug.mockResolvedValue(event);
     plannerInputForEvent.mockResolvedValue([]);
+    listCourts.mockResolvedValue([{ id: "c9000000-0000-4000-8000-000000000001", sport: "padel", name: "Kremer Baan", active: true, sortOrder: 10 }]);
     loadDraft.mockResolvedValue({
-      eventId: event.id, players: [], selectedCourts: ["Kremer Baan", "ZGA/F&F Baan"],
+      eventId: event.id, players: [], selectedCourts: ["c9000000-0000-4000-8000-000000000001"],
       matchMinutes: 20, restMinutes: 0, searchProfile: "Normaal", allowRepeatPartners: false,
       levelMix: 50, teamDifferenceTolerance: 0.5, revision: 0,
       updatedBy: null, updatedByName: null, updatedAt: null, createdAt: null,
@@ -92,6 +101,7 @@ describe("staff participant detail page", () => {
     expect(eventBySlug).toHaveBeenCalledWith(event.slug);
     expect(plannerInputForEvent).toHaveBeenCalledWith(event.id);
     expect(draftConstructor).toHaveBeenCalledWith(client);
+    expect(courtConstructor).toHaveBeenCalledWith(client);
     expect(scheduleConstructor).toHaveBeenCalledWith(client);
     expect(loadDraft).toHaveBeenCalledWith(event);
     expect(listSchedules).toHaveBeenCalledWith(event.id);
@@ -136,5 +146,23 @@ describe("staff participant detail page", () => {
     expect(screen.getByRole("heading", { name: event.title })).toBeVisible();
     expect(screen.getByRole("heading", { name: "Deelnemers zijn tijdelijk niet beschikbaar" })).toBeVisible();
     expect(screen.queryByText("private database detail")).not.toBeInTheDocument();
+  });
+
+  it("hides inactive new choices but keeps an inactive court already stored in the draft", async () => {
+    listCourts.mockResolvedValue([
+      { id: "c9000000-0000-4000-8000-000000000001", sport: "padel", name: "Kremer Baan", active: true, sortOrder: 10 },
+      { id: "c9000000-0000-4000-8000-000000000002", sport: "padel", name: "Oude Baan", active: false, sortOrder: 20 },
+      { id: "c9000000-0000-4000-8000-000000000003", sport: "padel", name: "Niet gekozen inactief", active: false, sortOrder: 30 },
+    ]);
+    loadDraft.mockResolvedValueOnce({
+      eventId: event.id, players: [], selectedCourts: ["c9000000-0000-4000-8000-000000000002"],
+      matchMinutes: 20, restMinutes: 0, searchProfile: "Normaal", allowRepeatPartners: false,
+      levelMix: 50, teamDifferenceTolerance: 0.5, revision: 1,
+      updatedBy: null, updatedByName: null, updatedAt: null, createdAt: null,
+    });
+    render(await TosEventParticipantsPage({ params: Promise.resolve({ slug: event.slug }) }));
+    expect(screen.getByLabelText("Oude Baan — niet meer actief")).toBeChecked();
+    expect(screen.queryByLabelText("Niet gekozen inactief — niet meer actief")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Schema genereren" })).toBeDisabled();
   });
 });

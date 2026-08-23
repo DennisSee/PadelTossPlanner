@@ -157,7 +157,7 @@ test("Google returnroutes hergebruiken participant- en staffcapabilities", async
   await configureGoogle(request, testEmail("google-live"));
   await page.goto("/login?next=/live");
   await startGoogle(page);
-  await expect(page).toHaveURL(/\/live$/u);
+  await expect(page).toHaveURL(/\/live\/live-schema$/u);
 });
 
 test("Google callback en returninput falen zonder providerdetails veilig gesloten", async ({

@@ -48,13 +48,16 @@ def test_generate_supports_midnight_and_minute_precision() -> None:
     assert response.status_code == 200
 
 
-def test_generate_rejects_unknown_fields_courts_and_duplicate_names() -> None:
+def test_generate_accepts_server_resolved_courts_and_rejects_unsafe_values() -> None:
     with TestClient(app) as client:
         extra = payload() | {"event_id": "private"}
         assert client.post("/generate", json=extra).json() == {"error": "invalid-input"}
-        unknown = payload()
-        unknown["courts"] = ["Onbekende baan"]
-        assert client.post("/generate", json=unknown).status_code == 422
+        tennis = payload()
+        tennis["courts"] = ["Tennisbaan Noord", "Tennisbaan Zuid"]
+        assert client.post("/generate", json=tennis).status_code == 200
+        unsafe = payload()
+        unsafe["courts"] = ["Tennisbaan\nNoord"]
+        assert client.post("/generate", json=unsafe).status_code == 422
         duplicate = payload()
         duplicate["players"][1]["name"] = "speler 1"
         assert client.post("/generate", json=duplicate).status_code == 422

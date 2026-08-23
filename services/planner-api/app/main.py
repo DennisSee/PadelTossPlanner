@@ -17,7 +17,6 @@ app = FastAPI(
     openapi_url=None,
 )
 
-COURTS = {"Kremer Baan", "ZGA/F&F Baan", "PlaySeat Baan", "Seppworks/Bax Baan"}
 SEARCH_PROFILES = {
     "Snel": (4, 8, 45),
     "Normaal": (8, 12, 70),
@@ -43,7 +42,7 @@ class GeneratePlayer(BaseModel):
 class GenerateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     players: Annotated[list[GeneratePlayer], Field(min_length=4, max_length=160)]
-    courts: Annotated[list[str], Field(min_length=1, max_length=4)]
+    courts: Annotated[list[str], Field(min_length=1, max_length=12)]
     start_time: Annotated[str, Field(pattern=r"^(?:[01]\d|2[0-3]):[0-5]\d$")]
     end_time: Annotated[str, Field(pattern=r"^(?:[01]\d|2[0-3]):[0-5]\d$")]
     match_minutes: Literal[15, 20, 25, 30]
@@ -56,7 +55,11 @@ class GenerateRequest(BaseModel):
 
     @model_validator(mode="after")
     def validate_collections(self) -> "GenerateRequest":
-        if len(set(self.courts)) != len(self.courts) or any(court not in COURTS for court in self.courts):
+        if len(set(self.courts)) != len(self.courts) or any(
+            not court.strip() or len(court.strip()) > 80 or court != court.strip()
+            or any(ord(character) < 32 or ord(character) == 127 for character in court)
+            for court in self.courts
+        ):
             raise ValueError("invalid courts")
         names = [player.name.casefold() for player in self.players]
         if len(set(names)) != len(names):

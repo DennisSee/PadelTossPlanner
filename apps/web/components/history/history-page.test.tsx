@@ -39,7 +39,9 @@ describe("participant history UI", () => {
 
   it("shows calm empty states without inventing history or clubmates", () => {
     render(<HistoryPage events={[]} years={[]} filters={{ year: null, sport: null, query: "" }} summary={{ evenings: 0, matches: 0, clubmates: 0, mostPlayed: null }} clubmates={[]} />);
-    expect(screen.getByText("Nog geen officiële TOS-historie gevonden met deze filters.")).toBeVisible();
-    expect(screen.getByText("Nog geen clubgenoten in je officiële historie.")).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Nog geen TOS-historie" })).toBeVisible();
+    expect(screen.getByRole("link", { name: "Bekijk komende TOS-avonden" })).toHaveAttribute("href", "/tos");
+    expect(screen.queryByRole("form")).not.toBeInTheDocument();
+    expect(screen.queryByText("0", { exact: true })).not.toBeInTheDocument();
   });
 });

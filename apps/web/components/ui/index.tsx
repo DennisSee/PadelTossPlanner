@@ -125,11 +125,20 @@ export function LinkButton({ href, children }: { href: string; children: ReactNo
   );
 }
 
-export function SecondaryLinkButton({ href, children }: { href: string; children: ReactNode }) {
+export function SecondaryLinkButton({
+  href,
+  children,
+  direction = "forward",
+}: {
+  href: string;
+  children: ReactNode;
+  direction?: "back" | "forward";
+}) {
   return (
     <Link className={styles.secondaryLinkButton} href={href}>
+      {direction === "back" ? <span className={styles.buttonArrow} aria-hidden="true">←</span> : null}
       <span>{children}</span>
-      <span className={styles.buttonArrow} aria-hidden="true">→</span>
+      {direction === "forward" ? <span className={styles.buttonArrow} aria-hidden="true">→</span> : null}
     </Link>
   );
 }

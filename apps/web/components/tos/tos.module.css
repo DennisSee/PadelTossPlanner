@@ -757,13 +757,13 @@
 
   .filters {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.7rem var(--space-3);
+    padding: 0.8rem;
   }
 
   .filters > label,
   .filters > strong,
-  .sportFilter,
-  .resultCount,
-  .filters > a {
+  .sportFilter {
     grid-column: 1 / -1;
   }
 
@@ -771,7 +771,12 @@
     display: none;
   }
 
+  .resultCount {
+    grid-column: 1;
+  }
+
   .filters > a {
+    grid-column: 2;
     justify-self: end;
   }
 

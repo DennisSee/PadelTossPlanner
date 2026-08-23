@@ -11,7 +11,7 @@ function draftForm(): FormData {
   for (const [key, value] of Object.entries({
     slug: "planner-padel", expected_revision: "1",
     players: JSON.stringify([{ rowId: "", name: "Handmatig", ranking: 3, included: true, availableFrom: "20:07", availableUntil: "22:00" }]),
-    selected_courts: JSON.stringify(["Kremer Baan"]), match_minutes: "20", rest_minutes: "0",
+    selected_courts: JSON.stringify(["c9000000-0000-4000-8000-000000000001"]), match_minutes: "20", rest_minutes: "0",
     search_profile: "Normaal", allow_repeat_partners: "false", level_mix: "50",
     team_difference_tolerance: "0.5",
   })) form.set(key, value);

@@ -34,16 +34,16 @@ import styles from "./live-schedule.module.css";
 import { TeamNames } from "./team-names";
 
 const EVERYONE = "Iedereen";
-const PLAYER_PREFERENCE_KEY = "tc-zuid-tos/preferred-player";
 const PLAYER_PREFERENCE_EVENT = "tc-zuid-tos:preferred-player";
 
-function usePlayerPreference(participants: string[]): [string, (value: string) => void] {
+function usePlayerPreference(participants: string[], eventSlug = "latest"): [string, (value: string) => void] {
+  const preferenceKey = `tc-zuid-tos/preferred-player:${eventSlug}`;
   const memoryPreference = useRef(EVERYONE);
   const storageAvailable = useRef(true);
 
   const subscribe = useCallback((notify: () => void) => {
     const notifyForPreference = (event: StorageEvent) => {
-      if (event.key === null || event.key === PLAYER_PREFERENCE_KEY) {
+      if (event.key === null || event.key === preferenceKey) {
         notify();
       }
     };
@@ -53,13 +53,13 @@ function usePlayerPreference(participants: string[]): [string, (value: string) =
       window.removeEventListener("storage", notifyForPreference);
       window.removeEventListener(PLAYER_PREFERENCE_EVENT, notify);
     };
-  }, []);
+  }, [preferenceKey]);
 
   const getSnapshot = useCallback(() => {
     let saved = memoryPreference.current;
     if (storageAvailable.current) {
       try {
-        saved = window.localStorage.getItem(PLAYER_PREFERENCE_KEY) ?? EVERYONE;
+        saved = window.localStorage.getItem(preferenceKey) ?? EVERYONE;
         memoryPreference.current = saved;
       } catch {
         storageAvailable.current = false;
@@ -68,20 +68,20 @@ function usePlayerPreference(participants: string[]): [string, (value: string) =
     return participants.find(
       (participant) => participant.toLocaleLowerCase("nl-NL") === saved.toLocaleLowerCase("nl-NL"),
     ) ?? EVERYONE;
-  }, [participants]);
+  }, [participants, preferenceKey]);
 
   const selected = useSyncExternalStore(subscribe, getSnapshot, () => EVERYONE);
   const update = useCallback((value: string) => {
     memoryPreference.current = value;
     if (storageAvailable.current) {
       try {
-        window.localStorage.setItem(PLAYER_PREFERENCE_KEY, value);
+        window.localStorage.setItem(preferenceKey, value);
       } catch {
         storageAvailable.current = false;
       }
     }
     window.dispatchEvent(new Event(PLAYER_PREFERENCE_EVENT));
-  }, []);
+  }, [preferenceKey]);
   return [selected, update];
 }
 
@@ -455,7 +455,7 @@ export function LiveSchedule({
   navigation?: NavigationModel;
 }) {
   const participants = useMemo(() => sortedParticipants(schedule.participants), [schedule.participants]);
-  const [selectedPlayer, setSelectedPlayer] = usePlayerPreference(participants);
+  const [selectedPlayer, setSelectedPlayer] = usePlayerPreference(participants, schedule.eventSlug);
   const [now, setNow] = useState(() => new Date(initialNowIso));
 
   useEffect(() => {
@@ -478,7 +478,7 @@ export function LiveSchedule({
           <CourtLines className={styles.eventLines} />
           <div className={styles.eventSummary} data-testid="event-summary">
             <p className={styles.eventEyebrow}>Wedstrijdprogramma</p>
-            <h1 className={styles.eventTitle}>Live TOS-schema</h1>
+            <h1 className={styles.eventTitle}>{schedule.eventTitle ?? "Live TOS-schema"}</h1>
             <p className={styles.eventDate}>{formatEventDate(schedule.eventDate)}</p>
             <p className={styles.eventMeta}>
               <span>{schedule.startTime}–{schedule.endTime}</span>

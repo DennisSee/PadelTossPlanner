@@ -4,12 +4,13 @@ import { useMemo, useState } from "react";
 
 import type {
   EditablePlannerPlayer,
+  ClubCourt,
   PlannerCourt,
   PlannerDraft,
   PlannerSearchProfile,
   TosEvent,
 } from "../../lib/tos/types";
-import { PLANNER_COURTS, PLANNER_SEARCH_PROFILES } from "../../lib/tos/types";
+import { PLANNER_SEARCH_PROFILES } from "../../lib/tos/types";
 import type { ImportPreviewItem } from "../../lib/tos/planner-draft";
 import type { PlannerGeneration } from "../../lib/planner-api/types";
 import { Card } from "../ui";
@@ -61,8 +62,8 @@ const DISPOSITION_LABELS: Record<ImportPreviewItem["disposition"], string> = {
   declined: "Afgemeld — overslaan",
   approval: "Goedkeuring ontbreekt",
   member: "Lid inactief",
-  "sport-profile": "Padelprofiel inactief",
-  ranking: "Padelniveau ontbreekt",
+  "sport-profile": "Sportprofiel inactief",
+  ranking: "Niveau ontbreekt",
   availability: "Beschikbaarheid ongeldig",
   "identity-conflict": "Dubbele ledenkoppeling",
   "legacy-name-conflict": "Naamconflict met handmatige rij",
@@ -84,17 +85,20 @@ export function PlannerWorkspace({
   event,
   draft,
   importPreview,
+  courts = [],
   schedules,
   selectedSchedule,
 }: {
   event: SafePlannerEvent;
   draft: SafeDraft;
   importPreview: readonly ImportPreviewItem[];
+  courts?: readonly ClubCourt[];
   schedules: readonly SafeScheduleSummary[];
   selectedSchedule: SafeScheduleDetail | null;
 }) {
   const [players, setPlayers] = useState<EditorPlayer[]>(() => draft.players.map((player) => ({ ...player, clientKey: clientKey() })));
-  const [selectedCourts, setSelectedCourts] = useState<PlannerCourt[]>([...draft.selectedCourts]);
+  const initialCourts = draft.selectedCourts.length ? draft.selectedCourts : courts.filter((court) => court.active).slice(0, 2).map((court) => court.id);
+  const [selectedCourts, setSelectedCourts] = useState<PlannerCourt[]>([...initialCourts]);
   const [allowRepeatPartners, setAllowRepeatPartners] = useState(draft.allowRepeatPartners);
   const [generation, setGeneration] = useState<PlannerGeneration | null>(null);
   const [generationError, setGenerationError] = useState<string | null>(null);
@@ -168,7 +172,7 @@ export function PlannerWorkspace({
 
       <Card className={styles.card}>
         <h2>Aanmeldingen overnemen</h2>
-        <p className={styles.muted}>Alleen geldige padelaanmeldingen worden toegevoegd of via hun stabiele ledenkoppeling bijgewerkt. Handmatige rijen blijven staan.</p>
+        <p className={styles.muted}>Alleen geldige {event.sport === "padel" ? "padel" : "tennis"}aanmeldingen worden toegevoegd of via hun stabiele ledenkoppeling bijgewerkt. Handmatige rijen blijven staan.</p>
         {importPreview.length ? (
           <ul className={styles.previewList}>
             {importPreview.map((item, index) => <li key={`${item.displayName}-${index}`}><strong>{item.displayName}</strong><span>{DISPOSITION_LABELS[item.disposition]}</span></li>)}
@@ -211,7 +215,7 @@ export function PlannerWorkspace({
         <Card className={styles.card}>
           <h2>Plannerinstellingen</h2>
           <div className={styles.courts}>
-            {PLANNER_COURTS.map((court) => <label className={styles.checkbox} key={court}><input type="checkbox" checked={selectedCourts.includes(court)} onChange={(event) => { markDirty(); setSelectedCourts((current) => event.target.checked ? [...current, court] : current.filter((entry) => entry !== court)); }} /> {court}</label>)}
+            {courts.length ? courts.map((court) => <label className={styles.checkbox} key={court.id}><input type="checkbox" disabled={!court.active && !selectedCourts.includes(court.id)} checked={selectedCourts.includes(court.id)} onChange={(event) => { markDirty(); setSelectedCourts((current) => event.target.checked ? [...current, court.id] : current.filter((entry) => entry !== court.id)); }} /> {court.name}{court.active ? "" : " — niet meer actief"}</label>) : <p className={styles.muted}>Nog geen actieve {event.sport === "padel" ? "padel" : "tennis"}banen. <a href="/beheer/banen">Banen beheren</a>.</p>}
           </div>
           <div className={styles.settings}>
             <label>Wedstrijdduur<select name="match_minutes" defaultValue={draft.matchMinutes}>{[15,20,25,30].map((value) => <option value={value} key={value}>{value} minuten</option>)}</select></label>
@@ -229,7 +233,7 @@ export function PlannerWorkspace({
       <Card className={styles.card}>
         <h2>Schema genereren</h2>
         <p className={styles.muted}>Sla wijzigingen eerst op. Iedere generatie gebruikt een nieuwe willekeurige seed.</p>
-        <button className={styles.primaryButton} type="button" disabled={draft.revision < 1 || dirty || generating} onClick={generate}>
+        <button className={styles.primaryButton} type="button" disabled={draft.revision < 1 || dirty || generating || selectedCourts.length < 1 || selectedCourts.some((id) => !courts.find((court) => court.id === id)?.active)} onClick={generate}>
           {generating ? "Schema wordt gemaakt…" : "Schema genereren"}
         </button>
         {generationError ? <p role="alert">{generationError}</p> : null}
@@ -269,7 +273,7 @@ export function PlannerWorkspace({
               <a href={`/beheer/tos/${event.slug}?schedule=${encodeURIComponent(schedule.id)}`}>Schema bekijken</a>
             </div>
             <div className={styles.scheduleActions}>
-              {schedule.isPublished ? <a href="/live">Open live schema</a> : null}
+              {schedule.isPublished ? <a href={`/live/${event.slug}`}>Open live schema</a> : null}
               {schedule.canPublish ? <form action="/api/beheer/tos/planner/schedule/publish" method="post">
                 <input type="hidden" name="slug" value={event.slug} />
                 <input type="hidden" name="schedule_id" value={schedule.id} />

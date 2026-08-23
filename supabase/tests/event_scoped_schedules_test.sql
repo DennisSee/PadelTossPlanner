@@ -89,7 +89,7 @@ select throws_ok(
  '40001','Planner draft changed.','stale draftrevision faalt');
 select throws_ok(
  $$select public.staff_save_event_schedule('c2200000-0000-4000-8000-000000000003',1,77,'[]','[]','[]','{}')$$,
- '42501','Schedule event unavailable.','tennis kan geen padelschema opslaan');
+ '40001','Planner draft changed.','tennis bereikt dezelfde eventscoped draftcontrole');
 
 create temporary table saved_ids (id uuid primary key, label text);
 grant select on table saved_ids to anon, authenticated;

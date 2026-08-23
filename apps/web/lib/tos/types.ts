@@ -111,14 +111,15 @@ export type StaffRoleWrite = Readonly<{
   role: import("../auth/account-context").AccountRole;
 }>;
 
-export const PLANNER_COURTS = [
-  "Kremer Baan",
-  "ZGA/F&F Baan",
-  "PlaySeat Baan",
-  "Seppworks/Bax Baan",
-] as const;
 export const PLANNER_SEARCH_PROFILES = ["Snel", "Normaal", "Uitgebreid"] as const;
-export type PlannerCourt = (typeof PLANNER_COURTS)[number];
+export type ClubCourt = Readonly<{
+  id: string;
+  sport: TosSport;
+  name: string;
+  active: boolean;
+  sortOrder: number;
+}>;
+export type PlannerCourt = string;
 export type PlannerSearchProfile = (typeof PLANNER_SEARCH_PROFILES)[number];
 
 export type PlannerPlayer = Readonly<{

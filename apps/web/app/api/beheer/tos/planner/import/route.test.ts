@@ -23,7 +23,7 @@ import { POST } from "./route";
 
 const BASE = "https://app.example";
 const event = { id: "11111111-1111-4111-8111-111111111111", slug: "vrijdag-padel", sport: "padel", startsAt: "2026-08-21T18:00:00Z", endsAt: "2026-08-21T20:00:00Z", status: "closed" };
-const draft = { eventId: event.id, players: [], selectedCourts: ["Kremer Baan"], matchMinutes: 20, restMinutes: 0, searchProfile: "Normaal", allowRepeatPartners: false, levelMix: 50, teamDifferenceTolerance: 0.5, revision: 0, updatedBy: null, updatedByName: null, updatedAt: null, createdAt: null };
+const draft = { eventId: event.id, players: [], selectedCourts: [], matchMinutes: 20, restMinutes: 0, searchProfile: "Normaal", allowRepeatPartners: false, levelMix: 50, teamDifferenceTolerance: 0.5, revision: 0, updatedBy: null, updatedByName: null, updatedAt: null, createdAt: null };
 
 function request(extra: Record<string, string> = {}) {
   const form = new FormData();

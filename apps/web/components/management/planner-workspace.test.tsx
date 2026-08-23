@@ -9,13 +9,14 @@ const event = Object.freeze({
   signupDeadline: null, status: "closed" as const,
   maxParticipants: 24,
 });
+const court = Object.freeze({ id: "c9000000-0000-4000-8000-000000000001", sport: "padel" as const, name: "Kremer Baan", active: true, sortOrder: 10 });
 
 const draft = Object.freeze({
   players: [Object.freeze({
     rowId: "11111111-1111-4111-8111-111111111111", name: "Ada", ranking: 4,
     included: true, availableFrom: "20:00", availableUntil: "22:00", linked: true,
   })],
-  selectedCourts: ["Kremer Baan" as const], matchMinutes: 20 as const, restMinutes: 0,
+  selectedCourts: [court.id], matchMinutes: 20 as const, restMinutes: 0,
   searchProfile: "Normaal" as const, allowRepeatPartners: false, levelMix: 50,
   teamDifferenceTolerance: 0.5, revision: 2, updatedByName: "Planner",
   updatedAt: "2026-08-21T16:00:00Z",
@@ -25,7 +26,7 @@ describe("PlannerWorkspace", () => {
   afterEach(() => vi.unstubAllGlobals());
 
   it("renders only editor-safe player data and marks unsaved edits", () => {
-    const { container } = render(<PlannerWorkspace event={event} draft={draft} importPreview={[]} schedules={[]} selectedSchedule={null} />);
+    const { container } = render(<PlannerWorkspace event={event} draft={draft} importPreview={[]} courts={[court]} schedules={[]} selectedSchedule={null} />);
     expect(screen.getByDisplayValue("Ada")).toBeVisible();
     expect(container.innerHTML).not.toMatch(/member_id|user_id|registration_id|source_event_id/u);
     const generate = screen.getByRole("button", { name: "Schema genereren" });
@@ -42,7 +43,7 @@ describe("PlannerWorkspace", () => {
       statistics: [], diagnostics: { rounds: 1 },
     }), { status: 200, headers: { "Content-Type": "application/json" } }));
     vi.stubGlobal("fetch", fetcher);
-    render(<PlannerWorkspace event={event} draft={draft} importPreview={[]} schedules={[]} selectedSchedule={null} />);
+    render(<PlannerWorkspace event={event} draft={draft} importPreview={[]} courts={[court]} schedules={[]} selectedSchedule={null} />);
     fireEvent.click(screen.getByRole("button", { name: "Schema genereren" }));
     await waitFor(() => expect(screen.getByRole("heading", { name: "Controleer het voorstel" })).toBeVisible());
     expect(screen.getByText("Plannerdiagnostiek")).toBeVisible();
@@ -60,7 +61,7 @@ describe("PlannerWorkspace", () => {
 
   it("shows event-scoped private schedule detail without identity metadata", () => {
     const { container } = render(<PlannerWorkspace
-      event={event} draft={draft} importPreview={[]}
+      event={event} draft={draft} importPreview={[]} courts={[court]}
       schedules={[{ id: "22222222-2222-4222-8222-222222222222", createdByName: "Planner", isPublished: false, generationSeed: 9, plannerDraftRevision: 2, createdAt: "2026-08-21T16:00:00Z", canPublish: true }]}
       selectedSchedule={{
         id: "22222222-2222-4222-8222-222222222222", title: event.title, eventDate: "2026-08-21",

@@ -35,7 +35,20 @@ export type PublicSchedule = {
   rows: PublicScheduleRow[];
   isPublished: true;
   createdAt: string;
+  eventSlug?: string;
+  eventTitle?: string;
+  eventSport?: "padel" | "tennis";
+  eventStartsAt?: string;
+  eventEndsAt?: string;
 };
+
+export type PublicLiveCandidate = Readonly<{
+  slug: string;
+  title: string;
+  sport: "padel" | "tennis";
+  startsAt: string;
+  endsAt: string;
+}>;
 
 export type GroupedRound = {
   roundNumber: string;

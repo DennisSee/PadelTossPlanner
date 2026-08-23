@@ -1,28 +1,26 @@
 import { LivePageState } from "../../components/live/live-page-state";
-import { LiveSchedule } from "../../components/live/live-schedule";
+import { LiveSelection } from "../../components/live/live-selection";
 import { navigationModelFromAccount } from "../../components/ui";
 import { loadOptionalAccountContext } from "../../lib/auth/session";
-import { loadLatestPublicSchedule } from "../../lib/supabase/public-schedule-repository";
+import { loadPublicLiveCandidates } from "../../lib/supabase/public-schedule-repository";
+import { resolveLiveCandidates } from "../../lib/public-schedule/live-resolver";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
 export default async function LivePage() {
   const navigation = navigationModelFromAccount(await loadOptionalAccountContext());
-  let schedule;
+  let candidates;
   try {
-    schedule = await loadLatestPublicSchedule();
+    candidates = await loadPublicLiveCandidates();
   } catch {
     return <LivePageState kind="error" navigation={navigation} />;
   }
 
-  if (!schedule) {
+  const resolution = resolveLiveCandidates(candidates, new Date());
+  if (resolution.kind === "empty") {
     return <LivePageState kind="empty" navigation={navigation} />;
   }
-  return (
-    <LiveSchedule
-      schedule={schedule}
-      initialNowIso={new Date().toISOString()}
-      navigation={navigation}
-    />
-  );
+  if (resolution.kind === "redirect") redirect(`/live/${resolution.slug}`);
+  return <LiveSelection candidates={resolution.candidates} navigation={navigation} />;
 }

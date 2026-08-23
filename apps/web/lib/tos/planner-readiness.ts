@@ -74,7 +74,7 @@ export function availabilityLabel(event: TosEvent, participant: StaffPlannerInpu
 export function readinessLabel(readiness: PlannerReadiness, sport: TosSport): string {
   const sportName = sport === "padel" ? "Padel" : "Tennis";
   const labels: Record<PlannerReadiness, string> = {
-    READY: sport === "padel" ? "Klaar voor planner" : "Gegevens compleet",
+    READY: "Klaar voor planner",
     DECLINED: "Afgemeld",
     APPROVAL_PENDING: "Goedkeuring in behandeling",
     APPROVAL_REJECTED: "Lidmaatschap niet goedgekeurd",

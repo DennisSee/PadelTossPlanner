@@ -64,6 +64,7 @@ export default async function ManagementPage({ searchParams }: PageProps) {
       ) : null}
       <div className={styles.managementLinks}>
         <SecondaryLinkButton href="/beheer/leden">Ledenbeheer</SecondaryLinkButton>
+        <SecondaryLinkButton href="/beheer/banen">Banenbeheer</SecondaryLinkButton>
       </div>
       <div className={styles.layout}>
         <CreateTosEventForm />

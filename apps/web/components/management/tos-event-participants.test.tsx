@@ -64,7 +64,7 @@ describe("staff event participant presentation", () => {
     expect(screen.getByText("PADEL")).toBeVisible();
     expect(screen.getByText(/vrijdag 21 augustus 2026 · 20:00–22:00/u)).toBeVisible();
     expect(screen.getByText(/Inschrijfdeadline: vrijdag 21 augustus 2026 · 19:00/u)).toBeVisible();
-    expect(screen.getByRole("link", { name: "← Terug naar beheer" })).toHaveAttribute("href", "/beheer");
+    expect(screen.getByRole("link", { name: "Terug naar beheer" })).toHaveAttribute("href", "/beheer");
     expect(screen.getByRole("link", { name: "Eventpagina bekijken" })).toHaveAttribute("href", "/tos/web5b1-padel");
 
     const summary = screen.getByLabelText("Deelnemerssamenvatting");
@@ -93,15 +93,14 @@ describe("staff event participant presentation", () => {
     expect(container.querySelector("input, select, textarea, button, form")).not.toBeInTheDocument();
   });
 
-  it("uses event-specific tennis ranking without claiming planner support", () => {
+  it("uses event-specific tennis ranking and reports planner readiness", () => {
     const tennisEvent = { ...padelEvent, sport: "tennis", slug: "web5b1-tennis", title: "WEB-5B1 Tennis" } as const;
     render(<TosEventParticipants event={tennisEvent} participants={[
       participant("Dubbele sporter", { ranking: 2 }),
     ]} />);
     expect(screen.getByText("Tennisniveau")).toBeVisible();
-    expect(screen.getByText("Gegevens compleet")).toBeVisible();
-    expect(screen.getByText("Tennisplanner wordt in een volgende stap toegevoegd.")).toBeVisible();
-    expect(screen.queryByText("Klaar voor planner")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Klaar voor planner")).toHaveLength(2);
+    expect(screen.getByText(/tennisplannerinput opleveren/i)).toBeVisible();
     expect(screen.queryByText("Padelniveau 4")).not.toBeInTheDocument();
   });
 

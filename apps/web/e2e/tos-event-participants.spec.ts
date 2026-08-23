@@ -80,16 +80,15 @@ test("planner without membership sees event-scoped padel readiness and preview",
   expect(widths.scroll).toBeLessThanOrEqual(widths.client + 1);
 });
 
-test("admin sees the event-specific tennis ranking without a planner preview", async ({ page, request }) => {
+test("admin sees the event-specific tennis ranking and Tennis planner setup", async ({ page, request }) => {
   await page.goto("/login?next=/beheer");
   await signIn(page, request, email("admin-no-member"));
   const card = page.getByRole("heading", { name: "WEB-5B1 Tennisavond" }).locator("xpath=ancestor::section[1]");
   await card.getByRole("link", { name: "TOS-avond beheren" }).click();
   await expect(page.getByRole("heading", { name: "WEB-5B1 Tennisavond" })).toBeVisible();
-  await expect(page.getByText("Tennisniveau")).toBeVisible();
-  await expect(page.getByText("Gegevens compleet")).toBeVisible();
-  await expect(page.getByText("Tennisplanner wordt in een volgende stap toegevoegd.")).toBeVisible();
+  await expect(page.getByText("Tennisniveau", { exact: true })).toBeVisible();
+  await expect(page.getByText("Klaar voor planner", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("Padelniveau 4")).toHaveCount(0);
-  await expect(page.getByText("Klaar voor planner")).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "Planneropzet" })).toHaveCount(0);
+  await expect(page.getByText("Tennisplanner wordt in een volgende stap toegevoegd.")).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Planneropzet" })).toBeVisible();
 });

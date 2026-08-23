@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import type { HistoryContactRequest, HistoryClubmate, HistoryEvent, SharedHistoryEvent } from "../../lib/history/types";
 import type { HistoryFilters, HistorySummary } from "../../lib/history/filters";
 import { ActionDialog, Badge, Card, SportBadge } from "../ui";
@@ -172,6 +174,13 @@ export function HistoryPage({
   summary: HistorySummary;
   clubmates: readonly ClubmateView[];
 }) {
+  if (years.length === 0 && clubmates.length === 0) {
+    return <Card className={styles.emptyHistory}>
+      <h2>Nog geen TOS-historie</h2>
+      <p>Je gespeelde TOS-avonden verschijnen hier nadat een officieel schema is gepubliceerd en de avond is afgelopen.</p>
+      <Link href="/tos">Bekijk komende TOS-avonden</Link>
+    </Card>;
+  }
   return (
     <div className={styles.stack}>
       <nav className={styles.mobileTabs} aria-label="Historieonderdelen">

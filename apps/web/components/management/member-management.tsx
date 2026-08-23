@@ -76,7 +76,7 @@ export function MemberManagement({
           <input id="member-search" name="q" maxLength={80} defaultValue={query} type="search" />
           <button type="submit">Zoeken</button>
         </form>
-        <SecondaryLinkButton href="/beheer">← Terug naar TOS-beheer</SecondaryLinkButton>
+        <SecondaryLinkButton direction="back" href="/beheer">Terug naar TOS-beheer</SecondaryLinkButton>
       </div>
       <p className={styles.resultCount}>{members.length} {members.length === 1 ? "lid" : "leden"}</p>
       {members.length ? (

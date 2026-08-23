@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-const PLAYER_PREFERENCE_KEY = "tc-zuid-tos/preferred-player";
+const PLAYER_PREFERENCE_KEY = "tc-zuid-tos/preferred-player:live-schema";
 const XSS_NAME = "<img src=x onerror=alert(1)>";
 const LONG_PLAYER_NAME = "Alexandria van den Berg-van der Meer met een bijzonder lange testnaam";
 const LONG_COURT_NAME = "Seppworks/Bax Baan met een bijzonder lange sponsornaam";
@@ -9,6 +9,7 @@ const MOCK_URL = "http://127.0.0.1:45391";
 async function openLive(page: Page) {
   const response = await page.goto("/live");
   expect(response?.status()).toBe(200);
+  await expect(page).toHaveURL(/\/live\/live-schema$/u);
   await expect(page.getByRole("heading", { level: 2, name: "Wedstrijdschema" })).toBeVisible();
 }
 
@@ -46,7 +47,7 @@ test("homepage toont de publieke stagingingang en navigeert met toetsenbord", as
   await liveLink.focus();
   await expect(liveLink).toBeFocused();
   await page.keyboard.press("Enter");
-  await expect(page).toHaveURL(/\/live$/);
+  await expect(page).toHaveURL(/\/live\/live-schema$/u);
 });
 
 test("mock weigert een wildcard of afwijkend publiek querycontract", async ({ request }) => {

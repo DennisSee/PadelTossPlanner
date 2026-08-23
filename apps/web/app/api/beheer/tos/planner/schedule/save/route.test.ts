@@ -9,6 +9,7 @@ const loadDraft = vi.hoisted(() => vi.fn());
 const generatePlannerSchedule = vi.hoisted(() => vi.fn());
 const save = vi.hoisted(() => vi.fn());
 const detail = vi.hoisted(() => vi.fn());
+const listCourts = vi.hoisted(() => vi.fn());
 
 vi.mock("../../../../../../../lib/config/public-supabase", () => ({ readAppBaseUrl }));
 vi.mock("../../../../../../../lib/supabase/server", () => ({ createServerSupabaseClient }));
@@ -23,13 +24,15 @@ vi.mock("../../../../../../../lib/tos/schedule-repository", async (original) => 
   const actual = await original<typeof import("../../../../../../../lib/tos/schedule-repository")>();
   return { ...actual, StaffScheduleRepository: class { save = save; detail = detail; } };
 });
+vi.mock("../../../../../../../lib/tos/court-repository", () => ({ CourtRepository: class { list = listCourts; } }));
 
 import { POST } from "./route";
 
 const BASE = "https://app.example";
 const scheduleId = "22222222-2222-4222-8222-222222222222";
 const event = { id: "11111111-1111-4111-8111-111111111111", slug: "vrijdag-padel", title: "Vrijdag", sport: "padel", startsAt: "2026-08-21T18:00:00Z", endsAt: "2026-08-21T20:00:00Z", signupDeadline: null, status: "closed" };
-const draft = { eventId: event.id, revision: 2, players: ["Ada", "Bea", "Cleo", "Dora"].map((name, index) => ({ rowId: `${index + 1}1111111-1111-4111-8111-111111111111`, name, ranking: index + 1, included: true, availableFrom: "20:00", availableUntil: "22:00" })), selectedCourts: ["Kremer Baan"], matchMinutes: 20, restMinutes: 0, searchProfile: "Snel", allowRepeatPartners: false, levelMix: 50, teamDifferenceTolerance: 0.5, updatedBy: null, updatedByName: null, updatedAt: null, createdAt: null };
+const courtId = "c9000000-0000-4000-8000-000000000001";
+const draft = { eventId: event.id, revision: 2, players: ["Ada", "Bea", "Cleo", "Dora"].map((name, index) => ({ rowId: `${index + 1}1111111-1111-4111-8111-111111111111`, name, ranking: index + 1, included: true, availableFrom: "20:00", availableUntil: "22:00" })), selectedCourts: [courtId], matchMinutes: 20, restMinutes: 0, searchProfile: "Snel", allowRepeatPartners: false, levelMix: 50, teamDifferenceTolerance: 0.5, updatedBy: null, updatedByName: null, updatedAt: null, createdAt: null };
 const generation = { seed: 77, schedule: [{ Ronde: 1, Tijd: "20:00 - 20:20", Baan: "Kremer Baan", "Team 1": "Ada & Bea", "Niveau T1": 2, "Team 2": "Cleo & Dora", "Niveau T2": 4, Teamverschil: 2, Rust: "Niemand", "Nog niet aanwezig": "Niemand", "Niet meer beschikbaar": "Niemand" }], statistics: [], diagnostics: {} };
 
 function request(extra: Record<string, string> = {}, origin: string | null = BASE) {
@@ -46,6 +49,7 @@ describe("private schedule save route", () => {
     loadAccountContextWithClient.mockResolvedValue({ capabilities: { canPlan: true } });
     eventBySlug.mockResolvedValue(event);
     loadDraft.mockResolvedValue(draft);
+    listCourts.mockResolvedValue([{ id: courtId, sport: "padel", name: "Kremer Baan", active: true, sortOrder: 10 }]);
     generatePlannerSchedule.mockResolvedValue(generation);
     save.mockResolvedValue(scheduleId);
     detail.mockResolvedValue({ ...generation, id: scheduleId, eventId: event.id, generationSeed: 77, plannerDraftRevision: 2, title: event.title, startTime: "20:00", endTime: "22:00", matchMinutes: 20, courts: ["Kremer Baan"] });

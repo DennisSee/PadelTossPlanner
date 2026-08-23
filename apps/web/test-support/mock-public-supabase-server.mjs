@@ -53,6 +53,13 @@ const OWN_REGISTRATION_WITH_EVENT_SELECT =
 const registrations = new Map();
 const plannerDrafts = new Map();
 const staffSchedules = new Map();
+const initialClubCourts = [
+  { id: "c9000000-0000-4000-8000-000000000001", sport: "padel", name: "Kremer Baan", active: true, sort_order: 10 },
+  { id: "c9000000-0000-4000-8000-000000000002", sport: "padel", name: "ZGA/F&F Baan", active: true, sort_order: 20 },
+  { id: "c9000000-0000-4000-8000-000000000003", sport: "padel", name: "PlaySeat Baan", active: true, sort_order: 30 },
+  { id: "c9000000-0000-4000-8000-000000000004", sport: "padel", name: "Seppworks/Bax Baan", active: true, sort_order: 40 },
+];
+const clubCourts = new Map(initialClubCourts.map((court) => [court.id, { ...court }]));
 const sportProfileOverrides = new Map();
 const historyContactRequests = new Map();
 const HISTORY_CLUBMATE_ID = "5c100000-0000-4000-8000-000000000001";
@@ -910,6 +917,8 @@ const server = createServer(async (request, response) => {
     registrations.clear();
     plannerDrafts.clear();
     staffSchedules.clear();
+    clubCourts.clear();
+    for (const court of initialClubCourts) clubCourts.set(court.id, { ...court });
     sportProfileOverrides.clear();
     historyContactRequests.clear();
     nextOAuthAttempt = null;
@@ -1470,6 +1479,47 @@ const server = createServer(async (request, response) => {
       )));
     return;
   }
+  if (request.method === "POST" && requestUrl.pathname === "/rest/v1/rpc/staff_courts") {
+    const user = bearerUser(request);
+    const body = await requestJson(request);
+    if (!user || !exactKeys(body, ["p_sport"]) || !validStaff(user)) {
+      json(response, user ? 200 : 401, user ? [] : { code: "42501", message: "court read rejected" });
+      return;
+    }
+    const sport = body.p_sport;
+    const rows = [...clubCourts.values()]
+      .filter((court) => sport === null || court.sport === sport)
+      .sort((left, right) => left.sport.localeCompare(right.sport) || left.sort_order - right.sort_order || left.name.localeCompare(right.name));
+    json(response, 200, rows);
+    return;
+  }
+  if (request.method === "POST" && requestUrl.pathname === "/rest/v1/rpc/staff_create_court") {
+    const user = bearerUser(request);
+    const body = await requestJson(request);
+    const expected = ["p_sport","p_name","p_active","p_sort_order"];
+    const name = typeof body.p_name === "string" ? body.p_name.trim() : "";
+    const valid = user && validStaff(user) && exactKeys(body, expected) && ["padel","tennis"].includes(body.p_sport) &&
+      name && name.length <= 80 && typeof body.p_active === "boolean" && Number.isInteger(body.p_sort_order) &&
+      body.p_sort_order >= 0 && body.p_sort_order <= 10000 &&
+      ![...clubCourts.values()].some((court) => court.sport === body.p_sport && court.name.toLowerCase() === name.toLowerCase());
+    if (!valid) { json(response, 403, { code: "42501", message: "court create rejected" }); return; }
+    const id = randomUUID();
+    clubCourts.set(id, { id, sport: body.p_sport, name, active: body.p_active, sort_order: body.p_sort_order });
+    json(response, 200, id); return;
+  }
+  if (request.method === "POST" && requestUrl.pathname === "/rest/v1/rpc/staff_update_court") {
+    const user = bearerUser(request);
+    const body = await requestJson(request);
+    const expected = ["p_court_id","p_name","p_active","p_sort_order"];
+    const court = clubCourts.get(body.p_court_id);
+    const name = typeof body.p_name === "string" ? body.p_name.trim() : "";
+    const valid = user && validStaff(user) && exactKeys(body, expected) && court && name && name.length <= 80 &&
+      typeof body.p_active === "boolean" && Number.isInteger(body.p_sort_order) && body.p_sort_order >= 0 && body.p_sort_order <= 10000 &&
+      ![...clubCourts.values()].some((candidate) => candidate.id !== court.id && candidate.sport === court.sport && candidate.name.toLowerCase() === name.toLowerCase());
+    if (!valid) { json(response, 403, { code: "42501", message: "court update rejected" }); return; }
+    Object.assign(court, { name, active: body.p_active, sort_order: body.p_sort_order });
+    json(response, 200, true); return;
+  }
   if (request.method === "POST" && requestUrl.pathname === "/rest/v1/rpc/staff_event_planner_draft") {
     const user = bearerUser(request);
     const body = await requestJson(request);
@@ -1480,7 +1530,7 @@ const server = createServer(async (request, response) => {
     const eventId = String(body.p_event_id ?? "");
     const event = eventById(eventId);
     const draft = plannerDrafts.get(eventId);
-    json(response, 200, validStaff(user) && event?.sport === "padel" && draft ? [draft] : []);
+    json(response, 200, validStaff(user) && event && draft ? [draft] : []);
     return;
   }
   if (request.method === "POST" && requestUrl.pathname === "/rest/v1/rpc/staff_save_event_planner_draft") {
@@ -1494,7 +1544,9 @@ const server = createServer(async (request, response) => {
       player && typeof player === "object" && !Array.isArray(player) &&
       Object.keys(player).every((key) => allowedPlayerKeys.has(key)) &&
       ["row_id","name","ranking","included","available_from","available_until"].every((key) => Object.hasOwn(player, key)));
-    if (!user || !validStaff(user) || !exactKeys(body, expected) || !validPlayers || event?.sport !== "padel" || event.status === "cancelled") {
+    const validCourts = Array.isArray(body.p_selected_courts) && new Set(body.p_selected_courts).size === body.p_selected_courts.length &&
+      body.p_selected_courts.every((id) => clubCourts.get(id)?.sport === event?.sport);
+    if (!user || !validStaff(user) || !exactKeys(body, expected) || !validPlayers || !validCourts || !event || event.status === "cancelled") {
       json(response, 403, { code: "42501", message: "draft save rejected" });
       return;
     }
@@ -1542,7 +1594,9 @@ const server = createServer(async (request, response) => {
     const scheduleKeys = ["Ronde","Tijd","Baan","Team 1","Niveau T1","Team 2","Niveau T2","Teamverschil","Rust","Nog niet aanwezig","Niet meer beschikbaar"];
     const validSchedule = Array.isArray(body.p_schedule_private) && body.p_schedule_private.length > 0 &&
       body.p_schedule_private.every((row) => exactKeys(row, scheduleKeys));
-    if (!user || !validStaff(user) || !exactKeys(body, expected) || !validSchedule || event?.sport !== "padel" || !draft || draft.revision !== body.p_planner_draft_revision) {
+    const courtNames = Array.isArray(draft?.selected_courts) ? draft.selected_courts.map((id) => clubCourts.get(id)?.name) : [];
+    const validCourts = courtNames.length > 0 && courtNames.every(Boolean) && body.p_schedule_private?.every((row) => courtNames.includes(row.Baan));
+    if (!user || !validStaff(user) || !exactKeys(body, expected) || !validSchedule || !validCourts || !event || !draft || draft.revision !== body.p_planner_draft_revision) {
       json(response, 403, { code: "42501", message: "schedule save rejected" });
       return;
     }
@@ -1550,7 +1604,7 @@ const server = createServer(async (request, response) => {
     staffSchedules.set(id, {
       id, event_id: event.id, created_by: user.id, created_by_name: user.role === "admin" ? "Admin" : "Planner",
       title: event.title, event_date: event.starts_at.slice(0, 10), start_time: "20:00", end_time: "22:00",
-      match_minutes: draft.match_minutes, courts: draft.selected_courts, players_private: draft.players,
+      match_minutes: draft.match_minutes, courts: courtNames, players_private: draft.players,
       participants_public: draft.players.filter(({ included }) => included).map(({ name }) => name),
       schedule_public: body.p_schedule_private.map((row) => Object.fromEntries([
         "Ronde", "Tijd", "Baan", "Team 1", "Team 2", "Rust", "Nog niet aanwezig", "Niet meer beschikbaar",
@@ -1907,6 +1961,54 @@ const server = createServer(async (request, response) => {
   }
   if (request.method === "DELETE" && requestUrl.pathname === "/rest/v1/registrations") {
     rejectMockContract(response, "DELETE is verboden");
+    return;
+  }
+  if (request.method === "POST" && requestUrl.pathname === "/rest/v1/rpc/public_live_schedule_candidates") {
+    const body = await requestJson(request);
+    if (!exactKeys(body, [])) { rejectMockContract(response, "live resolver bevat onverwachte velden"); return; }
+    const delay = nextDelayMilliseconds;
+    nextDelayMilliseconds = 0;
+    if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay));
+    const published = [...staffSchedules.values()].filter(({ is_published }) => is_published)
+      .map((schedule) => ({ schedule, event: eventById(schedule.event_id) }))
+      .filter(({ event }) => event && event.status !== "cancelled")
+      .map(({ event }) => ({ slug: event.slug, title: event.title, sport: event.sport, starts_at: event.starts_at, ends_at: event.ends_at }));
+    if (published.length) { json(response, 200, published); return; }
+    const now = Date.now();
+    json(response, 200, [{
+      slug: "live-schema", title: "Live TOS-schema", sport: "padel",
+      starts_at: new Date(now - 20 * 60_000).toISOString(),
+      ends_at: new Date(now + 55 * 60_000).toISOString(),
+    }]);
+    return;
+  }
+  if (request.method === "POST" && requestUrl.pathname === "/rest/v1/rpc/public_event_live_schedule") {
+    const body = await requestJson(request);
+    if (!exactKeys(body, ["p_slug"]) || typeof body.p_slug !== "string") {
+      rejectMockContract(response, "event live read bevat onverwachte velden"); return;
+    }
+    const event = tosEvents.find((candidate) => candidate.slug === body.p_slug && candidate.status !== "cancelled");
+    const eventSchedule = event ? [...staffSchedules.values()]
+      .filter((schedule) => schedule.event_id === event.id && schedule.is_published)
+      .sort((left, right) => new Date(right.created_at) - new Date(left.created_at))[0] : null;
+    if (event && eventSchedule) {
+      json(response, 200, [{
+        id: eventSchedule.id, event_slug: event.slug, event_title: event.title, event_sport: event.sport,
+        event_starts_at: event.starts_at, event_ends_at: event.ends_at, event_date: eventSchedule.event_date,
+        created_by_name: eventSchedule.created_by_name, start_time: eventSchedule.start_time, end_time: eventSchedule.end_time,
+        courts: eventSchedule.courts, participants_public: eventSchedule.participants_public,
+        schedule_public: eventSchedule.schedule_public, is_published: true, created_at: eventSchedule.created_at,
+      }]);
+      return;
+    }
+    if (body.p_slug !== "live-schema") { json(response, 200, []); return; }
+    const fixture = scheduleFixture();
+    const now = Date.now();
+    json(response, 200, [{
+      ...fixture, event_slug: "live-schema", event_title: "Live TOS-schema", event_sport: "padel",
+      event_starts_at: new Date(now - 20 * 60_000).toISOString(),
+      event_ends_at: new Date(now + 55 * 60_000).toISOString(),
+    }]);
     return;
   }
   if (request.method !== "GET") {

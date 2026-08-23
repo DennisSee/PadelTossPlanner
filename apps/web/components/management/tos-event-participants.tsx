@@ -53,14 +53,14 @@ function EventContext({ event }: { event: TosEvent }) {
       </p>
       <p className={styles.deadline}>Capaciteit: maximaal {event.maxParticipants} deelnemers</p>
       <div className={styles.actions}>
-        <SecondaryLinkButton href="/beheer">← Terug naar beheer</SecondaryLinkButton>
+        <SecondaryLinkButton direction="back" href="/beheer">Terug naar beheer</SecondaryLinkButton>
         <SecondaryLinkButton href={tosDetailPath(event.slug)}>Eventpagina bekijken</SecondaryLinkButton>
       </div>
     </Card>
   );
 }
 
-function Summary({ event, assessed }: { event: TosEvent; assessed: readonly AssessedOverview[] }) {
+function Summary({ assessed }: { assessed: readonly AssessedOverview[] }) {
   const placed = assessed.filter(({ participant }) => participant.placementStatus === "placed");
   const waitlist = assessed.filter(({ participant }) => participant.placementStatus === "waitlist");
   const declined = assessed.filter(({ participant }) => participant.placementStatus === "declined").length;
@@ -70,9 +70,7 @@ function Summary({ event, assessed }: { event: TosEvent; assessed: readonly Asse
     ["Geplaatst", placed.length],
     ["Wachtlijst", waitlist.length],
     ["Afgemeld", declined],
-    ...(event.sport === "padel"
-      ? [["Klaar voor planner", ready], ["Aandacht nodig", placed.length - ready]]
-      : []),
+    ["Klaar voor planner", ready], ["Aandacht nodig", placed.length - ready],
   ] as const;
   return (
     <section className={styles.summary} aria-label="Deelnemerssamenvatting">
@@ -143,33 +141,25 @@ function PlannerInputPreview({
   event: TosEvent;
   assessed: readonly AssessedOverview[];
 }) {
-  if (event.sport === "tennis") {
-    return (
-      <Card className={styles.previewCard}>
-        <h2>Plannerinput</h2>
-        <p className={styles.empty}>Tennisplanner wordt in een volgende stap toegevoegd.</p>
-      </Card>
-    );
-  }
   const ready = assessed.filter(({ participant, readiness }) =>
     participant.placementStatus === "placed" && readiness === PLANNER_READINESS.READY);
   return (
     <Card className={styles.previewCard}>
       <div>
         <h2>Plannerinput</h2>
-        <p className={styles.previewIntro}>Read-only preview van deelnemers die nu geldige padelplannerinput opleveren.</p>
+        <p className={styles.previewIntro}>Read-only preview van deelnemers die nu geldige {event.sport === "padel" ? "padel" : "tennis"}plannerinput opleveren.</p>
       </div>
       {ready.length ? (
         <ul className={styles.previewList}>
           {ready.map(({ participant }) => (
             <li key={participant.registrationId}>
               <strong>{participant.displayName}</strong>
-              <span>Padelniveau {participant.ranking}</span>
+              <span>{event.sport === "padel" ? "Padel" : "Tennis"}niveau {participant.ranking}</span>
               <span>{availabilityLabel(event, participant)}</span>
             </li>
           ))}
         </ul>
-      ) : <p className={styles.empty}>Nog niemand is klaar voor de padelplanner.</p>}
+      ) : <p className={styles.empty}>Nog niemand is klaar voor de planner.</p>}
     </Card>
   );
 }
@@ -202,7 +192,7 @@ export function TosEventParticipants({
   return (
     <div className={styles.stack}>
       <EventContext event={event} />
-      <Summary event={event} assessed={assessed} />
+      <Summary assessed={assessed} />
       <div className={styles.groups}>
         <ParticipantGroup event={event} title="Geplaatst" items={placed} empty="Nog niemand is geplaatst." />
         <ParticipantGroup event={event} title="Wachtlijst" items={waitlist} empty="De wachtlijst is leeg." />
