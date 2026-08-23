@@ -10,7 +10,7 @@ fail() {
   exit 1
 }
 
-[[ $# -eq 1 ]] || fail "Gebruik: ./smoke-test.sh https://test-tos.oddbounce.nl"
+[[ $# -eq 1 ]] || fail "Gebruik: ./smoke-test.sh https://tczuidtos.oddbounce.nl"
 base_url=${1%/}
 if [[ ! "$base_url" =~ ^https://([A-Za-z0-9.-]+)(:([0-9]{1,5}))?$ ]]; then
   fail "Geef een HTTPS-base-URL zonder pad, query of credentials op."

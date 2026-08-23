@@ -1,4 +1,4 @@
-{$SITE_ADDRESS:test-tos.oddbounce.nl} {
+{$SITE_ADDRESS:tczuidtos.oddbounce.nl} {
 	encode zstd gzip
 
 	handle {

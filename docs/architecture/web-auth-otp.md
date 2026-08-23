@@ -118,7 +118,7 @@ stagingcontrole, omdat de browsertestserver geen Supabase-mailaflevering test.
 Staging vereist naast de bestaande publieke Supabaseconfiguratie:
 
 ```dotenv
-APP_BASE_URL=https://test-tos.oddbounce.nl
+APP_BASE_URL=https://tczuidtos.oddbounce.nl
 ```
 
 Preflight valideert deze origin zonder waarden te tonen. Smoke-tests controleren
@@ -126,7 +126,7 @@ Preflight valideert deze origin zonder waarden te tonen. Smoke-tests controleren
 
 Voor iedere HTTPS-stagingrelease blijft een korte browsercontrole verplicht:
 open in Chrome DevTools onder **Application → Cookies** uitsluitend de host
-`test-tos.oddbounce.nl` en controleer zonder waarden te kopiëren of loggen dat de
+`tczuidtos.oddbounce.nl` en controleer zonder waarden te kopiëren of loggen dat de
 Supabase Auth-cookie(chunks) host-only zijn, `Path=/`, `SameSite=Lax` en
 `Secure=true`. Log daarna via de echte UI uit en bevestig dat alle sessiechunks
 en tijdelijke PKCE-flowcookies verdwenen zijn, dat refresh uitgelogd blijft en

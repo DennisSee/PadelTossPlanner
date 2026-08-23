@@ -178,6 +178,14 @@ describe("WEB-2 routes", () => {
     expect(worker).not.toContain("ports:");
   });
 
+  it("uses the canonical staging domain throughout deployment contracts", () => {
+    for (const file of ["Caddyfile", ".env.example", "compose.yml", "preflight.sh", "smoke-test.sh", "test-smoke-redirects.sh"]) {
+      const source = readFileSync(resolve(process.cwd(), `../../deploy/staging/${file}`), "utf8");
+      expect(source).toContain("tczuidtos.oddbounce.nl");
+      expect(source).not.toContain("test-tos.oddbounce.nl");
+    }
+  });
+
   it("keeps UI hierarchy and keyboard focus structural rather than pixel-bound", () => {
     const globalCss = readFileSync(resolve(process.cwd(), "app/globals.css"), "utf8");
     const uiCss = readFileSync(resolve(process.cwd(), "components/ui/ui.module.css"), "utf8");

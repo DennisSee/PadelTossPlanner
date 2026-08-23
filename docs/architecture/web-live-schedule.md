@@ -25,7 +25,7 @@ Kopieer op staging `deploy/staging/.env.example` naar een niet-gecommit `deploy/
 
 ```dotenv
 APP_ENV=staging
-SITE_ADDRESS=test-tos.oddbounce.nl
+SITE_ADDRESS=tczuidtos.oddbounce.nl
 SUPABASE_URL=https://JOUW-TESTPROJECT.supabase.co
 SUPABASE_PUBLISHABLE_KEY=sb_publishable_VERVANG_DIT
 ```
@@ -108,7 +108,7 @@ listeners en Git-commit. Het print geen env-waarden en start, stopt of bouwt nie
 Voer na een expliciet uitgevoerde deployment uit:
 
 ```sh
-./smoke-test.sh https://test-tos.oddbounce.nl
+./smoke-test.sh https://tczuidtos.oddbounce.nl
 ```
 
 De smoke-test gebruikt normale TLS- en hostnameverificatie (nooit insecure mode),

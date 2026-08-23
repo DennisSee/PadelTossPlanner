@@ -92,8 +92,8 @@ done
 app_environment=$(read_env_value APP_ENV)
 [[ "$app_environment" == "staging" ]] || fail "APP_ENV moet staging zijn."
 app_base_url=$(read_env_value APP_BASE_URL)
-if [[ ! "$app_base_url" =~ ^https://test-tos\.oddbounce\.nl/?$ ]]; then
-  fail "APP_BASE_URL moet de HTTPS-URL van test-tos.oddbounce.nl zijn."
+if [[ ! "$app_base_url" =~ ^https://tczuidtos\.oddbounce\.nl/?$ ]]; then
+  fail "APP_BASE_URL moet de HTTPS-URL van tczuidtos.oddbounce.nl zijn."
 fi
 if grep -Eqi '^[[:space:]]*(export[[:space:]]+)?SUPABASE_SECRET_KEY[[:space:]]*=' "$env_file"; then
   fail "De niet-gescopeerde SUPABASE_SECRET_KEY mag niet in de staging-env staan."

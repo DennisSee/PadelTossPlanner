@@ -11,14 +11,14 @@ De nieuwe T.C. Zuid TOS-website wordt naast de bestaande Streamlit-app opgebouwd
 
 ## Stagingrouting
 
-Staging gebruikt `test-tos.oddbounce.nl`:
+Staging gebruikt `tczuidtos.oddbounce.nl`:
 
 - alle browserroutes gaan naar Next.js. Daardoor blijft `/api/health` de publieke healthroute van de webservice;
 - FastAPI heeft geen publieke Caddy-route. Next.js gebruikt uitsluitend `http://planner-api:8000` op het interne Compose-netwerk.
 
 Next.js en FastAPI publiceren geen hostpoorten en delen het interne Compose-netwerk `application`. Caddy heeft daarnaast `edge` voor internetverkeer en TLS-certificaten. Vanaf WEB-2 heeft uitsluitend Next.js daarnaast `web-egress` voor de server-side openbare Supabase-read. FastAPI blijft volledig intern. Alleen Caddy bewaart infrastructuurdata voor automatische HTTPS; er is geen persistente applicatiedata en geen lokale database.
 
-Voor een lokale end-to-endcontrole kan `SITE_ADDRESS` tijdelijk op `http://:80` worden gezet. De stagingwaarde blijft standaard `test-tos.oddbounce.nl`; er is daarom geen `.env`-bestand nodig.
+Voor een lokale end-to-endcontrole kan `SITE_ADDRESS` tijdelijk op `http://:80` worden gezet. De stagingwaarde blijft standaard `tczuidtos.oddbounce.nl`; er is daarom geen `.env`-bestand nodig.
 
 De web-buildcontext blijft beperkt tot `apps/web/`. De planner-API gebruikt vanaf WEB-5C de repositoryroot als strikt gefilterde buildcontext, omdat uitsluitend de bewezen rootmodule `planner.py`, de servicecode en de productionlock nodig zijn. De root- en applicatiespecifieke `.dockerignore`-bestanden sluiten overige broncode, lokale env-bestanden, registryconfiguratie, credentials, private keys, caches en buildoutput expliciet uit. `NEXT_PUBLIC_*`-waarden worden tijdens `next build` permanent in de browserbundle ingebakken en mogen daarom nooit secrets bevatten.
 
@@ -47,7 +47,7 @@ De bestaande Streamlit-app blijft volledig zelfstandig deploybaar. Nieuwe functi
 
 ## Latere handmatige stagingdeployment
 
-1. Laat DNS voor `test-tos.oddbounce.nl` naar de staging-VPS wijzen en zorg dat TCP 80/443 en UDP 443 bereikbaar zijn.
+1. Laat DNS voor `tczuidtos.oddbounce.nl` naar de staging-VPS wijzen en zorg dat TCP 80/443 en UDP 443 bereikbaar zijn.
 2. Installeer Docker Engine met de Compose-plugin op de VPS.
 3. Controleer vóór de rollout de bestaande listeners en stacks met `sudo ss -ltnup`, `sudo docker compose ls` en `sudo docker ps`. Poorten 80/443 zijn momenteel nog in gebruik door de tijdelijke statische Caddy-stack onder `/opt/tos-staging-stack`.
 4. Ga naar `/opt/tos-staging-stack`, controleer eerst het bijbehorende Composebestand en stop daarna uitsluitend die tijdelijke stack met `docker compose down`. Gebruik geen `--volumes`.
@@ -59,7 +59,7 @@ De bestaande Streamlit-app blijft volledig zelfstandig deploybaar. Nieuwe functi
 8. Bouw nooit gelijktijdig: voer eerst `docker compose build --pull planner-api` uit en daarna `docker compose build --pull web`.
 9. Start de stack met `docker compose up -d`.
 10. Controleer `docker compose ps` en voer daarna de read-only controle
-    `./smoke-test.sh https://test-tos.oddbounce.nl` uit. Deze valideert ook `/`,
+    `./smoke-test.sh https://tczuidtos.oddbounce.nl` uit. Deze valideert ook `/`,
     `/live`, TLS, protected redirects en het publieke webhealthcontract zonder
     volledige responses te printen. De interne FastAPI-healthcheck blijft onderdeel
     van de containerstatus en is bewust niet publiek via Caddy bereikbaar.

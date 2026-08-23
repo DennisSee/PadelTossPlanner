@@ -4,7 +4,7 @@ set -euo pipefail
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 validator="$script_dir/validate-smoke-redirect.py"
 header_utils="$script_dir/smoke-header-utils.sh"
-base_url="https://test-tos.oddbounce.nl"
+base_url="https://tczuidtos.oddbounce.nl"
 redirect_fixture_count=0
 header_fixture_count=0
 
@@ -70,7 +70,7 @@ run_fixture "gecodeerd relatief" "accept" "/login?next=%2Faccount" "/account"
 run_fixture "gecodeerd TOS-pad" "accept" "/login?next=%2Ftos" "/tos"
 run_fixture "gecodeerd beheerpad" "accept" "/login?next=%2Fbeheer" "/beheer"
 run_fixture "absoluut same-origin" "accept" \
-  "https://test-tos.oddbounce.nl/login?next=%2Faccount" "/account"
+  "https://tczuidtos.oddbounce.nl/login?next=%2Faccount" "/account"
 run_fixture "externe origin" "reject" \
   "https://evil.example/login?next=%2Faccount" "/account"
 run_fixture "protocol-relative origin" "reject" \
@@ -88,7 +88,7 @@ run_fixture "refresh-token in Location" "reject" \
 run_fixture "OTP in Location" "reject" \
   "/login?next=%2Faccount&otp=fixture" "/account"
 run_fixture "credentials in absolute URL" "reject" \
-  "https://fixture:fixture@test-tos.oddbounce.nl/login?next=%2Faccount" "/account"
+  "https://fixture:fixture@tczuidtos.oddbounce.nl/login?next=%2Faccount" "/account"
 
 run_header_fixture "CRLF account met lowercase location" "accept" \
   $'HTTP/2 307\r\nlocation: /login?next=%2Faccount\r\ncache-control: no-store\r\n\r\n' "/account"
