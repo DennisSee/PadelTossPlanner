@@ -24,6 +24,13 @@ export class StaffEventConflictError extends StaffEventDataError {
   }
 }
 
+export class StaffEventDeleteError extends StaffEventDataError {
+  constructor() {
+    super();
+    this.name = "StaffEventDeleteError";
+  }
+}
+
 function errorCode(error: unknown): string {
   return error && typeof error === "object" && typeof (error as { code?: unknown }).code === "string"
     ? String((error as { code: string }).code)
@@ -81,6 +88,17 @@ export class StaffTosEventRepository {
     return values[0] ?? null;
   }
 
+  async eventById(eventId: string): Promise<TosEvent | null> {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(eventId)) {
+      throw new StaffEventDataError();
+    }
+    const values = parseRows(
+      await this.client.from("tos_events").select(TOS_EVENT_SELECT).eq("id", eventId).limit(2),
+    );
+    if (values.length > 1) throw new StaffEventDataError();
+    return values[0] ?? null;
+  }
+
   async createEvent(write: StaffEventCreateWrite): Promise<void> {
     assertWrite(await this.client.from("tos_events").insert({
       slug: write.slug,
@@ -105,5 +123,13 @@ export class StaffTosEventRepository {
       })
       .eq("id", event.id)
       .eq("slug", event.slug));
+  }
+
+  async deleteEvent(eventId: string): Promise<void> {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(eventId)) {
+      throw new StaffEventDeleteError();
+    }
+    const result = await this.client.rpc("admin_delete_tos_event", { p_event_id: eventId });
+    if (result.error || result.data !== true) throw new StaffEventDeleteError();
   }
 }

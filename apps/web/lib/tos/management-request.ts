@@ -1,20 +1,23 @@
 import { NextResponse } from "next/server";
 
-export type ManagementNotice = "event-created" | "event-updated";
+export type ManagementNotice = "event-created" | "event-updated" | "event-deleted";
 export type ManagementErrorCode =
   | "invalid-request"
   | "not-authorized"
   | "conflict"
+  | "delete-failed"
   | "temporarily-unavailable";
 
 const NOTICE_TEXT: Record<ManagementNotice, string> = {
   "event-created": "De TOS-avond is aangemaakt.",
   "event-updated": "De TOS-avond is bijgewerkt.",
+  "event-deleted": "De TOS-avond en bijbehorende gegevens zijn verwijderd.",
 };
 const ERROR_TEXT: Record<ManagementErrorCode, string> = {
   "invalid-request": "Controleer de ingevulde eventgegevens.",
   "not-authorized": "Je hebt geen toegang tot eventbeheer.",
   conflict: "De TOS-avond kon door een conflict niet worden opgeslagen.",
+  "delete-failed": "De TOS-avond kon niet veilig worden verwijderd.",
   "temporarily-unavailable": "TOS-eventbeheer is tijdelijk niet beschikbaar.",
 };
 

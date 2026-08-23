@@ -126,6 +126,24 @@
 .roleForm select,.roleForm button { min-height: 2.8rem; padding: .6rem .7rem; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); font: inherit; }
 .roleForm button { border-color: var(--club-green); color: var(--surface); background: var(--club-green); cursor: pointer; font-weight: 800; }
 
+.deleteZone {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+  padding: 0.85rem;
+  border: 1px solid #efc3bd;
+  border-radius: var(--radius-sm);
+  background: var(--danger-soft);
+}
+.deleteZone p { margin: var(--space-1) 0 0; }
+.deleteTrigger { min-height: 2.8rem; border-color: var(--danger) !important; color: var(--danger) !important; }
+.deleteWarning { display: grid; gap: var(--space-3); }
+.deleteWarning p { margin: 0; line-height: 1.5; }
+.deleteWarning form { display: grid; }
+.deleteWarning button { min-height: 3rem; border: 1px solid var(--danger); border-radius: var(--radius-sm); color: white; background: var(--danger); cursor: pointer; font: inherit; font-weight: 800; }
+
 .sportForm {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -192,4 +210,6 @@
 
   .roleState { align-items: stretch; flex-direction: column; }
   .roleTrigger { width: 100%; }
+  .deleteZone { align-items: stretch; flex-direction: column; }
+  .deleteTrigger { width: 100%; }
 }

@@ -274,6 +274,30 @@
   min-height: 2.75rem;
 }
 
+.deleteTrigger {
+  min-height: 2.75rem;
+  border-color: var(--danger) !important;
+  color: var(--danger) !important;
+}
+
+.deleteWarning {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.deleteWarning p { margin: 0; line-height: 1.5; }
+.deleteWarning form { display: grid; }
+.deleteWarning button {
+  min-height: 3rem;
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-sm);
+  color: white;
+  background: var(--danger);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+}
+
 .editForm {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }

@@ -105,6 +105,31 @@ export function MemberManagement({
                 <SportProfileForm member={member} sport="tennis" />
               </div>
               <RoleManagement member={member} canAdminister={canAdminister} currentProfileId={currentProfileId} />
+              {canAdminister && member.profileId !== currentProfileId ? (
+                <div className={styles.deleteZone}>
+                  <div>
+                    <strong>Lid en account verwijderen</strong>
+                    <p>Verwijdert het clublid, sportprofielen, aanmeldingen en het eventueel gekoppelde loginaccount.</p>
+                  </div>
+                  <ActionDialog
+                    triggerLabel="Lid verwijderen"
+                    title="Lid definitief verwijderen?"
+                    description={`${member.displayName}${member.loginEmail ? ` · ${member.loginEmail}` : ""}`}
+                    triggerClassName={styles.deleteTrigger}
+                    dialogClassName={styles.deleteDialog}
+                    initialFocus="cancel"
+                  >
+                    <div className={styles.deleteWarning}>
+                      <p>Het lid, het gekoppelde loginaccount, aanmeldingen, sportprofielen en contactverzoeken worden verwijderd. Historische wedstrijden bij andere leden behouden alleen de historische naam.</p>
+                      <p><strong>Dit kan niet ongedaan worden gemaakt.</strong></p>
+                      <form action="/api/beheer/leden/delete" method="post">
+                        <input type="hidden" name="member_id" value={member.memberId} />
+                        <button type="submit">Definitief verwijderen</button>
+                      </form>
+                    </div>
+                  </ActionDialog>
+                </div>
+              ) : null}
             </Card>
           ))}
         </div>

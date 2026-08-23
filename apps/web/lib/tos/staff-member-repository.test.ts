@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { describe, expect, it, vi } from "vitest";
 
-import { StaffMemberDataError, StaffMemberRepository } from "./staff-member-repository";
+import { StaffMemberActiveParticipationError, StaffMemberDataError, StaffMemberRepository } from "./staff-member-repository";
 
 const MEMBER_ID = "44444444-4444-4444-8444-444444444444";
 
@@ -81,5 +81,14 @@ describe("staff member repository", () => {
     }], error: null });
     await expect(new StaffMemberRepository(leaked.value).list())
       .rejects.toBeInstanceOf(StaffMemberDataError);
+  });
+
+  it("deletes by member ID only and maps an active-participation block", async () => {
+    const success = client({ data: true, error: null });
+    await expect(new StaffMemberRepository(success.value).deleteMember(MEMBER_ID)).resolves.toBeUndefined();
+    expect(success.rpc).toHaveBeenCalledWith("admin_delete_member_account", { p_member_id: MEMBER_ID });
+    const blocked = client({ data: null, error: { code: "55000", message: "private" } });
+    await expect(new StaffMemberRepository(blocked.value).deleteMember(MEMBER_ID))
+      .rejects.toBeInstanceOf(StaffMemberActiveParticipationError);
   });
 });

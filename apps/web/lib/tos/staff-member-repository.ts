@@ -21,6 +21,26 @@ export class StaffMemberDataError extends Error {
   }
 }
 
+export class StaffMemberActiveParticipationError extends StaffMemberDataError {
+  constructor() {
+    super();
+    this.name = "StaffMemberActiveParticipationError";
+  }
+}
+
+export class StaffMemberDeleteError extends StaffMemberDataError {
+  constructor() {
+    super();
+    this.name = "StaffMemberDeleteError";
+  }
+}
+
+function errorCode(error: unknown): string {
+  return error && typeof error === "object" && typeof (error as { code?: unknown }).code === "string"
+    ? String((error as { code: string }).code)
+    : "";
+}
+
 export class StaffMemberRepository {
   constructor(private readonly client: SupabaseClient) {}
 
@@ -62,5 +82,12 @@ export class StaffMemberRepository {
     } catch {
       throw new StaffMemberDataError();
     }
+  }
+
+  async deleteMember(memberId: string): Promise<void> {
+    if (!isUuid(memberId)) throw new StaffMemberDeleteError();
+    const result = await this.client.rpc("admin_delete_member_account", { p_member_id: memberId });
+    if (errorCode(result.error) === "55000") throw new StaffMemberActiveParticipationError();
+    if (result.error || result.data !== true) throw new StaffMemberDeleteError();
   }
 }

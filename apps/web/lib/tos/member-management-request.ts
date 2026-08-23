@@ -1,15 +1,18 @@
 import { NextResponse } from "next/server";
 
-export type MemberNotice = "sport-profile-updated" | "account-role-updated";
-export type MemberError = "invalid-request" | "not-authorized" | "temporarily-unavailable";
+export type MemberNotice = "sport-profile-updated" | "account-role-updated" | "member-deleted";
+export type MemberError = "invalid-request" | "not-authorized" | "active-participation" | "delete-failed" | "temporarily-unavailable";
 
 const NOTICES: Record<MemberNotice, string> = {
   "sport-profile-updated": "Het sportprofiel is bijgewerkt.",
   "account-role-updated": "De accountrol is bijgewerkt.",
+  "member-deleted": "Het lid en het gekoppelde account zijn verwijderd.",
 };
 const ERRORS: Record<MemberError, string> = {
   "invalid-request": "Controleer het sportprofiel.",
   "not-authorized": "Je hebt geen toegang tot ledenbeheer.",
+  "active-participation": "Dit lid kan niet worden verwijderd zolang er nog een actieve of toekomstige TOS-deelname is.",
+  "delete-failed": "Het lid kon niet veilig worden verwijderd.",
   "temporarily-unavailable": "Het sportprofiel kon tijdelijk niet worden bijgewerkt.",
 };
 

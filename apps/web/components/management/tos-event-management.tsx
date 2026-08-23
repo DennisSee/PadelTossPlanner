@@ -85,7 +85,7 @@ export function CreateTosEventForm({ now = new Date() }: { now?: Date }) {
   );
 }
 
-function EventCard({ event, capacity }: { event: TosEvent; capacity: StaffEventCapacity }) {
+function EventCard({ event, capacity, canAdminister }: { event: TosEvent; capacity: StaffEventCapacity; canAdminister: boolean }) {
   const presentation = eventPresentationStatus(event);
   const occupancy = Math.min(100, Math.round((capacity.placedCount / capacity.maxParticipants) * 100));
   const capacityStyle = { "--occupancy": `${occupancy}%` } as CSSProperties;
@@ -157,6 +157,25 @@ function EventCard({ event, capacity }: { event: TosEvent; capacity: StaffEventC
                 <button className={styles.primaryEditButton} type="submit">Wijzigingen opslaan</button>
               </form>
             </ActionDialog>
+            {canAdminister ? (
+              <ActionDialog
+                triggerLabel="TOS-avond verwijderen"
+                title="TOS-avond definitief verwijderen?"
+                description={`${event.title} · ${formatEventDate(event.startsAt)} · ${formatEventClock(event.startsAt)}–${formatEventClock(event.endsAt)}`}
+                triggerClassName={styles.deleteTrigger}
+                dialogClassName={styles.deleteDialog}
+                initialFocus="cancel"
+              >
+                <div className={styles.deleteWarning}>
+                  <p>Alle aanmeldingen, plannerinput, schema’s en historie van deze TOS-avond worden definitief verwijderd.</p>
+                  <p><strong>Dit kan niet ongedaan worden gemaakt.</strong></p>
+                  <form action="/api/beheer/tos/delete" method="post">
+                    <input type="hidden" name="event_id" value={event.id} />
+                    <button type="submit">Definitief verwijderen</button>
+                  </form>
+                </div>
+              </ActionDialog>
+            ) : null}
           </div>
         </div>
         <div
@@ -180,9 +199,11 @@ function EventCard({ event, capacity }: { event: TosEvent; capacity: StaffEventC
 export function TosEventList({
   events,
   capacityByEvent,
+  canAdminister,
 }: {
   events: readonly TosEvent[];
   capacityByEvent: ReadonlyMap<string, StaffEventCapacity>;
+  canAdminister: boolean;
 }) {
   return (
     <section className={styles.section} aria-labelledby="tos-events-heading">
@@ -194,7 +215,7 @@ export function TosEventList({
         <div className={styles.eventGrid}>
           {events.map((event) => {
             const capacity = capacityByEvent.get(event.id);
-            return capacity ? <EventCard key={event.id} event={event} capacity={capacity} /> : null;
+            return capacity ? <EventCard key={event.id} event={event} capacity={capacity} canAdminister={canAdminister} /> : null;
           })}
         </div>
       ) : (

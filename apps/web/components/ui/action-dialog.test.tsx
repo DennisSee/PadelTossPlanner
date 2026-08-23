@@ -30,4 +30,15 @@ describe("action dialog", () => {
     expect(screen.getByRole("button", { name: "Sluiten" })).toHaveAttribute("type", "submit");
     expect(screen.getByRole("button", { name: "Annuleren" }).closest("form")).toHaveAttribute("method", "dialog");
   });
+
+  it("can safely focus cancellation instead of a destructive action", () => {
+    render(
+      <ActionDialog triggerLabel="Verwijderen" title="Definitief verwijderen?" initialFocus="cancel">
+        <button type="submit">Definitief verwijderen</button>
+      </ActionDialog>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Verwijderen" }));
+    expect(screen.getByRole("button", { name: "Annuleren" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Definitief verwijderen" })).not.toHaveFocus();
+  });
 });

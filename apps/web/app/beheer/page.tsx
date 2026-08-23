@@ -73,7 +73,7 @@ export default async function ManagementPage({ searchParams }: PageProps) {
             sport={filters.sport}
             resultCount={filteredEvents.length}
           />
-          <TosEventList events={filteredEvents} capacityByEvent={capacityByEvent} />
+          <TosEventList events={filteredEvents} capacityByEvent={capacityByEvent} canAdminister={account.capabilities.canAdminister} />
         </div>
       </div>
     </AccountShell>

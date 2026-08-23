@@ -47,6 +47,7 @@ describe("TOS event management UI", () => {
         [event.id, capacity],
         [tennisEvent.id, { ...capacity, eventId: tennisEvent.id }],
       ])}
+      canAdminister={false}
     />);
     expect(screen.getAllByText("TOS vrijdag", { selector: "h3" })).toHaveLength(2);
     expect(screen.getAllByText("Padel", { selector: '[data-sport="padel"] span' })).toHaveLength(1);
@@ -70,5 +71,15 @@ describe("TOS event management UI", () => {
     expect(within(update).queryByLabelText("Starttijd")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /verwijder|delete/u })).not.toBeInTheDocument();
     expect(container.textContent).not.toMatch(/aanmeldingen|ranking/u);
+  });
+
+  it("offers irreversible event deletion only to admins with cancellation focused", () => {
+    const { container, rerender } = render(<TosEventList events={[event]} capacityByEvent={new Map([[event.id, capacity]])} canAdminister />);
+    expect(screen.getByRole("button", { name: "TOS-avond verwijderen" })).toBeVisible();
+    const form = container.querySelector<HTMLFormElement>('form[action="/api/beheer/tos/delete"]')!;
+    expect([...form.querySelectorAll("[name]")].map((node) => node.getAttribute("name"))).toEqual(["event_id"]);
+    expect(form.querySelector('[name="event_id"]')).toHaveValue(event.id);
+    rerender(<TosEventList events={[event]} capacityByEvent={new Map([[event.id, capacity]])} canAdminister={false} />);
+    expect(screen.queryByRole("button", { name: "TOS-avond verwijderen" })).not.toBeInTheDocument();
   });
 });

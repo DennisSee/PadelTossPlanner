@@ -12,6 +12,7 @@ export function ActionDialog({
   triggerClassName = "",
   dialogClassName = "",
   cancelLabel = "Annuleren",
+  initialFocus = "content",
 }: {
   triggerLabel: ReactNode;
   title: string;
@@ -20,6 +21,7 @@ export function ActionDialog({
   triggerClassName?: string;
   dialogClassName?: string;
   cancelLabel?: string;
+  initialFocus?: "content" | "cancel";
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const titleId = useId();
@@ -61,7 +63,7 @@ export function ActionDialog({
         </header>
         <div className={styles.actionDialogBody}>{children}</div>
         <form className={styles.actionDialogCancel} method="dialog">
-          <button type="submit">{cancelLabel}</button>
+          <button type="submit" data-dialog-initial={initialFocus === "cancel" ? "" : undefined}>{cancelLabel}</button>
         </form>
       </dialog>
     </>

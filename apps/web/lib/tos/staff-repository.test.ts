@@ -117,4 +117,13 @@ describe("staff TOS event repository", () => {
       maxParticipants: 24,
     })).rejects.toBeInstanceOf(StaffEventConflictError);
   });
+
+  it("deletes only through the narrow admin RPC after validating the server ID", async () => {
+    const rpc = vi.fn(async () => ({ data: true, error: null }));
+    const repository = new StaffTosEventRepository({ rpc } as unknown as SupabaseClient);
+    await expect(repository.deleteEvent(row.id)).resolves.toBeUndefined();
+    expect(rpc).toHaveBeenCalledWith("admin_delete_tos_event", { p_event_id: row.id });
+    await expect(repository.deleteEvent("attacker")).rejects.toBeInstanceOf(StaffEventDataError);
+    expect(rpc).toHaveBeenCalledTimes(1);
+  });
 });

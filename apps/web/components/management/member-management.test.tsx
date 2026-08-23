@@ -64,4 +64,14 @@ describe("member and sport-profile management UI", () => {
     const ownView = render(<MemberManagement members={[member]} query="" canAdminister currentProfileId={member.profileId} />);
     expect(within(ownView.container).getByText("Je kunt je eigen rol niet wijzigen.")).toBeVisible();
   });
+
+  it("offers member/account deletion only to an admin and never on their own card", () => {
+    const { container, rerender } = render(<MemberManagement members={[member]} query="" canAdminister currentProfileId="99999999-9999-4999-8999-999999999999" />);
+    expect(screen.getByRole("button", { name: "Lid verwijderen" })).toBeVisible();
+    const form = container.querySelector<HTMLFormElement>('form[action="/api/beheer/leden/delete"]')!;
+    expect([...form.querySelectorAll("[name]")].map((node) => node.getAttribute("name"))).toEqual(["member_id"]);
+    expect(form.querySelector('[name="member_id"]')).toHaveValue(member.memberId);
+    rerender(<MemberManagement members={[member]} query="" canAdminister currentProfileId={member.profileId} />);
+    expect(screen.queryByRole("button", { name: "Lid verwijderen" })).not.toBeInTheDocument();
+  });
 });

@@ -1336,6 +1336,47 @@ const server = createServer(async (request, response) => {
     json(response, 200, [{ profile_id: target.id, role: target.role }]);
     return;
   }
+  if (request.method === "POST" && requestUrl.pathname === "/rest/v1/rpc/admin_delete_tos_event") {
+    const user = bearerUser(request);
+    const body = await requestJson(request);
+    const eventIndex = tosEvents.findIndex(({ id }) => id === body.p_event_id);
+    if (!user || !exactKeys(body, ["p_event_id"]) || user.role !== "admin" || !user.active || eventIndex < 0) {
+      json(response, 403, { code: "42501", message: "event delete rejected" });
+      return;
+    }
+    const [deleted] = tosEvents.splice(eventIndex, 1);
+    for (const [key, registration] of registrations) if (registration.event_id === deleted.id) registrations.delete(key);
+    plannerDrafts.delete(deleted.id);
+    for (const [key, schedule] of staffSchedules) if (schedule.event_id === deleted.id) staffSchedules.delete(key);
+    json(response, 200, true);
+    return;
+  }
+  if (request.method === "POST" && requestUrl.pathname === "/rest/v1/rpc/admin_delete_member_account") {
+    const user = bearerUser(request);
+    const body = await requestJson(request);
+    const memberId = String(body.p_member_id ?? "");
+    const target = [...authUsers.values()].find((candidate) => candidate.membership?.id === memberId);
+    const activeParticipation = [...registrations.values()].some((registration) =>
+      registration.member_id === memberId && registration.response === "attending" &&
+      new Date(eventById(registration.event_id)?.ends_at ?? 0) > new Date());
+    if (!user || !exactKeys(body, ["p_member_id"]) || user.role !== "admin" || !user.active ||
+        user.membership?.id === memberId || !target || activeParticipation) {
+      json(response, activeParticipation ? 409 : 403, {
+        code: activeParticipation ? "55000" : "42501",
+        message: "member delete rejected",
+      });
+      return;
+    }
+    authUsers.delete(target.email);
+    for (const [token, sessionUser] of sessions) if (sessionUser.id === target.id) sessions.delete(token);
+    for (const [key, registration] of registrations) if (registration.member_id === memberId) registrations.delete(key);
+    for (const key of sportProfileOverrides.keys()) if (key.startsWith(`${memberId}:`)) sportProfileOverrides.delete(key);
+    for (const [key, contact] of historyContactRequests) {
+      if (contact.requester === memberId || contact.recipient === memberId) historyContactRequests.delete(key);
+    }
+    json(response, 200, true);
+    return;
+  }
   if (request.method === "POST" && requestUrl.pathname === "/rest/v1/rpc/my_tos_history") {
     const user = bearerUser(request);
     const body = await requestJson(request);
@@ -1582,6 +1623,17 @@ const server = createServer(async (request, response) => {
           ? [event]
           : [],
       );
+      return;
+    }
+    const id = eqValue(requestUrl, "id");
+    if (id !== null) {
+      if (!validStaff(user) || !hasOnlyQueryKeys(requestUrl, new Set(["select", "id", "limit"])) ||
+          singleQueryValue(requestUrl, "limit") !== "2") {
+        rejectMockContract(response, "staff event-ID filter wijkt af");
+        return;
+      }
+      const event = eventById(id);
+      json(response, 200, event ? [event] : []);
       return;
     }
     if (
