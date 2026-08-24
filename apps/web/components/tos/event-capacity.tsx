@@ -4,13 +4,21 @@ import type { EventCapacity } from "../../lib/tos/types";
 import type { Sport } from "../ui";
 import styles from "./tos.module.css";
 
-export function EventCapacityPanel({ capacity, sport }: { capacity: EventCapacity; sport: Sport }) {
+export function EventCapacityPanel({
+  capacity,
+  sport,
+  compact = false,
+}: {
+  capacity: EventCapacity;
+  sport: Sport;
+  compact?: boolean;
+}) {
   const occupied = capacity.placedCount;
   const percentage = Math.min(100, Math.round((occupied / capacity.maxParticipants) * 100));
   const style = { "--occupancy": `${percentage}%` } as CSSProperties;
   return (
     <div
-      className={`${styles.capacityPanel} ${sport === "padel" ? styles.capacityPadel : styles.capacityTennis} ${capacity.availableCount === 0 ? styles.capacityFull : ""}`.trim()}
+      className={`${styles.capacityPanel} ${compact ? styles.capacityPanelCompact : ""} ${sport === "padel" ? styles.capacityPadel : styles.capacityTennis} ${capacity.availableCount === 0 ? styles.capacityFull : ""}`.trim()}
       data-sport={sport}
       aria-label={`${occupied} van ${capacity.maxParticipants} plaatsen bezet`}
     >
@@ -20,6 +28,7 @@ export function EventCapacityPanel({ capacity, sport }: { capacity: EventCapacit
         <span>Plekken bezet</span>
       </div>
       <p>{capacity.availableCount} {capacity.availableCount === 1 ? "plek" : "plekken"} vrij</p>
+      {compact ? <span className={styles.capacityProgress} style={style} aria-hidden="true" /> : null}
       {capacity.waitlistCount ? (
         <p className={styles.waitlistCount}>{capacity.waitlistCount} op wachtlijst</p>
       ) : null}

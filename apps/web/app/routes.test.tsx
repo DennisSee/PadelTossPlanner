@@ -44,14 +44,14 @@ describe("WEB-2 routes", () => {
   it("links the public homepage to live schedule and the shared login", async () => {
     render(await Home());
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
-      "Jouw TOS-avond. Live.",
+      "Samen spelen. Iedere ronde anders.",
     );
     expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
       "Doe mee met de volgende TOS",
     );
-    expect(screen.getByRole("link", { name: "Bekijk live TOS-schema" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Bekijk TOS-avonden" })).toHaveAttribute(
       "href",
-      "/live",
+      "/tos",
     );
     expect(screen.getAllByRole("link", { name: "Inloggen / aanmelden" })[0])
       .toHaveAttribute("href", "/login?next=%2Ftos");
@@ -128,6 +128,9 @@ describe("WEB-2 routes", () => {
 
     render(await Home());
     expect(screen.getByRole("heading", { level: 2, name: "Jouw volgende TOS" })).toBeVisible();
+    expect(screen.getByRole("heading", { level: 1, name: "Je volgende TOS staat klaar." })).toBeVisible();
+    expect(screen.queryByRole("heading", { level: 1, name: /live/u })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Bekijk je aanmelding" })).toHaveAttribute("href", "/tos/vrijdag-padel");
     expect(screen.getByRole("heading", { level: 3, name: "Clubkampioenen TOS" })).toBeVisible();
     expect(screen.queryByRole("heading", { name: "Padel TOS-avond" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Aanmelding wijzigen" })).toHaveAttribute("href", "/tos/vrijdag-padel");

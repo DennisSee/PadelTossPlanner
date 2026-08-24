@@ -15,6 +15,7 @@ import { loadAccountContextWithClient } from "../lib/auth/session";
 import { readAppEnvironment } from "../lib/config/public-supabase";
 import { createServerSupabaseClient } from "../lib/supabase/server";
 import { selectHomeEvent, type HomeEventSelection } from "../lib/tos/home-event";
+import { homeHeroPresentation } from "../lib/tos/home-presentation";
 import { TosRepository } from "../lib/tos/repository";
 
 import styles from "./home.module.css";
@@ -69,6 +70,7 @@ export default async function Home() {
     }
   }
   const navigation = navigationModelFromAccount(account);
+  const hero = homeHeroPresentation(homeKind, homeSnapshot?.event ?? null);
 
   return (
     <main className={styles.page}>
@@ -84,12 +86,10 @@ export default async function Home() {
             <CourtLines className={styles.heroLines} />
             <div className={styles.introContent}>
               <p className={styles.eyebrow}>Samen spelen, iedere ronde anders</p>
-              <h1 className={styles.title}>Jouw TOS-avond. Live.</h1>
-              <p className={styles.lead}>
-                Bekijk de actuele wedstrijden, wie er rust heeft en op welke baan je
-                volgende ronde speelt.
-              </p>
-              <LinkButton href="/live">Bekijk live TOS-schema</LinkButton>
+              <h1 className={styles.title}>{hero.title}</h1>
+              {hero.cue ? <p className={styles.heroCue}>{hero.cue}</p> : null}
+              <p className={styles.lead}>{hero.lead}</p>
+              <LinkButton href={hero.action.href}>{hero.action.label}</LinkButton>
             </div>
           </Card>
 
@@ -127,10 +127,7 @@ export default async function Home() {
         {homeSnapshot ? (
           <section className={styles.nextTos} aria-labelledby="next-tos-heading">
             <div className={styles.nextTosHeading}>
-              <div>
-                <h2 id="next-tos-heading">{homeKind === "live-placed" ? "Jouw TOS is live" : "Jouw volgende TOS"}</h2>
-                <p>{homeKind === "future-waitlist" ? "Je staat op de wachtlijst." : homeKind === "open" ? "Deze TOS staat open voor inschrijving." : "Je staat geplaatst voor deze TOS-avond."}</p>
-              </div>
+              <h2 id="next-tos-heading">{homeKind === "live-placed" ? "Jouw TOS is live" : "Jouw volgende TOS"}</h2>
               <Link href="/tos">Alle TOS-avonden <span aria-hidden="true">→</span></Link>
             </div>
             <TosEventCard

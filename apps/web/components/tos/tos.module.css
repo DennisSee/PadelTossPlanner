@@ -292,6 +292,14 @@
   padding-block: 0.9rem;
 }
 
+.eventCardCompact .eventTitle {
+  font-size: clamp(1.2rem, 2vw, 1.45rem);
+}
+
+.eventCardCompact .deadline {
+  font-size: 0.82rem;
+}
+
 .metadata {
   margin: 0;
   color: var(--text);
@@ -420,6 +428,33 @@
   font-weight: 750;
 }
 
+.capacityPanelCompact {
+  grid-template-columns: 2.8rem minmax(0, 1fr);
+  padding: 0.7rem;
+}
+
+.capacityPanelCompact .capacityRing {
+  width: 2.65rem;
+  height: 2.65rem;
+}
+
+.capacityPanelCompact .capacityNumbers strong {
+  font-size: 1.35rem;
+}
+
+.capacityPanelCompact > p {
+  text-align: left;
+}
+
+.capacityProgress {
+  grid-column: 1 / -1;
+  height: 0.28rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: linear-gradient(90deg, currentColor var(--occupancy), color-mix(in srgb, currentColor 15%, transparent) 0);
+  opacity: 0.75;
+}
+
 .capacityFull {
   border-color: #efc3bd;
   color: var(--danger);
@@ -451,6 +486,48 @@
   font: inherit;
   font-weight: 750;
   text-align: left;
+}
+
+.compactAttendeePreview {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.peopleTriggerCompact {
+  min-height: 2.75rem;
+  padding: 0.35rem 0;
+}
+
+.compactPeopleAction {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--club-green-dark);
+  font-size: 0.8rem;
+}
+
+.attendeeAvatars {
+  display: flex;
+  flex: 0 0 auto;
+}
+
+.attendeeAvatars > span {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border: 1px solid #b9decf;
+  border-radius: 50%;
+  color: var(--club-green-dark);
+  background: var(--success-soft);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.attendeeAvatars > span + span {
+  margin-left: -0.35rem;
 }
 
 .peopleDialog {
@@ -819,6 +896,37 @@
     padding: 0.75rem 0.75rem 0.85rem;
   }
 
+  .eventCardCompact {
+    grid-template-columns: 4.25rem minmax(0, 1fr);
+  }
+
+  .eventCardCompact > time {
+    width: 3.75rem;
+    min-height: 5.2rem;
+    margin: 0.65rem 0 0 0.25rem;
+  }
+
+  .eventCardCompact > time strong {
+    font-size: 1.85rem;
+  }
+
+  .eventCardCompact .eventBody {
+    gap: 0.48rem;
+    padding: 0.7rem 0.65rem 0.75rem;
+  }
+
+  .eventCardCompact .badges {
+    gap: 0.28rem;
+  }
+
+  .eventCardCompact .metadata {
+    font-size: 0.82rem;
+  }
+
+  .eventCardCompact .deadline {
+    font-size: 0.75rem;
+  }
+
   .badges {
     gap: 0.35rem;
   }
@@ -854,6 +962,32 @@
     padding: 0.55rem 0.65rem;
   }
 
+  .capacityPanelCompact {
+    grid-template-columns: 2.45rem minmax(0, 1fr) auto;
+    min-height: 3.8rem;
+    padding: 0.45rem 0.55rem;
+  }
+
+  .capacityPanelCompact .capacityRing {
+    width: 2.3rem;
+    height: 2.3rem;
+  }
+
+  .capacityPanelCompact .capacityNumbers strong {
+    font-size: 1.1rem;
+  }
+
+  .capacityPanelCompact > p {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+    text-align: right;
+  }
+
+  .capacityPanelCompact .capacityProgress {
+    grid-column: 2 / -1;
+    grid-row: 3;
+  }
+
   .capacityRing {
     width: 2.5rem;
     height: 2.5rem;
@@ -872,6 +1006,33 @@
 
   .participantColumn {
     gap: 0.35rem;
+  }
+
+  .eventCardCompact .participantColumn {
+    gap: 0.25rem;
+  }
+
+  .eventCardCompact .compactAttendeePreview {
+    gap: 0.45rem;
+  }
+
+  .eventCardCompact .attendeeAvatars > span {
+    width: 1.8rem;
+    height: 1.8rem;
+    font-size: 0.64rem;
+  }
+
+  .eventCardCompact .peopleTrigger {
+    min-height: 2.75rem;
+    padding-block: 0.25rem;
+  }
+
+  .eventCardCompact .compactPeopleAction {
+    font-size: 0;
+  }
+
+  .eventCardCompact .compactPeopleAction span {
+    font-size: 1rem;
   }
 
   .peopleTrigger {

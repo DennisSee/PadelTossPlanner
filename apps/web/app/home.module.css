@@ -82,11 +82,11 @@
 }
 
 .title {
-  max-width: 11ch;
+  max-width: 16ch;
   margin: 0;
   color: var(--surface);
   font-family: var(--font-display);
-  font-size: clamp(2.75rem, 5.5vw, 4.8rem);
+  font-size: clamp(2.75rem, 5.2vw, 4.5rem);
   font-weight: 800;
   line-height: 0.86;
   letter-spacing: 0.005em;
@@ -103,6 +103,20 @@
   color: #f3eee3;
   font-size: clamp(1rem, 2.2vw, 1.2rem);
   line-height: 1.55;
+}
+
+.heroCue {
+  width: fit-content;
+  margin: var(--space-3) 0 0;
+  padding: 0.3rem 0.55rem;
+  border-radius: 0.35rem;
+  color: var(--club-green-ink);
+  background: var(--club-yellow);
+  font-family: var(--font-interface);
+  font-size: 0.8rem;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .intro a {
@@ -213,8 +227,7 @@
   padding-inline: 0.35rem;
 }
 
-.nextTosHeading h2,
-.nextTosHeading p {
+.nextTosHeading h2 {
   margin: 0;
 }
 
@@ -222,11 +235,6 @@
   color: var(--club-green-dark);
   font-family: var(--font-interface);
   font-size: clamp(1.35rem, 2.5vw, 1.75rem);
-}
-
-.nextTosHeading p {
-  margin-top: 0.2rem;
-  color: var(--text-muted);
 }
 
 .nextTosHeading > a {
@@ -266,7 +274,8 @@
   }
 
   .intro {
-    min-height: 9.25rem;
+    min-height: 8.75rem;
+    padding: 1rem;
     background:
       linear-gradient(160deg, var(--club-green) 0 72%, transparent 72%),
       var(--club-yellow);
@@ -278,9 +287,9 @@
   }
 
   .title {
-    max-width: 11ch;
-    font-size: clamp(2.1rem, 10vw, 3rem);
-    line-height: 0.96;
+    max-width: 16ch;
+    font-size: clamp(1.95rem, 9.2vw, 2.8rem);
+    line-height: 0.92;
   }
 
   .side {
@@ -316,6 +325,11 @@
     display: none;
   }
 
+  .heroCue {
+    margin-top: 0.55rem;
+    font-size: 0.66rem;
+  }
+
   .intro a {
     min-height: 2.65rem;
     margin-top: 0.8rem;
@@ -324,10 +338,6 @@
 
   .nextTosHeading {
     align-items: flex-start;
-  }
-
-  .nextTosHeading p {
-    font-size: 0.85rem;
   }
 
   .emptyTos {
@@ -350,11 +360,18 @@
   }
 
   .intro {
-    min-height: 9rem;
-    padding: 1rem;
+    min-height: 8.5rem;
   }
 
   .nextTosHeading {
-    display: grid;
+    gap: var(--space-2);
+  }
+
+  .nextTosHeading h2 {
+    font-size: 1.3rem;
+  }
+
+  .nextTosHeading > a {
+    font-size: 0.82rem;
   }
 }

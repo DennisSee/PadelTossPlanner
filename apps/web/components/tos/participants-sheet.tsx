@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, type ReactNode } from "react";
 
 import type { EventCapacity, ParticipantAttendance, TosEvent } from "../../lib/tos/types";
 import { formatEventClock, formatEventDate } from "../../lib/tos/time";
@@ -29,18 +29,20 @@ export function ParticipantsSheet({
   event,
   capacity,
   attendance,
+  triggerContent,
 }: {
   event: TosEvent;
   capacity: EventCapacity;
   attendance: readonly ParticipantAttendance[];
+  triggerContent?: ReactNode;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const placed = attendance.filter((person) => person.placementStatus === "placed");
   const waiting = attendance.filter((person) => person.placementStatus === "waitlist");
   return (
     <>
-      <button className={styles.peopleTrigger} type="button" onClick={() => dialog.current?.showModal()}>
-        Bekijk deelnemers <span aria-hidden="true">›</span>
+      <button className={`${styles.peopleTrigger} ${triggerContent ? styles.peopleTriggerCompact : ""}`.trim()} type="button" onClick={() => dialog.current?.showModal()}>
+        {triggerContent ?? <>Bekijk deelnemers <span aria-hidden="true">›</span></>}
       </button>
       <dialog className={styles.peopleDialog} ref={dialog} aria-labelledby={`people-${event.id}`}>
         <div className={styles.dialogHandle} aria-hidden="true" />

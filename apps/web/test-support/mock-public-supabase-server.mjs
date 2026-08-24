@@ -929,7 +929,7 @@ const server = createServer(async (request, response) => {
     const body = await requestJson(request);
     const email = String(body.email ?? "").trim().toLowerCase();
     const state = String(body.state ?? "");
-    if (!email.includes("@") || !new Set(["waitlist", "empty"]).has(state)) {
+    if (!email.includes("@") || !new Set(["live", "waitlist", "empty"]).has(state)) {
       json(response, 400, { error: "invalid home state fixture" });
       return;
     }
@@ -938,7 +938,17 @@ const server = createServer(async (request, response) => {
       json(response, 400, { error: "invalid home participant fixture" });
       return;
     }
-    if (state === "waitlist") {
+    if (state === "live") {
+      const event = tosEvents.find(({ slug }) => slug === "vrijdag-padel");
+      if (!event) {
+        json(response, 500, { error: "missing live home fixture" });
+        return;
+      }
+      event.starts_at = relativeIso(-1);
+      event.ends_at = relativeIso(1);
+      event.signup_deadline = relativeIso(-2);
+      seedRegistration(user, event.id, "attending");
+    } else if (state === "waitlist") {
       seedRegistration(
         user,
         tosEvents.find(({ slug }) => slug === "tennis-avond-2026").id,

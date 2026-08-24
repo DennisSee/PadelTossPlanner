@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import type { OwnRegistration, TosEvent } from "../../lib/tos/types";
@@ -165,5 +165,71 @@ describe("participant TOS cards", () => {
     />);
     expect(screen.getByText("Wachtlijst · plek 2")).toBeVisible();
     expect(screen.getByRole("link", { name: "Aanmelding wijzigen" })).toBeVisible();
+  });
+
+  it("uses a compact home hierarchy without the duplicate availability sentence", () => {
+    const attending = {
+      ...declined,
+      response: "attending" as const,
+      availableFrom: event.startsAt,
+      availableUntil: event.endsAt,
+      attendingSince: "2026-08-20T10:00:00Z",
+    };
+    const { container } = render(<TosEventCard
+      event={event}
+      registration={attending}
+      registrationPosition={{ placementStatus: "placed", waitlistPosition: null }}
+      capacity={{ maxParticipants: 24, placedCount: 4, availableCount: 20, waitlistCount: 0 }}
+      attendance={[
+        { displayName: "Dennis Seesing", placementStatus: "placed", waitlistPosition: null },
+        { displayName: "Bram Jansen", placementStatus: "placed", waitlistPosition: null },
+        { displayName: "Joyce Olsthoorn", placementStatus: "placed", waitlistPosition: null },
+        { displayName: "Jeroen Brouwer", placementStatus: "placed", waitlistPosition: null },
+      ]}
+      compact
+      now={new Date("2026-08-20T12:00:00Z")}
+    />);
+    expect(screen.getByText("✓ Geplaatst")).toBeVisible();
+    expect(screen.queryByText(/Je doet mee/u)).not.toBeInTheDocument();
+    expect(screen.queryByText("Open voor inschrijving")).not.toBeInTheDocument();
+    expect(screen.getByText("Dennis Seesing, Bram Jansen +2")).toBeVisible();
+    expect(screen.getByRole("button", { name: /Dennis Seesing, Bram Jansen \+2\s*Bekijk/u })).toBeVisible();
+    expect(container.querySelectorAll('[aria-hidden="true"] span')).toHaveLength(3);
+    expect(container.querySelector("[aria-label='4 van 24 plaatsen bezet']")).toBeInTheDocument();
+  });
+
+  it.each([
+    [0, 24],
+    [1, 4],
+    [2, 9],
+    [20, 24],
+    [24, 24],
+  ])("keeps compact capacity %i / %i textual and accessible", (placedCount, maxParticipants) => {
+    render(<TosEventCard
+      event={{ ...event, maxParticipants }}
+      capacity={{
+        maxParticipants,
+        placedCount,
+        availableCount: maxParticipants - placedCount,
+        waitlistCount: 0,
+      }}
+      attendance={[]}
+      compact
+      now={new Date("2026-08-20T12:00:00Z")}
+    />);
+    const capacityPanel = screen.getByLabelText(`${placedCount} van ${maxParticipants} plaatsen bezet`);
+    expect(capacityPanel).toBeVisible();
+    expect(within(capacityPanel).getByText(`${placedCount} / ${maxParticipants}`)).toBeVisible();
+  });
+
+  it("shows one safe participant name beside its initials", () => {
+    render(<TosEventCard
+      event={event}
+      capacity={{ maxParticipants: 24, placedCount: 1, availableCount: 23, waitlistCount: 0 }}
+      attendance={[{ displayName: "Dennis Seesing", placementStatus: "placed", waitlistPosition: null }]}
+      compact
+      now={new Date("2026-08-20T12:00:00Z")}
+    />);
+    expect(screen.getByRole("button", { name: /Dennis Seesing\s*Bekijk/u })).toBeVisible();
   });
 });
