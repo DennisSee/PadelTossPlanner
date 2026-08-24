@@ -52,7 +52,7 @@ test("admin deletes a TOS event only after an explicit safe confirmation", async
   await assertNoOverflow(page);
 });
 
-test("admin deletes another member account while planner cannot see destructive controls", async ({ page, request }) => {
+test("admin deletes another member account while planner cannot see destructive controls", async ({ page, request }, testInfo) => {
   const targetEmail = email("web8-delete-target");
   const fixture = await request.post(`${MOCK_URL}/auth/v1/otp`, { data: { email: targetEmail, create_user: true } });
   expect(fixture.ok()).toBe(true);
@@ -61,7 +61,6 @@ test("admin deletes another member account while planner cannot see destructive 
   await signIn(page, request, email("planner-no-member"));
   await expect(page).toHaveURL(/\/beheer\/leden$/u);
   await page.getByLabel("Zoeken op naam of e-mailadres").fill(targetEmail);
-  await page.getByRole("button", { name: "Zoeken" }).click();
   await expect(page.getByRole("button", { name: "Lid verwijderen" })).toHaveCount(0);
   await page.context().clearCookies();
 
@@ -69,18 +68,24 @@ test("admin deletes another member account while planner cannot see destructive 
   await signIn(page, request, email("admin-no-member"));
   await expect(page).toHaveURL(/\/beheer\/leden$/u);
   await page.getByLabel("Zoeken op naam of e-mailadres").fill(targetEmail);
-  await page.getByRole("button", { name: "Zoeken" }).click();
-  const card = page.getByText(targetEmail).locator("xpath=ancestor::section[1]");
-  await card.getByRole("button", { name: "Lid verwijderen" }).click();
-  const dialog = page.getByRole("dialog", { name: "Lid definitief verwijderen?" });
-  await expect(dialog.getByRole("button", { name: "Annuleren" })).toBeFocused();
+  const openMember = async () => {
+    if (testInfo.project.name === "phone-390") {
+      await page.locator("button[class*='mobileMember']").filter({ hasText: targetEmail }).click();
+    } else {
+      await page.locator("tbody tr").filter({ hasText: targetEmail }).getByRole("button", { name: /Details van/u }).click();
+    }
+  };
+  await openMember();
+  const editor = page.getByRole("dialog", { name: /bewerken/u });
+  await editor.getByRole("button", { name: "Lid verwijderen" }).click();
+  const dialog = page.getByRole("dialog", { name: "Lid verwijderen", exact: true });
   await expect(dialog).toContainText(targetEmail);
   await dialog.getByRole("button", { name: "Annuleren" }).click();
-  await expect(page.getByText(targetEmail, { exact: true })).toBeVisible();
-  await card.getByRole("button", { name: "Lid verwijderen" }).click();
-  await dialog.getByRole("button", { name: "Definitief verwijderen" }).click();
-  await expect(page).toHaveURL(/\/beheer\/leden\?notice=member-deleted$/u);
+  await expect(page.locator(`[title="${targetEmail}"]:visible`)).toHaveCount(1);
+  await openMember();
+  await editor.getByRole("button", { name: "Lid verwijderen" }).click();
+  await dialog.getByRole("button", { name: "Lid verwijderen" }).click();
+  await expect(page.getByRole("status")).toContainText("Lid verwijderd");
   await expect(page.getByText(targetEmail, { exact: true })).toHaveCount(0);
-  await expect(page.getByRole("status")).toContainText("gekoppelde account zijn verwijderd");
   await assertNoOverflow(page);
 });

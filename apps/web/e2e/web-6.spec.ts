@@ -77,7 +77,7 @@ test("participant filters, capaciteit en veilige deelnemerssheet werken samen", 
   await noHorizontalOverflow(page);
 });
 
-test("staff beheert capaciteit en onafhankelijke sportprofielen zonder membership", async ({ page, request }) => {
+test("staff beheert capaciteit en onafhankelijke sportprofielen zonder membership", async ({ page, request }, testInfo) => {
   await page.goto("/login?next=/beheer");
   await signIn(page, request, email("planner-no-member"));
 
@@ -93,20 +93,27 @@ test("staff beheert capaciteit en onafhankelijke sportprofielen zonder membershi
   await page.getByRole("link", { name: "Ledenbeheer" }).click();
   await expect(page).toHaveURL(/\/beheer\/leden$/u);
   await page.getByLabel("Zoeken op naam of e-mailadres").fill("Ready Partieel");
-  await page.getByRole("button", { name: "Zoeken" }).click();
-  const card = page.getByRole("heading", { name: "Ready Partieel" }).locator("xpath=ancestor::section[1]");
-  await expect(card).toBeVisible();
-  const tennis = card.getByRole("heading", { name: "Tennis" }).locator("xpath=ancestor::form[1]");
-  await tennis.getByLabel("Profiel").selectOption("true");
-  await tennis.getByLabel("Niveau").selectOption("5");
-  await tennis.getByRole("button", { name: "Tennisprofiel opslaan" }).click();
-  await expect(page).toHaveURL(/\/beheer\/leden\?notice=sport-profile-updated$/u);
-  await expect(page.getByRole("status")).toContainText("sportprofiel is bijgewerkt");
-  const updated = page.getByRole("heading", { name: "Ready Partieel" }).locator("xpath=ancestor::section[1]");
-  await expect(updated.getByRole("heading", { name: "Padel" }).locator("xpath=ancestor::form[1]").getByLabel("Niveau"))
-    .toHaveValue("3");
-  await expect(updated.getByRole("heading", { name: "Tennis" }).locator("xpath=ancestor::form[1]").getByLabel("Niveau"))
-    .toHaveValue("5");
+  await expect(page.getByText("1 lid")).toBeVisible();
+  if (testInfo.project.name === "phone-390") {
+    await page.locator("button[class*='mobileMember']").filter({ hasText: "Ready Partieel" }).click();
+    const sheet = page.getByRole("dialog", { name: "Ready Partieel bewerken" });
+    const tennis = sheet.locator("section").filter({ hasText: "Tennis" }).first();
+    await tennis.getByLabel("Profiel").selectOption("true");
+    await tennis.getByLabel("Niveau").selectOption("5");
+    await sheet.getByRole("button", { name: "Wijzigingen toepassen" }).click();
+  } else {
+    await page.getByLabel("Tennisprofiel voor Ready Partieel").selectOption("true");
+    await page.getByLabel("Tennisniveau voor Ready Partieel").selectOption("5");
+  }
+  await expect(page.getByRole("region", { name: "Niet-opgeslagen wijzigingen" })).toContainText("1 lid gewijzigd");
+  await page.getByRole("button", { name: "1 wijziging opslaan" }).click();
+  await expect(page.getByRole("status")).toContainText("Wijzigingen opgeslagen");
+  if (testInfo.project.name === "desktop-1440") {
+    await expect(page.getByLabel("Padelniveau voor Ready Partieel")).toHaveValue("3");
+    await expect(page.getByLabel("Tennisniveau voor Ready Partieel")).toHaveValue("5");
+  } else {
+    await expect(page.locator("button[class*='mobileMember']").filter({ hasText: "Ready Partieel" })).toContainText("Tennis 5");
+  }
   await noHorizontalOverflow(page);
 });
 
@@ -141,10 +148,10 @@ test("staff onderscheidt dubbele displaynamen uitsluitend in ledenbeheer via log
   await page.goto("/login?next=/beheer/leden");
   await signIn(page, request, email("planner-no-member"));
   await page.getByLabel("Zoeken op naam of e-mailadres").fill("Testlid");
-  await page.getByRole("button", { name: "Zoeken" }).click();
-  await expect(page.getByRole("heading", { name: "Testlid" })).toHaveCount(2);
-  await expect(page.getByText(first)).toBeVisible();
-  await expect(page.getByText(second)).toBeVisible();
+  await expect(page.getByText("2 leden")).toBeVisible();
+  await expect(page.locator("tbody tr").filter({ hasText: "Testlid" })).toHaveCount(2);
+  await expect(page.locator(`[title="${first}"]:visible`)).toHaveCount(1);
+  await expect(page.locator(`[title="${second}"]:visible`)).toHaveCount(1);
   await noHorizontalOverflow(page);
 
   await page.goto("/tos");

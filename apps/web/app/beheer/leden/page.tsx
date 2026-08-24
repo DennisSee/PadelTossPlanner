@@ -29,22 +29,16 @@ export default async function MemberManagementPage({ searchParams }: PageProps) 
   const message = memberManagementMessage(last(params.notice), last(params.error));
   let members;
   try {
-    const allMembers = await new StaffMemberRepository(client).list();
-    const folded = query.toLocaleLowerCase("nl-NL");
-    members = folded
-      ? allMembers.filter((member) =>
-          member.displayName.toLocaleLowerCase("nl-NL").includes(folded) ||
-          member.loginEmail?.toLocaleLowerCase("en-US").includes(folded))
-      : allMembers;
+    members = await new StaffMemberRepository(client).list();
   } catch {
     return (
-      <AccountShell account={account} title="Leden en niveaus" intro="Beheer padel- en tennisprofielen." variant="management" currentPath="/beheer/leden">
+      <AccountShell account={account} title="Ledenbeheer" intro="Beheer sportprofielen, niveaus en rollen." variant="management" currentPath="/beheer/leden">
         <StateMessage title="Leden tijdelijk niet beschikbaar"><p>Probeer het later opnieuw.</p></StateMessage>
       </AccountShell>
     );
   }
   return (
-    <AccountShell account={account} title="Leden en niveaus" intro="Beheer per clublid de actieve sportprofielen en niveaus." variant="management" currentPath="/beheer/leden">
+    <AccountShell account={account} title="Ledenbeheer" intro="Beheer sportprofielen, niveaus en rollen." variant="management" currentPath="/beheer/leden">
       {message ? (
         <p className={`${styles.message} ${message.tone === "success" ? styles.messageSuccess : styles.messageDanger}`} role={message.tone === "danger" ? "alert" : "status"}>
           {message.text}
