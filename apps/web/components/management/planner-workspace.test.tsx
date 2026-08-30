@@ -74,4 +74,54 @@ describe("PlannerWorkspace", () => {
     expect(screen.getByText(/Niveau 3 – 3/u)).toBeVisible();
     expect(container.innerHTML).not.toMatch(/member_id|user_id|registration_id|players_private/u);
   });
+
+  it("announces actionable structured diagnostics and preserves planner state", async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      error: "generation-failed",
+      failure: {
+        error: "NO_VALID_SCHEDULE",
+        summary: "Geen geldig schema gevonden.",
+        diagnostics: [
+          {
+            code: "LEVEL_MIX_TOO_RESTRICTIVE", severity: "likely",
+            message: "Met een hogere niveaumix vond de planner wel een geldig schema.",
+            suggested_change: "Verhoog Niveaumix van 50 naar 100.",
+            setting: "level_mix", current_value: 50, suggested_value: 100,
+          },
+          {
+            code: "TEAM_TOLERANCE_TOO_RESTRICTIVE", severity: "likely",
+            message: "Met ruimere teamtolerantie vond de planner wel een geldig schema.",
+            suggested_change: "Verhoog Teamtolerantie van 0.5 naar 1,5.",
+            setting: "team_difference_tolerance", current_value: 0.5, suggested_value: 1.5,
+          },
+        ],
+        probes_run: 2,
+      },
+    }), { status: 422, headers: { "Content-Type": "application/json" } }));
+    vi.stubGlobal("fetch", fetcher);
+    const { container } = render(<PlannerWorkspace event={event} draft={draft} importPreview={[]} courts={[court]} schedules={[]} selectedSchedule={null} />);
+    fireEvent.click(screen.getByRole("button", { name: "Schema genereren" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Geen geldig schema gevonden.");
+    expect(alert).toHaveTextContent("Verhoog Niveaumix van 50 naar 100.");
+    expect(alert).toHaveTextContent("Verhoog Teamtolerantie van 0.5 naar 1,5.");
+    expect(alert).toHaveTextContent("Wijzig één instelling tegelijk");
+    expect(screen.getByRole("link", { name: "Instellingen aanpassen" })).toHaveAttribute("href", "#planner-settings");
+    expect(screen.getByDisplayValue("Ada")).toBeVisible();
+    expect(screen.getByDisplayValue("50")).toBeVisible();
+    expect(container.innerHTML).not.toMatch(/stacktrace|sql|token|private engine detail/iu);
+    fireEvent.change(screen.getByDisplayValue("50"), { target: { value: "100" } });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByDisplayValue("Ada")).toBeVisible();
+    expect(screen.getByText(/Niet-opgeslagen wijzigingen/u)).toBeVisible();
+  });
+
+  it("uses a finite generic fallback for malformed or unavailable diagnostics", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("private upstream stack", { status: 500 })));
+    render(<PlannerWorkspace event={event} draft={draft} importPreview={[]} courts={[court]} schedules={[]} selectedSchedule={null} />);
+    fireEvent.click(screen.getByRole("button", { name: "Schema genereren" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("De planner kon geen betrouwbare specifieke oorzaak bepalen.");
+    expect(alert).not.toHaveTextContent("private upstream stack");
+  });
 });

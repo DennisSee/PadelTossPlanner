@@ -49,6 +49,7 @@ test("staff completes the event-scoped draft, private save and publication workf
   await addManualPlayer(page, 1, "Handmatig Twee", "2");
   await page.getByLabel("Kremer Baan").check();
   await page.getByLabel("ZGA/F&F Baan").uncheck();
+  await page.getByLabel("Niveaumix").fill("80");
   await expect(page.getByText(/Niet-opgeslagen wijzigingen/u)).toBeVisible();
   await expect(page.getByRole("button", { name: "Schema genereren" })).toBeDisabled();
   await page.getByRole("button", { name: "Planneropzet opslaan" }).click();
@@ -56,6 +57,23 @@ test("staff completes the event-scoped draft, private save and publication workf
   await expect(page.getByText("Planneropzet opgeslagen.")).toBeVisible();
   await expect(page.getByText("Revisie 2", { exact: false })).toBeVisible();
   await expect(page.locator('input[value="Handmatig Eén"]')).toBeVisible();
+
+  const diagnosticFixture = await request.post(`${MOCK_URL}/__test/planner-diagnostic-failure`, {
+    data: { enabled: true },
+  });
+  expect(diagnosticFixture.ok()).toBe(true);
+  await page.getByRole("button", { name: "Schema genereren" }).click();
+  const diagnosticHeading = page.getByRole("heading", { name: "Geen geldig schema gevonden" });
+  const diagnostic = page.getByRole("alert").filter({ has: diagnosticHeading });
+  await expect(diagnosticHeading).toBeVisible();
+  await expect(diagnostic).toContainText("Verhoog Niveaumix van 80 naar 100.");
+  await expect(diagnostic.getByRole("link", { name: "Instellingen aanpassen" })).toHaveAttribute("href", "#planner-settings");
+  await expect(page.locator('input[value="Handmatig Eén"]')).toBeVisible();
+
+  await page.getByLabel("Niveaumix").fill("100");
+  await page.getByRole("button", { name: "Planneropzet opslaan" }).click();
+  await expect(page.getByText("Planneropzet opgeslagen.")).toBeVisible();
+  await expect(page.getByText("Revisie 3", { exact: false })).toBeVisible();
   await page.getByRole("button", { name: "Schema genereren" }).click();
   const review = page.getByRole("heading", { name: "Controleer het voorstel" }).locator("xpath=ancestor::div[contains(@class,'generation')]");
   await expect(review).toBeVisible();

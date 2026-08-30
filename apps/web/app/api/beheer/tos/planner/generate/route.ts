@@ -5,7 +5,8 @@ import { privateAuthRedirect } from "../../../../../../lib/auth/finalize";
 import { loginPathFor } from "../../../../../../lib/auth/return-path";
 import { loadAccountContextWithClient } from "../../../../../../lib/auth/session";
 import { readAppBaseUrl } from "../../../../../../lib/config/public-supabase";
-import { generatePlannerSchedule } from "../../../../../../lib/planner-api/client";
+import { generatePlannerSchedule, PlannerGenerationError } from "../../../../../../lib/planner-api/client";
+import { serializePlannerGenerationFailure } from "../../../../../../lib/planner-api/failure";
 import { createServerSupabaseClient } from "../../../../../../lib/supabase/server";
 import { PlannerDraftRepository } from "../../../../../../lib/tos/planner-draft-repository";
 import { parsePlannerLocatorJson } from "../../../../../../lib/tos/planner-draft-request";
@@ -40,7 +41,13 @@ export async function POST(request: NextRequest) {
     const seed = randomInt(0, 2_147_483_647);
     const generated = await generatePlannerSchedule(plannerGenerateRequest(event, draft, seed, courts));
     return Response.json(generated, { headers: { "Cache-Control": "private, no-store, max-age=0" } });
-  } catch {
+  } catch (error) {
+    if (error instanceof PlannerGenerationError) {
+      return Response.json(
+        { error: "generation-failed", failure: serializePlannerGenerationFailure(error.failure) },
+        { status: 422, headers: { "Cache-Control": "private, no-store, max-age=0" } },
+      );
+    }
     return jsonError("generation-failed", 422);
   }
 }

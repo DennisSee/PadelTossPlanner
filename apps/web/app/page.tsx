@@ -13,10 +13,12 @@ import {
 import { TosEventCard } from "../components/tos/event-card";
 import { loadAccountContextWithClient } from "../lib/auth/session";
 import { readAppEnvironment } from "../lib/config/public-supabase";
+import { loadEventPublicSchedule } from "../lib/supabase/public-schedule-repository";
 import { createServerSupabaseClient } from "../lib/supabase/server";
 import { selectHomeEvent, type HomeEventSelection } from "../lib/tos/home-event";
-import { homeHeroPresentation } from "../lib/tos/home-presentation";
+import { homePresentation } from "../lib/tos/home-presentation";
 import { TosRepository } from "../lib/tos/repository";
+import { eventAllowsSelfService } from "../lib/tos/time";
 
 import styles from "./home.module.css";
 
@@ -24,9 +26,11 @@ export const dynamic = "force-dynamic";
 
 export default async function Home() {
   const isStaging = readAppEnvironment() === "staging";
+  const now = new Date();
   let account = null;
   let homeSnapshot: Parameters<typeof TosEventCard>[0] | null = null;
   let homeKind: HomeEventSelection["kind"] | null = null;
+  let homeHasPublishedSchedule = false;
   let participantHomeResolved = false;
   let client: Awaited<ReturnType<typeof createServerSupabaseClient>> | null = null;
   try {
@@ -38,7 +42,6 @@ export default async function Home() {
   if (account?.capabilities.canParticipate && client) {
     try {
       const repository = new TosRepository(client);
-      const now = new Date();
       const [events, registrations] = await Promise.all([
         repository.listParticipantEvents(now),
         repository.listOwnUpcomingRegistrations(account.identity.userId, now),
@@ -54,6 +57,16 @@ export default async function Home() {
           repository.eventAttendance(selected.event.id),
         ]);
         homeKind = selected.kind;
+        if (
+          (selected.kind === "live-placed" || selected.kind === "future-placed") &&
+          (selected.kind === "live-placed" || !eventAllowsSelfService(selected.event, now))
+        ) {
+          try {
+            homeHasPublishedSchedule = Boolean(await loadEventPublicSchedule(selected.event.slug));
+          } catch {
+            homeHasPublishedSchedule = false;
+          }
+        }
         homeSnapshot = {
           event: selected.event,
           registration: selected.registration,
@@ -70,7 +83,11 @@ export default async function Home() {
     }
   }
   const navigation = navigationModelFromAccount(account);
-  const hero = homeHeroPresentation(homeKind, homeSnapshot?.event ?? null);
+  const presentation = homePresentation(homeKind, homeSnapshot?.event ?? null, {
+    now,
+    hasPublishedSchedule: homeHasPublishedSchedule,
+    hasRegistration: Boolean(homeSnapshot?.registration),
+  });
 
   return (
     <main className={styles.page}>
@@ -86,10 +103,10 @@ export default async function Home() {
             <CourtLines className={styles.heroLines} />
             <div className={styles.introContent}>
               <p className={styles.eyebrow}>Samen spelen, iedere ronde anders</p>
-              <h1 className={styles.title}>{hero.title}</h1>
-              {hero.cue ? <p className={styles.heroCue}>{hero.cue}</p> : null}
-              <p className={styles.lead}>{hero.lead}</p>
-              <LinkButton href={hero.action.href}>{hero.action.label}</LinkButton>
+              <h1 className={styles.title}>{presentation.title}</h1>
+              {presentation.cue ? <p className={styles.heroCue}>{presentation.cue}</p> : null}
+              <p className={styles.lead}>{presentation.lead}</p>
+              <LinkButton href={presentation.action.href}>{presentation.action.label}</LinkButton>
             </div>
           </Card>
 
@@ -132,13 +149,7 @@ export default async function Home() {
             </div>
             <TosEventCard
               {...homeSnapshot}
-              actionOverride={homeKind === "live-placed"
-                ? { href: `/live/${homeSnapshot.event.slug}`, label: "Bekijk live schema" }
-                : homeKind === "future-waitlist"
-                  ? { href: `/tos/${homeSnapshot.event.slug}`, label: "Wachtlijst bekijken" }
-                  : homeKind === "open" && !homeSnapshot.registration
-                    ? { href: `/tos/${homeSnapshot.event.slug}`, label: "Aanmelden" }
-                    : { href: `/tos/${homeSnapshot.event.slug}`, label: "Aanmelding wijzigen" }}
+              actionOverride={presentation.cardAction}
             />
           </section>
         ) : participantHomeResolved ? (

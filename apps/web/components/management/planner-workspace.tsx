@@ -13,6 +13,8 @@ import type {
 import { PLANNER_SEARCH_PROFILES } from "../../lib/tos/types";
 import type { ImportPreviewItem } from "../../lib/tos/planner-draft";
 import type { PlannerGeneration } from "../../lib/planner-api/types";
+import type { PlannerGenerationFailure } from "../../lib/planner-api/types";
+import { parsePlannerGenerationFailure } from "../../lib/planner-api/failure";
 import { Card } from "../ui";
 
 import styles from "./planner-workspace.module.css";
@@ -104,7 +106,7 @@ export function PlannerWorkspace({
   const [selectedCourts, setSelectedCourts] = useState<PlannerCourt[]>([...initialCourts]);
   const [allowRepeatPartners, setAllowRepeatPartners] = useState(draft.allowRepeatPartners);
   const [generation, setGeneration] = useState<PlannerGeneration | null>(null);
-  const [generationError, setGenerationError] = useState<string | null>(null);
+  const [generationFailure, setGenerationFailure] = useState<PlannerGenerationFailure | null>(null);
   const [generating, setGenerating] = useState(false);
   const [dirty, setDirty] = useState(false);
   const serializedPlayers = useMemo(() => JSON.stringify(players.map((player) => ({
@@ -119,7 +121,7 @@ export function PlannerWorkspace({
   function markDirty() {
     setDirty(true);
     setGeneration(null);
-    setGenerationError(null);
+    setGenerationFailure(null);
   }
 
   function updatePlayer(index: number, update: Partial<EditorPlayer>) {
@@ -139,7 +141,7 @@ export function PlannerWorkspace({
 
   async function generate() {
     setGenerating(true);
-    setGenerationError(null);
+    setGenerationFailure(null);
     try {
       const response = await fetch("/api/beheer/tos/planner/generate", {
         method: "POST",
@@ -148,14 +150,36 @@ export function PlannerWorkspace({
         credentials: "same-origin",
       });
       const body: unknown = await response.json();
-      if (!response.ok || !body || typeof body !== "object" || Array.isArray(body)) throw new Error();
+      if (!response.ok) {
+        if (body && typeof body === "object" && !Array.isArray(body) &&
+            (body as Record<string, unknown>).error === "generation-failed") {
+          setGeneration(null);
+          setGenerationFailure(parsePlannerGenerationFailure((body as Record<string, unknown>).failure));
+          return;
+        }
+        throw new Error();
+      }
+      if (!body || typeof body !== "object" || Array.isArray(body)) throw new Error();
       const value = body as Record<string, unknown>;
       if (!Number.isSafeInteger(value.seed) || !Array.isArray(value.schedule) || !Array.isArray(value.statistics) ||
           !value.diagnostics || typeof value.diagnostics !== "object") throw new Error();
       setGeneration(value as PlannerGeneration);
     } catch {
       setGeneration(null);
-      setGenerationError("Er kon met deze opzet geen geldig schema worden gemaakt.");
+      setGenerationFailure({
+        code: "NO_VALID_SCHEDULE",
+        summary: "Geen geldig schema gevonden.",
+        diagnostics: [{
+          code: "COMBINED_OR_SEARCH_LIMIT",
+          severity: "unknown",
+          message: "De planner kon geen betrouwbare specifieke oorzaak bepalen.",
+          suggestedChange: "Controleer spelers, beschikbaarheid, banen en instellingen en probeer opnieuw.",
+          setting: null,
+          currentValue: null,
+          suggestedValue: null,
+        }],
+        probesRun: 0,
+      });
     } finally {
       setGenerating(false);
     }
@@ -215,7 +239,7 @@ export function PlannerWorkspace({
           </div>
         </Card>
 
-        <Card className={styles.card}>
+        <Card className={styles.card} id="planner-settings">
           <h2>Plannerinstellingen</h2>
           <div className={styles.courts}>
             {courts.length ? courts.map((court) => <label className={styles.checkbox} key={court.id}><input type="checkbox" disabled={!court.active && !selectedCourts.includes(court.id)} checked={selectedCourts.includes(court.id)} onChange={(event) => { markDirty(); setSelectedCourts((current) => event.target.checked ? [...current, court.id] : current.filter((entry) => entry !== court.id)); }} /> {court.name}{court.active ? "" : " — niet meer actief"}</label>) : <p className={styles.muted}>Nog geen actieve {event.sport === "padel" ? "padel" : "tennis"}banen. <a href="/beheer/banen">Banen beheren</a>.</p>}
@@ -239,7 +263,24 @@ export function PlannerWorkspace({
         <button className={styles.primaryButton} type="button" disabled={draft.revision < 1 || dirty || generating || selectedCourts.length < 1 || selectedCourts.some((id) => !courts.find((court) => court.id === id)?.active)} onClick={generate}>
           {generating ? "Schema wordt gemaakt…" : "Schema genereren"}
         </button>
-        {generationError ? <p role="alert">{generationError}</p> : null}
+        {generationFailure ? (
+          <div className={styles.failureCard} role="alert" aria-live="assertive">
+            <h3>{generationFailure.summary}</h3>
+            <p>Met de huidige instellingen kan de planner geen geldige indeling maken.</p>
+            <ul>
+              {generationFailure.diagnostics.map((diagnostic) => (
+                <li key={diagnostic.code}>
+                  <span>{diagnostic.message}</span>
+                  <strong>{diagnostic.suggestedChange}</strong>
+                </li>
+              ))}
+            </ul>
+            {generationFailure.diagnostics.length > 1 ? (
+              <p className={styles.failureHint}>Wijzig één instelling tegelijk en genereer daarna opnieuw.</p>
+            ) : null}
+            <a className={styles.failureAction} href="#planner-settings">Instellingen aanpassen</a>
+          </div>
+        ) : null}
         {generation ? (
           <div className={styles.generation}>
             <h3>Controleer het voorstel</h3>

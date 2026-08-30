@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { generatePlannerSchedule, PlannerApiError, readPlannerApiBaseUrl } from "./client";
+import { generatePlannerSchedule, PlannerApiError, PlannerGenerationError, readPlannerApiBaseUrl } from "./client";
 
 const result = {
   seed: 7,
@@ -40,5 +40,41 @@ describe("internal planner API client", () => {
   it("fails closed for malformed or unsuccessful responses", async () => {
     await expect(generatePlannerSchedule({} as never, { baseUrl: "http://planner-api:8000", fetcher: vi.fn().mockResolvedValue(new Response(JSON.stringify({ ...result, private: true }), { status: 200 })) })).rejects.toThrow(PlannerApiError);
     await expect(generatePlannerSchedule({} as never, { baseUrl: "http://planner-api:8000", fetcher: vi.fn().mockResolvedValue(new Response("private upstream detail", { status: 500 })) })).rejects.toThrow(PlannerApiError);
+  });
+
+  it("keeps a valid structured no-solution result separate from transport errors", async () => {
+    const failure = {
+      error: "NO_VALID_SCHEDULE",
+      summary: "Geen geldig schema gevonden.",
+      diagnostics: [{
+        code: "LEVEL_MIX_TOO_RESTRICTIVE", severity: "likely",
+        message: "Met een hogere niveaumix vond de planner wel een geldig schema.",
+        suggested_change: "Verhoog Niveaumix van 80 naar 100.",
+        setting: "level_mix", current_value: 80, suggested_value: 100,
+      }],
+      probes_run: 1,
+    };
+    const promise = generatePlannerSchedule({} as never, {
+      baseUrl: "http://planner-api:8000",
+      fetcher: vi.fn().mockResolvedValue(new Response(JSON.stringify(failure), { status: 422 })),
+    });
+    await expect(promise).rejects.toMatchObject({
+      name: "PlannerGenerationError",
+      failure: expect.objectContaining({ code: "NO_VALID_SCHEDULE", probesRun: 1 }),
+    } satisfies Partial<PlannerGenerationError>);
+  });
+
+  it("rejects unknown diagnostic codes and control characters", async () => {
+    for (const diagnostic of [
+      { code: "RAW_SQL", severity: "likely", message: "raw", suggested_change: "change", setting: null, current_value: null, suggested_value: null },
+      { code: "NO_COURTS", severity: "blocking", message: "unsafe\ntext", suggested_change: "change", setting: null, current_value: null, suggested_value: null },
+    ]) {
+      await expect(generatePlannerSchedule({} as never, {
+        baseUrl: "http://planner-api:8000",
+        fetcher: vi.fn().mockResolvedValue(new Response(JSON.stringify({
+          error: "INVALID_PLANNER_INPUT", summary: "Invalid", diagnostics: [diagnostic], probes_run: 0,
+        }), { status: 422 })),
+      })).rejects.toThrow(PlannerApiError);
+    }
   });
 });

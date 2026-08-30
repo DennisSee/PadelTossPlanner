@@ -24,6 +24,7 @@ vi.mock("../../../../../../lib/planner-api/client", async (original) => {
 vi.mock("../../../../../../lib/tos/court-repository", () => ({ CourtRepository: class { list = listCourts; } }));
 
 import { POST } from "./route";
+import { PlannerGenerationError } from "../../../../../../lib/planner-api/client";
 
 const BASE = "https://app.example";
 const client = Object.freeze({ requestScoped: true });
@@ -96,5 +97,35 @@ describe("planner generation route", () => {
     const body = await response.text();
     expect(JSON.parse(body)).toEqual({ error: "generation-failed" });
     expect(body).not.toContain("internal upstream detail");
+  });
+
+  it("returns only the parsed structured failure from the internal planner", async () => {
+    generatePlannerSchedule.mockRejectedValueOnce(new PlannerGenerationError({
+      code: "NO_VALID_SCHEDULE",
+      summary: "Geen geldig schema gevonden.",
+      diagnostics: [{
+        code: "LEVEL_MIX_TOO_RESTRICTIVE", severity: "likely",
+        message: "Met een hogere niveaumix vond de planner wel een geldig schema.",
+        suggestedChange: "Verhoog Niveaumix van 80 naar 100.",
+        setting: "level_mix", currentValue: 80, suggestedValue: 100,
+      }],
+      probesRun: 1,
+    }));
+    const response = await POST(request({ slug: event.slug, expected_revision: 2 }));
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toEqual({
+      error: "generation-failed",
+      failure: {
+        error: "NO_VALID_SCHEDULE",
+        summary: "Geen geldig schema gevonden.",
+        diagnostics: [{
+          code: "LEVEL_MIX_TOO_RESTRICTIVE", severity: "likely",
+          message: "Met een hogere niveaumix vond de planner wel een geldig schema.",
+          suggested_change: "Verhoog Niveaumix van 80 naar 100.",
+          setting: "level_mix", current_value: 80, suggested_value: 100,
+        }],
+        probes_run: 1,
+      },
+    });
   });
 });

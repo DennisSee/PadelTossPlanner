@@ -25,6 +25,7 @@ const otpCodes = new Map();
 const oauthCodes = new Map();
 let nextOAuthAttempt = null;
 let attendeeFailureEventId = null;
+let plannerDiagnosticFailure = false;
 
 const TOS_EVENT_COLUMNS = [
   "id",
@@ -929,7 +930,7 @@ const server = createServer(async (request, response) => {
     const body = await requestJson(request);
     const email = String(body.email ?? "").trim().toLowerCase();
     const state = String(body.state ?? "");
-    if (!email.includes("@") || !new Set(["live", "waitlist", "empty"]).has(state)) {
+    if (!email.includes("@") || !new Set(["live", "closed", "closed-published", "waitlist", "waitlist-closed", "empty"]).has(state)) {
       json(response, 400, { error: "invalid home state fixture" });
       return;
     }
@@ -938,25 +939,41 @@ const server = createServer(async (request, response) => {
       json(response, 400, { error: "invalid home participant fixture" });
       return;
     }
-    if (state === "live") {
+    if (state === "live" || state === "closed" || state === "closed-published") {
       const event = tosEvents.find(({ slug }) => slug === "vrijdag-padel");
       if (!event) {
         json(response, 500, { error: "missing live home fixture" });
         return;
       }
-      event.starts_at = relativeIso(-1);
-      event.ends_at = relativeIso(1);
+      event.starts_at = relativeIso(state === "live" ? -1 : 24 * 60);
+      event.ends_at = relativeIso(state === "live" ? 1 : 26 * 60);
       event.signup_deadline = relativeIso(-2);
+      if (state !== "live") event.status = "closed";
       seedRegistration(user, event.id, "attending");
-    } else if (state === "waitlist") {
-      seedRegistration(
-        user,
-        tosEvents.find(({ slug }) => slug === "tennis-avond-2026").id,
-        "attending",
-      );
+      if (state !== "closed") {
+        const published = scheduleFixture();
+        staffSchedules.set(published.id, { ...published, event_id: event.id });
+      }
+    } else if (state === "waitlist" || state === "waitlist-closed") {
+      const event = tosEvents.find(({ slug }) => slug === "tennis-avond-2026");
+      if (state === "waitlist-closed") {
+        event.status = "closed";
+        event.signup_deadline = relativeIso(-2);
+      }
+      seedRegistration(user, event.id, "attending");
     } else {
       homeEmptyUsers.add(user.id);
     }
+    json(response, 200, { status: "ok" });
+    return;
+  }
+  if (request.method === "POST" && requestUrl.pathname === "/__test/planner-diagnostic-failure") {
+    const body = await requestJson(request);
+    if (!exactKeys(body, ["enabled"]) || typeof body.enabled !== "boolean") {
+      json(response, 400, { error: "invalid planner diagnostic fixture" });
+      return;
+    }
+    plannerDiagnosticFailure = body.enabled;
     json(response, 200, { status: "ok" });
     return;
   }
@@ -977,6 +994,7 @@ const server = createServer(async (request, response) => {
     homeEmptyUsers.clear();
     nextOAuthAttempt = null;
     attendeeFailureEventId = null;
+    plannerDiagnosticFailure = false;
     response.writeHead(204);
     response.end();
     return;
@@ -992,6 +1010,20 @@ const server = createServer(async (request, response) => {
     if (!exactKeys(body, expected) || !validPlayers || !Array.isArray(body.courts) || body.courts.length < 1 ||
         !Number.isSafeInteger(body.generation_seed)) {
       json(response, 422, { error: "invalid-input" });
+      return;
+    }
+    if (plannerDiagnosticFailure && body.level_mix < 100) {
+      json(response, 422, {
+        error: "NO_VALID_SCHEDULE",
+        summary: "Geen geldig schema gevonden.",
+        diagnostics: [{
+          code: "LEVEL_MIX_TOO_RESTRICTIVE", severity: "likely",
+          message: "Met een hogere niveaumix vond de planner wel een geldig schema.",
+          suggested_change: `Verhoog Niveaumix van ${body.level_mix} naar 100.`,
+          setting: "level_mix", current_value: body.level_mix, suggested_value: 100,
+        }],
+        probes_run: 1,
+      });
       return;
     }
     const names = body.players.map(({ name }) => String(name));

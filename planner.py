@@ -16,6 +16,15 @@ from datetime import date, datetime, time, timedelta
 from typing import Iterable, Sequence
 
 
+class PlannerInputError(ValueError):
+    """Machineleesbare, veilige categorie voor deterministische invoerfouten."""
+
+    def __init__(self, code: str, message: str, **details: object) -> None:
+        super().__init__(message)
+        self.code = code
+        self.details = details
+
+
 @dataclass(frozen=True)
 class Player:
     name: str
@@ -97,14 +106,19 @@ def calculate_rounds(settings: PlannerSettings) -> tuple[int, int]:
     """
     total_minutes = _session_minutes(settings)
     if settings.match_minutes <= 0:
-        raise ValueError("Wedstrijdduur moet groter dan nul zijn.")
+        raise PlannerInputError("INVALID_MATCH_DURATION", "Wedstrijdduur moet groter dan nul zijn.")
     if settings.rest_minutes < 0:
-        raise ValueError("Pauzeduur mag niet negatief zijn.")
+        raise PlannerInputError("INVALID_REST_DURATION", "Pauzeduur mag niet negatief zijn.")
 
     cycle_minutes = settings.match_minutes + settings.rest_minutes
     rounds = (total_minutes + settings.rest_minutes) // cycle_minutes
     if rounds < 1:
-        raise ValueError("De beschikbare tijd is korter dan één wedstrijdduur.")
+        raise PlannerInputError(
+            "SESSION_TOO_SHORT",
+            "De beschikbare tijd is korter dan één wedstrijdduur.",
+            session_minutes=total_minutes,
+            match_minutes=settings.match_minutes,
+        )
 
     used_minutes = rounds * settings.match_minutes + max(0, rounds - 1) * settings.rest_minutes
     unused_minutes = total_minutes - used_minutes
@@ -364,15 +378,18 @@ def _availability_context(
         until_offset = _time_offset_minutes(settings.start_time, until_time)
 
         if from_offset > session_minutes:
-            raise ValueError(
+            raise PlannerInputError(
+                "AVAILABILITY_OUTSIDE_SESSION",
                 f"De vanaf-tijd van {player.name} ({from_time:%H:%M}) ligt buiten de sessie."
             )
         if until_offset > session_minutes:
-            raise ValueError(
+            raise PlannerInputError(
+                "AVAILABILITY_OUTSIDE_SESSION",
                 f"De eindtijd van {player.name} ({until_time:%H:%M}) ligt buiten de sessie."
             )
         if until_offset <= from_offset:
-            raise ValueError(
+            raise PlannerInputError(
+                "INVALID_AVAILABILITY_WINDOW",
                 f"De eindtijd van {player.name} moet later zijn dan de vanaf-tijd."
             )
 
@@ -417,10 +434,12 @@ def _availability_context(
 
     no_rounds = [name for name, count in availability_rounds.items() if count == 0]
     if no_rounds:
-        raise ValueError(
+        raise PlannerInputError(
+            "NO_COMPLETE_ROUND",
             "Deze deelnemer(s) hebben geen volledige speelronde binnen hun beschikbaarheid: "
             + ", ".join(no_rounds)
-            + ". Pas vanaf-/eindtijd, wedstrijdduur of pauzeduur aan."
+            + ". Pas vanaf-/eindtijd, wedstrijdduur of pauzeduur aan.",
+            affected_players=len(no_rounds),
         )
 
     return (
@@ -591,29 +610,41 @@ def generate_schedule(
 ) -> tuple[list[RoundPlan], dict[str, object]]:
     """Genereer een schema met individuele beschikbaarheidsvensters per speler."""
     if len(players) < 4:
-        raise ValueError("Minimaal vier spelers zijn nodig.")
+        raise PlannerInputError(
+            "INSUFFICIENT_PLAYERS",
+            "Minimaal vier spelers zijn nodig.",
+            available_players=len(players),
+            required_players=4,
+        )
     if not courts:
-        raise ValueError("Selecteer minimaal één baan.")
+        raise PlannerInputError("NO_COURTS", "Selecteer minimaal één baan.")
 
     names = [player.name.strip() for player in players]
     if any(not name for name in names):
-        raise ValueError("Iedere speler moet een naam hebben.")
+        raise PlannerInputError("INVALID_PLAYER_NAME", "Iedere speler moet een naam hebben.")
     if len({name.casefold() for name in names}) != len(names):
-        raise ValueError("Spelernamen moeten uniek zijn.")
+        raise PlannerInputError("DUPLICATE_PLAYER_NAMES", "Spelernamen moeten uniek zijn.")
     if any(not 1 <= player.ranking <= 5 for player in players):
-        raise ValueError("Iedere ranking moet tussen 1 en 5 liggen.")
+        raise PlannerInputError("INVALID_RANKING", "Iedere ranking moet tussen 1 en 5 liggen.")
     if not 0 <= settings.level_mix <= 100:
-        raise ValueError("Niveaumix moet tussen 0 en 100 liggen.")
+        raise PlannerInputError("INVALID_LEVEL_MIX", "Niveaumix moet tussen 0 en 100 liggen.")
     if not 0 <= settings.team_difference_tolerance <= 1.5:
-        raise ValueError("Tolerantie voor teamverschil moet tussen 0 en 1,5 liggen.")
+        raise PlannerInputError(
+            "INVALID_TEAM_TOLERANCE",
+            "Tolerantie voor teamverschil moet tussen 0 en 1,5 liggen.",
+        )
     if settings.rest_minutes < 0:
-        raise ValueError("Pauzeduur mag niet negatief zijn.")
+        raise PlannerInputError("INVALID_REST_DURATION", "Pauzeduur mag niet negatief zijn.")
 
     active_slots = len(courts) * 4
     if len(players) < active_slots:
-        raise ValueError(
+        raise PlannerInputError(
+            "INSUFFICIENT_PLAYERS",
             f"Voor {len(courts)} banen zijn minimaal {active_slots} spelers nodig. "
-            f"Er zijn nu {len(players)} spelers ingevoerd."
+            f"Er zijn nu {len(players)} spelers ingevoerd.",
+            available_players=len(players),
+            required_players=active_slots,
+            courts=len(courts),
         )
 
     ranks = {player.name: float(player.ranking) for player in players}
@@ -631,11 +662,17 @@ def generate_schedule(
         if len(available) < active_slots:
             start, _ = round_times(settings, round_index)
             shortage = active_slots - len(available)
-            raise ValueError(
+            raise PlannerInputError(
+                "ROUND_PLAYER_SHORTAGE",
                 f"Om {start:%H:%M} zijn slechts {len(available)} spelers beschikbaar, "
                 f"maar voor {len(courts)} banen zijn er {active_slots} nodig. "
                 f"Er ontbreken {shortage} speler(s). Pas een vanaf-/eindtijd aan, "
-                "pas de pauzeduur aan of selecteer minder banen."
+                "pas de pauzeduur aan of selecteer minder banen.",
+                round_time=f"{start:%H:%M}",
+                available_players=len(available),
+                required_players=active_slots,
+                shortage=shortage,
+                courts=len(courts),
             )
 
     play_targets, rest_targets = _build_fairness_targets(
@@ -650,9 +687,11 @@ def generate_schedule(
         available_count = len(available_by_round[round_index])
         if previous_rest + current_rest > available_count:
             start, _ = round_times(settings, round_index)
-            raise ValueError(
+            raise PlannerInputError(
+                "CONSECUTIVE_REST_IMPOSSIBLE",
                 f"Rond {start:%H:%M} kan de regel 'niet twee echte rustbeurten achter elkaar' "
-                "niet worden gehaald. Selecteer meer banen of gebruik minder spelers."
+                "niet worden gehaald. Selecteer meer banen of gebruik minder spelers.",
+                round_time=f"{start:%H:%M}",
             )
 
     best_state: SearchState | None = None

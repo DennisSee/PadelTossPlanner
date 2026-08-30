@@ -33,7 +33,7 @@ test("homepage toont de publieke stagingingang en navigeert met toetsenbord", as
     await expect(stagingBadge).toBeVisible();
   }
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(
-    "Jouw TOS-avond. Live.",
+    "Samen spelen. Iedere ronde anders.",
   );
   await expect(page.getByRole("heading", { level: 2 })).toHaveText(
     "Doe mee met de volgende TOS",
@@ -43,11 +43,11 @@ test("homepage toont de publieke stagingingang en navigeert met toetsenbord", as
     .locator("xpath=ancestor::section[1]");
   await expect(joinCard.getByRole("link", { name: "Inloggen / aanmelden" })).toBeVisible();
 
-  const liveLink = page.getByRole("link", { name: "Bekijk live TOS-schema" });
-  await liveLink.focus();
-  await expect(liveLink).toBeFocused();
+  const tosLink = page.getByRole("link", { name: "Bekijk TOS-avonden" });
+  await tosLink.focus();
+  await expect(tosLink).toBeFocused();
   await page.keyboard.press("Enter");
-  await expect(page).toHaveURL(/\/live\/live-schema$/u);
+  await expect(page).toHaveURL(/\/login\?next=%2Ftos$/u);
 });
 
 test("mock weigert een wildcard of afwijkend publiek querycontract", async ({ request }) => {
@@ -208,7 +208,7 @@ test("homepage en livepagina blijven binnen iedere geconfigureerde viewport", as
   expect(logo).not.toBeNull();
   expect(brand).not.toBeNull();
   expect((logo?.x ?? 0) + (logo?.width ?? 0)).toBeLessThanOrEqual((brand?.x ?? 0) + 1);
-  const cta = await page.getByRole("link", { name: "Bekijk live TOS-schema" }).boundingBox();
+  const cta = await page.getByRole("link", { name: "Bekijk TOS-avonden" }).boundingBox();
   expect(cta?.height ?? 0).toBeGreaterThanOrEqual(44);
 
   await openLive(page);

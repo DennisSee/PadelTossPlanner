@@ -16,11 +16,13 @@ const listOwnUpcomingRegistrations = vi.hoisted(() => vi.fn());
 const ownRegistrationPosition = vi.hoisted(() => vi.fn());
 const eventCapacity = vi.hoisted(() => vi.fn());
 const eventAttendance = vi.hoisted(() => vi.fn());
+const loadEventPublicSchedule = vi.hoisted(() => vi.fn());
 
 vi.mock("../lib/auth/session", () => ({
   loadAccountContextWithClient,
 }));
 vi.mock("../lib/supabase/server", () => ({ createServerSupabaseClient }));
+vi.mock("../lib/supabase/public-schedule-repository", () => ({ loadEventPublicSchedule }));
 vi.mock("../lib/tos/repository", () => ({ TosRepository: class {
   listParticipantEvents = listParticipantEvents;
   listOwnUpcomingRegistrations = listOwnUpcomingRegistrations;
@@ -39,6 +41,8 @@ describe("WEB-2 routes", () => {
     ownRegistrationPosition.mockReset();
     eventCapacity.mockReset();
     eventAttendance.mockReset();
+    loadEventPublicSchedule.mockReset();
+    loadEventPublicSchedule.mockResolvedValue(null);
   });
 
   it("links the public homepage to live schedule and the shared login", async () => {
@@ -134,6 +138,50 @@ describe("WEB-2 routes", () => {
     expect(screen.getByRole("heading", { level: 3, name: "Clubkampioenen TOS" })).toBeVisible();
     expect(screen.queryByRole("heading", { name: "Padel TOS-avond" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Aanmelding wijzigen" })).toHaveAttribute("href", "/tos/vrijdag-padel");
+  });
+
+  it.each([
+    [false, "Bekijk TOS-avond", "/tos/vrijdag-padel"],
+    [true, "Bekijk je schema", "/live/vrijdag-padel"],
+  ] as const)("maps a closed placed registration truthfully when schedule published=%s", async (published, label, href) => {
+    const event = {
+      id: "10000000-0000-4000-8000-000000000002", slug: "vrijdag-padel", title: "Besloten TOS",
+      sport: "padel" as const, startsAt: "2099-08-28T18:00:00.000Z", endsAt: "2099-08-28T20:00:00.000Z",
+      signupDeadline: "2026-08-01T17:00:00.000Z", status: "closed" as const, maxParticipants: 4,
+    };
+    const registration = {
+      id: "20000000-0000-4000-8000-000000000002", eventId: event.id, response: "attending" as const,
+      availableFrom: event.startsAt, availableUntil: event.endsAt, attendingSince: "2026-08-01T10:00:00.000Z",
+      createdAt: "2026-08-01T10:00:00.000Z", updatedAt: "2026-08-01T10:00:00.000Z", event,
+    };
+    loadAccountContextWithClient.mockResolvedValueOnce(deriveAccountContext(
+      { userId: "user-1", email: "member@example.test" },
+      { id: "user-1", display_name: "Member", role: "participant", active: true, member_id: "member-1" },
+      { id: "member-1", display_name: "Member", approval_status: "approved", active: true },
+    ));
+    listParticipantEvents.mockResolvedValueOnce([event]);
+    listOwnUpcomingRegistrations.mockResolvedValueOnce([registration]);
+    ownRegistrationPosition.mockResolvedValueOnce({ placementStatus: "placed", waitlistPosition: null });
+    eventCapacity.mockResolvedValueOnce({ maxParticipants: 4, placedCount: 1, availableCount: 3, waitlistCount: 0 });
+    eventAttendance.mockResolvedValueOnce([{ displayName: "Member", placementStatus: "placed", waitlistPosition: null }]);
+    loadEventPublicSchedule.mockResolvedValueOnce(published ? { id: "published" } : null);
+
+    render(await Home());
+    expect(screen.getAllByRole("link", { name: label })).not.toHaveLength(0);
+    expect(screen.getAllByRole("link", { name: label })[0]).toHaveAttribute("href", href);
+    expect(screen.queryByRole("link", { name: "Aanmelding wijzigen" })).not.toBeInTheDocument();
+  });
+
+  it("does not load participant data for staff without membership", async () => {
+    loadAccountContextWithClient.mockResolvedValueOnce(deriveAccountContext(
+      { userId: "staff-1", email: "staff@example.test" },
+      { id: "staff-1", display_name: "Staff", role: "planner", active: true, member_id: null },
+      null,
+    ));
+    render(await Home());
+    expect(listParticipantEvents).not.toHaveBeenCalled();
+    expect(loadEventPublicSchedule).not.toHaveBeenCalled();
+    expect(screen.getByRole("link", { name: "Naar TOS-avonden" })).toHaveAttribute("href", "/tos");
   });
 
   it("shows the staging badge from runtime APP_ENV", async () => {

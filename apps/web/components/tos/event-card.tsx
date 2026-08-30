@@ -66,7 +66,7 @@ export function TosEventCard({
   registrationPosition?: OwnRegistrationPosition | null;
   socialDataUnavailable?: boolean;
   compact?: boolean;
-  actionOverride?: Readonly<{ href: string; label: string }>;
+  actionOverride?: Readonly<{ href: string; label: string; status?: string }>;
   now: Date;
 }) {
   const status = eventPresentationStatus(event, now);
@@ -149,7 +149,10 @@ export function TosEventCard({
           )}
           <div className={styles.actions}>
             {actionOverride ? (
-              <LinkButton href={actionOverride.href}>{actionOverride.label}</LinkButton>
+              <>
+                <LinkButton href={actionOverride.href}>{actionOverride.label}</LinkButton>
+                {actionOverride.status ? <p className={styles.muted}>{actionOverride.status}</p> : null}
+              </>
             ) : registration && !canChange ? (
               <>
                 <SecondaryLinkButton href={`/tos/${event.slug}`}>

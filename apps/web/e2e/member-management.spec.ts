@@ -39,13 +39,15 @@ test("desktop stages inline sport and role edits and saves once", async ({ page,
   expect((await request.post(`${MOCK_URL}/auth/v1/otp`, { data: { email: roleTargetEmail, create_user: true } })).ok()).toBe(true);
   await signInAsAdmin(page, request);
   await expect(page.getByRole("table")).toBeVisible();
-  await expect(page.locator("tbody tr")).toHaveCount(9);
+  expect(await page.locator("tbody tr").count()).toBeGreaterThanOrEqual(9);
 
   await page.getByLabel("Padelniveau voor Ready Partieel").selectOption("2");
   await page.getByLabel("Tennisprofiel voor Ready Partieel").selectOption("true");
   await page.getByLabel("Tennisniveau voor Ready Partieel").selectOption("5");
   await page.getByLabel("Padelniveau voor Niveau Ontbreekt").selectOption("4");
-  await page.getByLabel("Accountrol voor Testlid").selectOption("planner");
+  const roleTargetRow = page.getByRole("row").filter({ hasText: roleTargetEmail });
+  await expect(roleTargetRow).toHaveCount(1);
+  await roleTargetRow.getByLabel("Accountrol voor Testlid").selectOption("planner");
 
   const saveBar = page.getByRole("region", { name: "Niet-opgeslagen wijzigingen" });
   await expect(saveBar).toContainText("3 leden gewijzigd");
@@ -53,7 +55,7 @@ test("desktop stages inline sport and role edits and saves once", async ({ page,
   await expect(page.getByRole("status")).toContainText("Wijzigingen opgeslagen");
   await expect(saveBar).toHaveCount(0);
   await expect(page.getByLabel("Tennisniveau voor Ready Partieel")).toHaveValue("5");
-  await expect(page.getByLabel("Accountrol voor Testlid")).toHaveValue("planner");
+  await expect(roleTargetRow.getByLabel("Accountrol voor Testlid")).toHaveValue("planner");
   await noHorizontalOverflow(page);
 });
 

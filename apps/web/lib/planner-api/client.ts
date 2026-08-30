@@ -1,6 +1,7 @@
 import "server-only";
 
-import type { PlannerGenerateRequest, PlannerGeneration, PrivateScheduleRow } from "./types";
+import type { PlannerGenerateRequest, PlannerGeneration, PlannerGenerationFailure, PrivateScheduleRow } from "./types";
+import { parsePlannerGenerationFailure } from "./failure";
 
 const ROW_KEYS = [
   "Ronde", "Tijd", "Baan", "Team 1", "Niveau T1", "Team 2", "Niveau T2",
@@ -12,6 +13,13 @@ export class PlannerApiError extends Error {
   constructor() {
     super("De plannergenerator is tijdelijk niet beschikbaar.");
     this.name = "PlannerApiError";
+  }
+}
+
+export class PlannerGenerationError extends PlannerApiError {
+  constructor(readonly failure: PlannerGenerationFailure) {
+    super();
+    this.name = "PlannerGenerationError";
   }
 }
 
@@ -96,10 +104,12 @@ export async function generatePlannerSchedule(
       cache: "no-store",
       signal: controller.signal,
     });
+    const body: unknown = await response.json();
+    if (response.status === 422) throw new PlannerGenerationError(parsePlannerGenerationFailure(body));
     if (!response.ok) throw new PlannerApiError();
-    return parsePlannerGeneration(await response.json());
+    return parsePlannerGeneration(body);
   } catch (error) {
-    if (error instanceof PlannerApiError) throw error;
+    if (error instanceof PlannerGenerationError || error instanceof PlannerApiError) throw error;
     throw new PlannerApiError();
   } finally {
     clearTimeout(timeout);

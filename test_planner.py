@@ -2,7 +2,7 @@
 
 from datetime import time
 
-from planner import Player, PlannerSettings, generate_schedule, round_times, schedule_rows
+from planner import PlannerInputError, Player, PlannerSettings, generate_schedule, round_times, schedule_rows
 
 
 def _assert_basic_rules(rounds, courts) -> None:
@@ -179,6 +179,18 @@ def test_level_mix_control() -> None:
 
     assert mixed_courts(mixed_rounds) > mixed_courts(strict_rounds)
     assert mixed_diagnostics["level_mix"] == 100
+
+
+def test_structured_input_error_remains_a_value_error() -> None:
+    settings = PlannerSettings(start_time=time(20), end_time=time(22), match_minutes=20)
+    try:
+        generate_schedule(_players()[:4], ["Baan 1", "Baan 2"], settings)
+    except PlannerInputError as error:
+        assert isinstance(error, ValueError)
+        assert error.code == "INSUFFICIENT_PLAYERS"
+        assert error.details == {"available_players": 4, "required_players": 8, "courts": 2}
+    else:
+        raise AssertionError("Expected structured planner input failure.")
 
 
 def main() -> None:

@@ -1,5 +1,7 @@
+import pytest
 from fastapi.testclient import TestClient
 
+from app import main as main_module
 from app.main import app
 
 
@@ -63,12 +65,34 @@ def test_generate_accepts_server_resolved_courts_and_rejects_unsafe_values() -> 
         assert client.post("/generate", json=duplicate).status_code == 422
 
 
-def test_generate_returns_finite_errors_without_engine_details() -> None:
+def test_generate_returns_structured_finite_errors_without_engine_details() -> None:
     value = payload()
     value["players"] = value["players"][:4]
     value["courts"] = ["Kremer Baan", "ZGA/F&F Baan"]
     with TestClient(app) as client:
         response = client.post("/generate", json=value)
     assert response.status_code == 422
-    assert response.json() == {"error": "insufficient-players"}
-    assert "spelers" not in response.text.lower()
+    body = response.json()
+    assert body["error"] == "INVALID_PLANNER_INPUT"
+    assert body["probes_run"] == 0
+    assert body["diagnostics"][0]["code"] == "INSUFFICIENT_PLAYERS"
+    assert body["diagnostics"][0]["current_value"] is None
+    assert "private" not in response.text.lower()
+
+
+def test_unexpected_diagnostic_failure_remains_a_finite_server_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def generation_failure(*_args: object) -> None:
+        raise RuntimeError("private generation detail")
+
+    def diagnostic_failure(*_args: object) -> None:
+        raise ValueError("private diagnostic detail")
+
+    monkeypatch.setattr(main_module, "generate_schedule", generation_failure)
+    monkeypatch.setattr(main_module, "diagnose_search_failure", diagnostic_failure)
+    with TestClient(app) as client:
+        response = client.post("/generate", json=payload())
+    assert response.status_code == 500
+    assert response.json() == {"error": "temporarily-unavailable"}
+    assert "private" not in response.text.lower()

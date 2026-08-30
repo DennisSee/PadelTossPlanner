@@ -8,7 +8,9 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from planner import Player, PlannerSettings, generate_schedule, player_statistics, schedule_rows
+from planner import PlannerInputError, Player, PlannerSettings, generate_schedule, player_statistics, schedule_rows
+
+from .diagnostics import SEARCH_PROFILES, diagnose_search_failure, input_failure
 
 app = FastAPI(
     title="T.C. Zuid TOS planner API",
@@ -16,13 +18,6 @@ app = FastAPI(
     redoc_url=None,
     openapi_url=None,
 )
-
-SEARCH_PROFILES = {
-    "Snel": (4, 8, 45),
-    "Normaal": (8, 12, 70),
-    "Uitgebreid": (14, 18, 105),
-}
-
 
 class GeneratePlayer(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True, str_strip_whitespace=True)
@@ -117,10 +112,15 @@ def generate(payload: GenerateRequest) -> JSONResponse:
             "statistics": player_statistics(rounds, players, diagnostics),
             "diagnostics": json_safe(diagnostics),
         })
-    except ValueError as error:
-        category = "insufficient-players" if "spelers" in str(error).lower() else "invalid-input"
-        return JSONResponse(status_code=422, content={"error": category})
+    except PlannerInputError as error:
+        return JSONResponse(status_code=422, content=input_failure(error).json())
     except RuntimeError:
-        return JSONResponse(status_code=422, content={"error": "no-schedule"})
+        try:
+            failure = diagnose_search_failure(
+                players, payload.courts, settings, payload.search_profile
+            )
+        except Exception:
+            return JSONResponse(status_code=500, content={"error": "temporarily-unavailable"})
+        return JSONResponse(status_code=422, content=failure.json())
     except Exception:
         return JSONResponse(status_code=500, content={"error": "temporarily-unavailable"})

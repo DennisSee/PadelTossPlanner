@@ -39,3 +39,20 @@ export type PlannerGeneration = Readonly<{
   statistics: readonly Readonly<Record<string, string | number>>[];
   diagnostics: Readonly<Record<string, unknown>>;
 }>;
+
+export type PlannerFailureDiagnostic = Readonly<{
+  code: string;
+  severity: "blocking" | "likely" | "unknown";
+  message: string;
+  suggestedChange: string;
+  setting: string | null;
+  currentValue: string | number | boolean | null;
+  suggestedValue: string | number | boolean | null;
+}>;
+
+export type PlannerGenerationFailure = Readonly<{
+  code: "INVALID_PLANNER_INPUT" | "NO_VALID_SCHEDULE";
+  summary: string;
+  diagnostics: readonly PlannerFailureDiagnostic[];
+  probesRun: number;
+}>;

@@ -79,10 +79,27 @@ test("incoming consent reveals contact e-mail only after acceptance and revoke h
 });
 
 test("admin role controls remain separate from membership and self-role is read-only", async ({ page, request }) => {
+  const address = email("admin-web7");
   await page.goto("/login?next=/beheer/leden");
-  await signIn(page, request, email("admin-web7"));
+  await signIn(page, request, address);
   await expect(page).toHaveURL(/\/beheer\/leden$/u);
-  await expect(page.getByText("Je kunt je eigen rol niet wijzigen.")).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Ledenbeheer" })).toBeVisible();
+  await page.getByRole("searchbox", { name: "Zoeken op naam of e-mailadres" }).fill(address);
+
+  const table = page.getByRole("table");
+  if (await table.isVisible().catch(() => false)) {
+    const ownRow = table.getByRole("row").filter({ hasText: address });
+    await expect(ownRow).toHaveCount(1);
+    await expect(ownRow.getByRole("combobox", { name: /Accountrol/u })).toHaveCount(0);
+    await expect(ownRow.getByText("Admin", { exact: true })).toBeVisible();
+  } else {
+    const ownMember = page.getByRole("button").filter({ hasText: address });
+    await expect(ownMember).toHaveCount(1);
+    await ownMember.click();
+    const dialog = page.getByRole("dialog", { name: "Testlid bewerken" });
+    await expect(dialog.getByRole("combobox", { name: "Accountrol" })).toHaveCount(0);
+    await expect(dialog.getByText("Admin", { exact: true })).toBeVisible();
+  }
   await expect(page.locator('a[href="/historie"]').first()).toHaveCount(1);
   await noOverflow(page);
 });

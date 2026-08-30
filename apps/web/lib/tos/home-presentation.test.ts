@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { TosEvent } from "./types";
-import { homeHeroPresentation } from "./home-presentation";
+import { homePresentation } from "./home-presentation";
 
 const event: TosEvent = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -14,28 +14,74 @@ const event: TosEvent = {
   status: "open",
   maxParticipants: 24,
 };
+const editOpen = new Date("2026-08-28T15:00:00Z");
+const editClosed = new Date("2026-08-28T17:00:00Z");
 
-describe("status-aware homepage presentation", () => {
-  it.each([
-    ["live-placed", "Jouw TOS-avond. Live.", "/live/vrijdag-padel"],
-    ["future-placed", "Je volgende TOS staat klaar.", "/tos/vrijdag-padel"],
-    ["future-waitlist", "Je staat op de wachtlijst.", "/tos/vrijdag-padel"],
-    ["open", "Zin in een TOS-avond?", "/tos"],
-  ] as const)("maps %s to truthful copy and a safe internal action", (kind, title, href) => {
-    const presentation = homeHeroPresentation(kind, event);
-    expect(presentation.title).toBe(title);
-    expect(presentation.action.href).toBe(href);
+function presentation(
+  kind: "live-placed" | "future-placed" | "future-waitlist" | "open" | null,
+  options: Partial<{ now: Date; hasPublishedSchedule: boolean; hasRegistration: boolean }> = {},
+  selectedEvent: TosEvent | null = event,
+) {
+  return homePresentation(kind, selectedEvent, {
+    now: options.now ?? editOpen,
+    hasPublishedSchedule: options.hasPublishedSchedule ?? false,
+    hasRegistration: options.hasRegistration ?? true,
+  });
+}
+
+describe("truthful status-aware homepage presentation", () => {
+  it("keeps an editable placed registration on its participant route", () => {
+    const value = presentation("future-placed");
+    expect(value.action).toMatchObject({ href: "/tos/vrijdag-padel", label: "Bekijk je aanmelding" });
+    expect(value.cardAction).toMatchObject({ href: "/tos/vrijdag-padel", label: "Aanmelding wijzigen" });
   });
 
-  it("keeps anonymous and empty states neutral", () => {
-    expect(homeHeroPresentation(null, null)).toEqual(expect.objectContaining({
+  it("uses event status after close when no published schedule exists", () => {
+    const value = presentation("future-placed", { now: editClosed });
+    expect(value.action).toMatchObject({ href: "/tos/vrijdag-padel", label: "Bekijk TOS-avond", status: "Schema volgt" });
+    expect(value.cardAction).toEqual(value.action);
+    expect(JSON.stringify(value)).not.toContain("Aanmelding wijzigen");
+    expect(JSON.stringify(value)).not.toContain("Bekijk je schema");
+  });
+
+  it("links a closed placed registration only to a published schedule", () => {
+    const value = presentation("future-placed", { now: editClosed, hasPublishedSchedule: true });
+    expect(value.action).toEqual({ href: "/live/vrijdag-padel", label: "Bekijk je schema" });
+    expect(value.cardAction).toEqual(value.action);
+  });
+
+  it("gives a current published schedule live priority", () => {
+    const value = presentation("live-placed", { now: editClosed, hasPublishedSchedule: true });
+    expect(value.title).toBe("Jouw TOS-avond. Live.");
+    expect(value.action).toEqual({ href: "/live/vrijdag-padel", label: "Bekijk live TOS-schema" });
+    expect(value.cardAction).toEqual({ href: "/live/vrijdag-padel", label: "Bekijk live schema" });
+  });
+
+  it("keeps waitlist states on the status route before and after close", () => {
+    for (const now of [editOpen, editClosed]) {
+      const value = presentation("future-waitlist", { now });
+      expect(value.action).toEqual({ href: "/tos/vrijdag-padel", label: "Bekijk je status" });
+      expect(value.cardAction).toEqual(value.action);
+    }
+  });
+
+  it("never links a cancelled event to live", () => {
+    const value = presentation(
+      "future-placed",
+      { now: editClosed, hasPublishedSchedule: true },
+      { ...event, status: "cancelled" },
+    );
+    expect(value.action.href).toBe("/tos/vrijdag-padel");
+    expect(value.title).toMatch(/geannuleerd/u);
+  });
+
+  it("keeps anonymous and open states neutral and formats Amsterdam time", () => {
+    expect(presentation(null, {}, null)).toMatchObject({
       title: "Samen spelen. Iedere ronde anders.",
       cue: null,
       action: { href: "/tos", label: "Bekijk TOS-avonden" },
-    }));
-  });
-
-  it("formats the event cue in Dutch and Europe/Amsterdam", () => {
-    expect(homeHeroPresentation("future-placed", event).cue).toBe("vrijdag · 20:00");
+    });
+    expect(presentation("open", { hasRegistration: false }).cardAction.label).toBe("Aanmelden");
+    expect(presentation("future-placed").cue).toBe("vrijdag · 20:00");
   });
 });

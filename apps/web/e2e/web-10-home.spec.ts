@@ -73,6 +73,32 @@ test("home toont uitsluitend tijdens een geplaatste lopende TOS een live hero", 
   await noHorizontalOverflow(page);
 });
 
+test("home toont na sluiting zonder publicatie alleen de eventstatus", async ({ page, request }) => {
+  const address = email("home-closed");
+  expect((await request.post(`${MOCK_URL}/__test/home-state`, {
+    data: { email: address, state: "closed" },
+  })).ok()).toBe(true);
+  await signInHome(page, request, address);
+  await expect(page.getByRole("heading", { level: 1, name: "Je plaats staat vast." })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Bekijk TOS-avond" }).first()).toHaveAttribute("href", "/tos/vrijdag-padel");
+  await expect(page.getByText("Schema volgt", { exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Aanmelding wijzigen" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Bekijk je schema" })).toHaveCount(0);
+  await noHorizontalOverflow(page);
+});
+
+test("home toont na sluiting uitsluitend een echt gepubliceerd schema", async ({ page, request }) => {
+  const address = email("home-closed-published");
+  expect((await request.post(`${MOCK_URL}/__test/home-state`, {
+    data: { email: address, state: "closed-published" },
+  })).ok()).toBe(true);
+  await signInHome(page, request, address);
+  await expect(page.getByRole("heading", { level: 1, name: "Je schema staat klaar." })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Bekijk je schema" }).first()).toHaveAttribute("href", "/live/vrijdag-padel");
+  await expect(page.getByRole("link", { name: "Aanmelding wijzigen" })).toHaveCount(0);
+  await noHorizontalOverflow(page);
+});
+
 test("home toont een wachtlijstregistratie met de juiste actie", async ({ page, request }) => {
   const address = email("home-waitlist");
   const fixture = await request.post(`${MOCK_URL}/__test/home-state`, {
@@ -81,14 +107,24 @@ test("home toont een wachtlijstregistratie met de juiste actie", async ({ page, 
   expect(fixture.ok()).toBe(true);
   await signInHome(page, request, address);
   await expect(page.getByRole("heading", { level: 1, name: "Je staat op de wachtlijst." })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Bekijk je wachtlijst" })).toHaveAttribute(
+  await expect(page.getByRole("link", { name: "Bekijk je status" }).first()).toHaveAttribute(
     "href",
     "/tos/tennis-avond-2026",
   );
-  await expect(page.getByRole("link", { name: "Wachtlijst bekijken" })).toHaveAttribute(
-    "href",
-    "/tos/tennis-avond-2026",
+  await noHorizontalOverflow(page);
+});
+
+test("home houdt een gesloten wachtlijst op de statusroute", async ({ page, request }) => {
+  const address = email("home-waitlist-closed");
+  expect((await request.post(`${MOCK_URL}/__test/home-state`, {
+    data: { email: address, state: "waitlist-closed" },
+  })).ok()).toBe(true);
+  await signInHome(page, request, address);
+  await expect(page.getByRole("link", { name: "Bekijk je status" }).first()).toHaveAttribute(
+    "href", "/tos/tennis-avond-2026",
   );
+  await expect(page.getByRole("link", { name: "Bekijk je schema", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Bekijk live schema", exact: true })).toHaveCount(0);
   await noHorizontalOverflow(page);
 });
 
