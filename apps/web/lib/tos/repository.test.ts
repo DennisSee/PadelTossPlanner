@@ -169,6 +169,19 @@ describe("user-scoped TOS repository", () => {
     ]);
   });
 
+  it("can include past events without widening the safe projection or status scope", async () => {
+    const fake = fakeClient({ data: [eventRow], error: null });
+    await expect(new TosRepository(fake.client).listParticipantEvents(
+      new Date("2026-08-22T12:00:00Z"), { includePast: true },
+    )).resolves.toHaveLength(1);
+    expect(fake.calls).toEqual([
+      ["from", "tos_events"],
+      ["select", TOS_EVENT_SELECT],
+      ["in", "status", ["open", "closed"]],
+      ["order", "starts_at", { ascending: true }],
+    ]);
+  });
+
   it("uses separate narrow RPCs for capacity, attendance and own position", async () => {
     const capacity = fakeClient({
       data: [{ max_participants: 2, placed_count: 2, available_count: 0, waitlist_count: 1 }],

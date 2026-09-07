@@ -3,11 +3,12 @@ import { TosEventCard } from "../../components/tos/event-card";
 import { MembershipPanel } from "../../components/tos/membership-panel";
 import { TosFilters } from "../../components/tos/tos-filters";
 import styles from "../../components/tos/tos.module.css";
-import { StateMessage } from "../../components/ui";
+import { Badge, Card, EventDateRail, SportBadge, StateMessage } from "../../components/ui";
 import { requireAccount } from "../../lib/auth/route-guard";
 import { filterParticipantEvents, participantFilters } from "../../lib/tos/event-filters";
 import { publicTosMessage } from "../../lib/tos/messages";
 import { TosRepository } from "../../lib/tos/repository";
+import { eventDisplayTitle, formatEventClock, formatEventDate } from "../../lib/tos/time";
 import { createServerSupabaseClient } from "../../lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -32,11 +33,14 @@ async function loadDashboard(
 ) {
   const [registrations, participantEvents] = await Promise.all([
     repository.listOwnUpcomingRegistrations(userId, now),
-    repository.listParticipantEvents(now),
+    repository.listParticipantEvents(now, { includePast: filters.status === "past" || filters.status === "all" }),
   ]);
   const registrationByEvent = new Map(registrations.map((registration) => [registration.eventId, registration]));
   const events = filterParticipantEvents(participantEvents, filters, now);
   const snapshots = await Promise.all(events.map(async (event) => {
+    // The existing social RPCs intentionally exclude past events. Keep this
+    // overview on the safe event projection, not personal played-history data.
+    if (new Date(event.endsAt) < now) return Object.freeze({ event, past: true as const });
     const registration = registrationByEvent.get(event.id);
     const [capacity, attendanceResult, positionResult] = await Promise.all([
       repository.eventCapacity(event.id),
@@ -49,6 +53,7 @@ async function loadDashboard(
         : Promise.resolve(null),
     ]);
     return Object.freeze({
+      past: false as const,
       event,
       registration,
       capacity,
@@ -138,11 +143,25 @@ export default async function TosPage({ searchParams }: { searchParams: SearchPa
           {snapshots.length ? (
             <div className={styles.eventGrid}>
               {snapshots.map((snapshot) => (
-                <TosEventCard key={snapshot.event.id} {...snapshot} now={now} />
+                snapshot.past ? (
+                  <Card key={snapshot.event.id} className={styles.eventCard}>
+                    <EventDateRail startsAt={snapshot.event.startsAt} accent="green" />
+                    <div className={styles.eventBody}>
+                      <div className={styles.badges}><SportBadge sport={snapshot.event.sport} compact /><Badge tone="neutral">Afgelopen</Badge></div>
+                      <h3 className={styles.eventTitle}>{eventDisplayTitle(snapshot.event)}</h3>
+                      <p className={styles.metadata}>{formatEventDate(snapshot.event.startsAt)} · {formatEventClock(snapshot.event.startsAt)}–{formatEventClock(snapshot.event.endsAt)}</p>
+                    </div>
+                  </Card>
+                ) : <TosEventCard key={snapshot.event.id} {...snapshot} now={now} />
               ))}
             </div>
           ) : (
-            <p className={styles.muted}>Geen TOS-avonden gevonden met deze filters.</p>
+            <p className={styles.muted}>{({
+              open: "Geen open TOS-avonden gevonden.",
+              closed: "Geen TOS-avonden met gesloten inschrijving gevonden.",
+              past: "Geen afgelopen TOS-avonden gevonden.",
+              all: "Geen TOS-avonden gevonden met deze filters.",
+            })[filters.status]}</p>
           )}
         </section>
       </div>

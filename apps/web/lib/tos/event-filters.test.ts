@@ -59,13 +59,27 @@ describe("TOS event filters", () => {
       .toEqual({ status: "closed", sport: "tennis" });
   });
 
-  it("maps participant Open to actual self-service and Gesloten to non-open", () => {
-    expect(filterParticipantEvents(events, { status: "open", sport: "all" }, now))
+  it("separates open, closed registration and past participant events", () => {
+    const pastOpen = { ...past, status: "open" as const, signupDeadline: null };
+    const directory = [...events, pastOpen];
+    expect(participantFilters({ status: "past" })).toEqual({ status: "past", sport: "all" });
+    expect(filterParticipantEvents(directory, { status: "open", sport: "all" }, now))
       .toEqual([openPadel, openTennis]);
-    expect(filterParticipantEvents(events, { status: "closed", sport: "all" }, now))
-      .toEqual([closed, expiredDeadline, past, draft, cancelled]);
+    expect(filterParticipantEvents(directory, { status: "closed", sport: "all" }, now))
+      .toEqual([closed, expiredDeadline]);
+    expect(filterParticipantEvents(directory, { status: "past", sport: "all" }, now))
+      .toEqual([past, pastOpen]);
+    expect(filterParticipantEvents(directory, { status: "all", sport: "all" }, now))
+      .toEqual([openPadel, openTennis, closed, expiredDeadline, past, pastOpen]);
     expect(filterParticipantEvents(events, { status: "all", sport: "tennis" }, now))
       .toEqual([openTennis, past]);
+  });
+
+  it("uses the existing strict past boundary, including current events", () => {
+    const current = { ...openPadel, endsAt: now.toISOString(), signupDeadline: null };
+    expect(filterParticipantEvents([current], { status: "open", sport: "all" }, now)).toEqual([current]);
+    expect(filterParticipantEvents([current], { status: "past", sport: "all" }, now)).toEqual([]);
+    expect(filterParticipantEvents([current], { status: "past", sport: "all" }, new Date(now.getTime() + 1))).toEqual([current]);
   });
 
   it("uses current as the conservative staff default", () => {

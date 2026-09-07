@@ -25,7 +25,8 @@ export function TosFilters({
         <select name="status" value={status} onChange={() => form.current?.requestSubmit()}>
           <option value="all">Alles</option>
           <option value="open">Open</option>
-          <option value="closed">Gesloten</option>
+          <option value="closed">Inschrijving gesloten</option>
+          <option value="past">Afgelopen</option>
         </select>
       </label>
       <fieldset className={styles.sportFilter}>

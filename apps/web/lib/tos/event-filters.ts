@@ -1,7 +1,7 @@
 import { eventAllowsSelfService } from "./time";
 import type { TosEvent, TosSport } from "./types";
 
-export type ParticipantStatusFilter = "open" | "closed" | "all";
+export type ParticipantStatusFilter = "open" | "closed" | "past" | "all";
 export type StaffStatusFilter =
   | "current"
   | "all"
@@ -23,7 +23,7 @@ export function participantFilters(params: {
   const status = last(params.status);
   const sport = last(params.sport);
   return Object.freeze({
-    status: status === "all" || status === "closed" ? status : "open",
+    status: status === "all" || status === "closed" || status === "past" ? status : "open",
     sport: sport === "padel" || sport === "tennis" ? sport : "all",
   });
 }
@@ -51,9 +51,16 @@ export function filterParticipantEvents(
   now: Date,
 ): TosEvent[] {
   return events.filter((event) => {
+    if (event.status !== "open" && event.status !== "closed") return false;
     if (filters.sport !== "all" && event.sport !== filters.sport) return false;
+    const ended = new Date(event.endsAt).getTime() < now.getTime();
     const open = eventAllowsSelfService(event, now);
-    return filters.status === "all" || (filters.status === "open" ? open : !open);
+    switch (filters.status) {
+      case "all": return true;
+      case "past": return ended;
+      case "open": return !ended && open;
+      case "closed": return !ended && !open;
+    }
   });
 }
 

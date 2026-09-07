@@ -118,13 +118,13 @@ export class TosRepository {
     }
   }
 
-  async listParticipantEvents(now: Date): Promise<TosEvent[]> {
-    const result = await this.client
+  async listParticipantEvents(now: Date, options: Readonly<{ includePast?: boolean }> = {}): Promise<TosEvent[]> {
+    let query = this.client
       .from("tos_events")
       .select(TOS_EVENT_SELECT)
-      .in("status", ["open", "closed"])
-      .gte("ends_at", now.toISOString())
-      .order("starts_at", { ascending: true });
+      .in("status", ["open", "closed"]);
+    if (!options.includePast) query = query.gte("ends_at", now.toISOString());
+    const result = await query.order("starts_at", { ascending: true });
     try {
       return sortEvents(resultRows(result).map(parseTosEvent));
     } catch (error) {

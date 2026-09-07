@@ -1868,11 +1868,12 @@ const server = createServer(async (request, response) => {
       validParticipant(user) &&
       hasOnlyQueryKeys(requestUrl, new Set(["select", "status", "ends_at", "order"])) &&
       singleQueryValue(requestUrl, "status") === "in.(open,closed)" &&
-      singleQueryValue(requestUrl, "ends_at")?.startsWith("gte.") &&
+      (singleQueryValue(requestUrl, "ends_at") === null || singleQueryValue(requestUrl, "ends_at")?.startsWith("gte.")) &&
       singleQueryValue(requestUrl, "order") === "starts_at.asc"
     ) {
       json(response, 200, homeEmptyUsers.has(user.id) ? [] : tosEvents
-        .filter((event) => new Set(["open", "closed"]).has(event.status) && new Date(event.ends_at) >= new Date())
+        .filter((event) => new Set(["open", "closed"]).has(event.status) &&
+          (singleQueryValue(requestUrl, "ends_at") === null || new Date(event.ends_at) >= new Date()))
         .sort((left, right) => new Date(left.starts_at) - new Date(right.starts_at)));
       return;
     }

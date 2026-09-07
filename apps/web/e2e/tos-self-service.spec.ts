@@ -121,6 +121,17 @@ test("TOS-filters tonen eigen reacties zonder gesloten en geannuleerde events pu
 
   await page.getByLabel("Status").selectOption("closed");
   await expect(page).toHaveURL(/\/tos\?status=closed&sport=all$/u);
+  await expect(page.getByRole("option", { name: "Inschrijving gesloten", exact: true })).toHaveAttribute("value", "closed");
+  await page.getByLabel("Status").selectOption("past");
+  await expect(page).toHaveURL(/\/tos\?status=past&sport=all$/u);
+  await expect(page.getByText("Geen afgelopen TOS-avonden gevonden.")).toBeVisible();
+  await page.getByLabel("Status").selectOption("all");
+  await expect(page).toHaveURL(/\/tos\?status=all&sport=all$/u);
+  await expect(page.getByRole("heading", { name: "Padel TOS vrijdagavond", level: 3 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Eigen gesloten TOS", level: 3 })).toBeVisible();
+  await expect(page.getByText("Eigen geannuleerde TOS")).toHaveCount(0);
+  await page.getByLabel("Status").selectOption("closed");
+  await expect(page).toHaveURL(/\/tos\?status=closed&sport=all$/u);
   const closedLink = page.locator('a[href="/tos/eigen-gesloten-tos"]');
   await expect(closedLink).toHaveAttribute("href", "/tos/eigen-gesloten-tos");
   await closedLink.click();
