@@ -16,6 +16,7 @@ import type { PlannerGeneration } from "../../lib/planner-api/types";
 import type { PlannerGenerationFailure } from "../../lib/planner-api/types";
 import { parsePlannerGenerationFailure } from "../../lib/planner-api/failure";
 import { parsePlannerQualitySummary } from "../../lib/planner-api/quality";
+import { isPlannerTechnicalCode, PLANNER_TECHNICAL_ERRORS, type PlannerTechnicalCode } from "../../lib/planner-api/errors";
 import { Card } from "../ui";
 
 import styles from "./planner-workspace.module.css";
@@ -108,6 +109,7 @@ export function PlannerWorkspace({
   const [allowRepeatPartners, setAllowRepeatPartners] = useState(draft.allowRepeatPartners);
   const [generation, setGeneration] = useState<PlannerGeneration | null>(null);
   const [generationFailure, setGenerationFailure] = useState<PlannerGenerationFailure | null>(null);
+  const [technicalFailure, setTechnicalFailure] = useState<PlannerTechnicalCode | null>(null);
   const [generating, setGenerating] = useState(false);
   const [dirty, setDirty] = useState(false);
   const serializedPlayers = useMemo(() => JSON.stringify(players.map((player) => ({
@@ -122,6 +124,7 @@ export function PlannerWorkspace({
   const selectedQuality = selectedSchedule ? parsePlannerQualitySummary(selectedSchedule.diagnostics) : null;
 
   function markDirty() {
+    setTechnicalFailure(null);
     setDirty(true);
     setGeneration(null);
     setGenerationFailure(null);
@@ -143,6 +146,7 @@ export function PlannerWorkspace({
   }
 
   async function generate() {
+    setTechnicalFailure(null);
     setGenerating(true);
     setGenerationFailure(null);
     try {
@@ -154,6 +158,11 @@ export function PlannerWorkspace({
       });
       const body: unknown = await response.json();
       if (!response.ok) {
+        if (body && typeof body === "object" && "error" in body && isPlannerTechnicalCode(body.error)) {
+          setGeneration(null);
+          setTechnicalFailure(body.error);
+          return;
+        }
         if (body && typeof body === "object" && !Array.isArray(body) &&
             (body as Record<string, unknown>).error === "generation-failed") {
           setGeneration(null);
@@ -169,20 +178,7 @@ export function PlannerWorkspace({
       setGeneration(value as PlannerGeneration);
     } catch {
       setGeneration(null);
-      setGenerationFailure({
-        code: "NO_VALID_SCHEDULE",
-        summary: "Geen geldig schema gevonden.",
-        diagnostics: [{
-          code: "SEARCH_BUDGET_EXHAUSTED",
-          severity: "unknown",
-          message: "De planner kon geen betrouwbare specifieke oorzaak bepalen binnen de huidige zoektijd.",
-          suggestedChange: "Kies Uitgebreid zoeken of genereer opnieuw met een nieuwe seed.",
-          setting: null,
-          currentValue: null,
-          suggestedValue: null,
-        }],
-        probesRun: 0,
-      });
+      setTechnicalFailure("PLANNER_UNAVAILABLE");
     } finally {
       setGenerating(false);
     }
@@ -267,6 +263,15 @@ export function PlannerWorkspace({
         <button className={styles.primaryButton} type="button" disabled={draft.revision < 1 || dirty || generating || selectedCourts.length < 1 || selectedCourts.some((id) => !courts.find((court) => court.id === id)?.active)} onClick={generate}>
           {generating ? "Schema wordt gemaakt…" : "Schema genereren"}
         </button>
+        {technicalFailure ? (
+          <div className={styles.failureCard} role="alert" aria-live="assertive">
+            <h3>{PLANNER_TECHNICAL_ERRORS[technicalFailure].title}</h3>
+            <p>{PLANNER_TECHNICAL_ERRORS[technicalFailure].message}</p>
+            {technicalFailure === "SEARCH_DEADLINE_REACHED" ? <p>{draft.searchProfile === "Uitgebreid"
+              ? "Genereer opnieuw met een nieuwe seed of controleer de instellingen."
+              : "Genereer opnieuw met een nieuwe seed of kies Uitgebreid zoeken."}</p> : null}
+          </div>
+        ) : null}
         {generationFailure ? (
           <div className={styles.failureCard} role="alert" aria-live="assertive">
             <h3>{generationFailure.summary}</h3>
@@ -306,7 +311,8 @@ export function PlannerWorkspace({
               <input type="hidden" name="slug" value={event.slug} />
               <input type="hidden" name="expected_revision" value={draft.revision} />
               <input type="hidden" name="generation_seed" value={generation.seed} />
-              <button className={styles.primaryButton} type="submit">Dit schema privé opslaan</button>
+              <input type="hidden" name="checkpoint" value={generation.checkpoint ?? ""} />
+              <button className={styles.primaryButton} type="submit" disabled={!generation.checkpoint}>Dit schema privé opslaan</button>
             </form>
           </div>
         ) : null}

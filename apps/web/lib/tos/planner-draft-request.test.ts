@@ -39,7 +39,10 @@ describe("planner mutation request contracts", () => {
 
   it("keeps save and publication browser payloads minimal", () => {
     const save = new FormData(); save.set("slug", "planner-padel"); save.set("expected_revision", "2"); save.set("generation_seed", "7");
-    expect(parseScheduleSaveRequest(save)).toEqual({ slug: "planner-padel", expectedRevision: 2, generationSeed: 7 });
+    expect(() => parseScheduleSaveRequest(save)).toThrow();
+    const checkpoint = `fixture.${"a".repeat(64)}`;
+    save.set("checkpoint", checkpoint);
+    expect(parseScheduleSaveRequest(save)).toEqual({ slug: "planner-padel", expectedRevision: 2, generationSeed: 7, checkpoint });
     const publish = new FormData(); publish.set("slug", "planner-padel"); publish.set("schedule_id", "11111111-1111-4111-8111-111111111111"); publish.set("published", "true");
     expect(parseSchedulePublishRequest(publish)).toEqual({ slug: "planner-padel", scheduleId: "11111111-1111-4111-8111-111111111111", published: true });
   });

@@ -27,6 +27,7 @@ vi.mock("../../../../../../../lib/tos/schedule-repository", async (original) => 
 vi.mock("../../../../../../../lib/tos/court-repository", () => ({ CourtRepository: class { list = listCourts; } }));
 
 import { POST } from "./route";
+import { PlannerApiError } from "../../../../../../../lib/planner-api/client";
 
 const BASE = "https://app.example";
 const scheduleId = "22222222-2222-4222-8222-222222222222";
@@ -37,7 +38,7 @@ const generation = { seed: 77, schedule: [{ Ronde: 1, Tijd: "20:00 - 20:20", Baa
 
 function request(extra: Record<string, string> = {}, origin: string | null = BASE) {
   const form = new FormData();
-  for (const [key, value] of Object.entries({ slug: event.slug, expected_revision: "2", generation_seed: "77", ...extra })) form.set(key, value);
+  for (const [key, value] of Object.entries({ slug: event.slug, expected_revision: "2", generation_seed: "77", checkpoint: `fixture.${"a".repeat(64)}`, ...extra })) form.set(key, value);
   return new NextRequest(`${BASE}/api/beheer/tos/planner/schedule/save`, { method: "POST", headers: origin ? { origin } : undefined, body: form });
 }
 
@@ -55,13 +56,28 @@ describe("private schedule save route", () => {
     detail.mockResolvedValue({ ...generation, id: scheduleId, eventId: event.id, generationSeed: 77, plannerDraftRevision: 2, title: event.title, startTime: "20:00", endTime: "22:00", matchMinutes: 20, courts: ["Kremer Baan"] });
   });
 
-  it("regenerates authoritatively with the same seed before private save and rereads", async () => {
+  it("replays the server-issued checkpoint before private save and rereads", async () => {
     const response = await POST(request());
     expect(response.headers.get("location")).toBe(`${BASE}/beheer/tos/${event.slug}?notice=schedule-saved`);
     expect(generatePlannerSchedule).toHaveBeenCalledTimes(1);
     expect(generatePlannerSchedule.mock.calls[0][0].generation_seed).toBe(77);
+    expect(generatePlannerSchedule.mock.calls[0][0].checkpoint).toBe(`fixture.${"a".repeat(64)}`);
+    expect(generatePlannerSchedule.mock.calls[0][0].checkpoint_context).toMatch(/^[0-9a-f]{64}$/u);
     expect(save).toHaveBeenCalledWith(event, draft, generation);
     expect(detail).toHaveBeenCalledWith(event.id, scheduleId);
+  });
+
+  it("does not regenerate or save without a checkpoint", async () => {
+    expect((await POST(request({ checkpoint: "" }))).status).toBe(400);
+    expect(generatePlannerSchedule).not.toHaveBeenCalled();
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it("fails closed without retry or persistence when checkpoint verification fails", async () => {
+    generatePlannerSchedule.mockRejectedValueOnce(new PlannerApiError("INVALID_CHECKPOINT"));
+    expect((await POST(request())).headers.get("location")).toContain("error=checkpoint-invalid");
+    expect(generatePlannerSchedule).toHaveBeenCalledTimes(1);
+    expect(save).not.toHaveBeenCalled();
   });
 
   it.each(["schedule", "statistics", "diagnostics", "players_private", "event_id", "created_by"])("rejects forged %s", async (field) => {

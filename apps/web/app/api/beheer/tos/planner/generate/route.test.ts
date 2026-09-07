@@ -52,7 +52,7 @@ describe("planner generation route", () => {
     eventBySlug.mockResolvedValue(event);
     loadDraft.mockResolvedValue(draft);
     listCourts.mockResolvedValue([{ id: "c9000000-0000-4000-8000-000000000001", sport: "padel", name: "Kremer Baan", active: true, sortOrder: 10 }]);
-    generatePlannerSchedule.mockImplementation(async (payload) => ({ seed: payload.generation_seed, schedule: [], statistics: [], diagnostics: {} }));
+    generatePlannerSchedule.mockImplementation(async (payload) => ({ seed: payload.generation_seed, schedule: [], statistics: [], diagnostics: {}, checkpoint: `fixture.${"a".repeat(64)}` }));
   });
 
   it("derives all planner input server-side and returns a private no-store result", async () => {
@@ -93,9 +93,9 @@ describe("planner generation route", () => {
   it("returns only a finite error when the internal planner is unavailable", async () => {
     generatePlannerSchedule.mockRejectedValueOnce(new Error("internal upstream detail"));
     const response = await POST(request({ slug: event.slug, expected_revision: 2 }));
-    expect(response.status).toBe(422);
+    expect(response.status).toBe(502);
     const body = await response.text();
-    expect(JSON.parse(body)).toEqual({ error: "generation-failed" });
+    expect(JSON.parse(body)).toEqual({ error: "PLANNER_INTERNAL_ERROR" });
     expect(body).not.toContain("internal upstream detail");
   });
 

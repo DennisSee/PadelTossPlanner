@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import time
+import logging
 from typing import Annotated, Any, Literal
 
 from fastapi import FastAPI, Request
@@ -8,9 +9,10 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from planner import PlannerInputError, Player, PlannerSettings, generate_schedule, player_statistics, schedule_rows
+from planner import PlannerInputError, Player, PlannerSettings, SearchDeadlineReached, InvalidSearchCheckpoint, generate_schedule, player_statistics, schedule_rows
 
-from .diagnostics import SEARCH_PROFILES, diagnose_search_failure, input_failure
+from .diagnostics import SEARCH_PROFILES, input_failure
+from .execution import TIME_BUDGETS, CheckpointError, consume, fingerprint, issue
 
 app = FastAPI(
     title="T.C. Zuid TOS planner API",
@@ -47,6 +49,8 @@ class GenerateRequest(BaseModel):
     level_mix: Annotated[int, Field(ge=0, le=100)]
     tolerance: Annotated[float, Field(ge=0, le=1.5)]
     generation_seed: Annotated[int, Field(ge=0, le=9_223_372_036_854_775_807)]
+    checkpoint_context: Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")] | None = None
+    checkpoint: Annotated[str, Field(min_length=1, max_length=2048)] | None = None
 
     @model_validator(mode="after")
     def validate_collections(self) -> "GenerateRequest":
@@ -82,7 +86,7 @@ def json_safe(value: Any) -> Any:
 
 @app.exception_handler(RequestValidationError)
 async def request_validation_error(_request: Request, _error: RequestValidationError) -> JSONResponse:
-    return JSONResponse(status_code=422, content={"error": "invalid-input"})
+    return JSONResponse(status_code=422, content=input_failure(PlannerInputError("INVALID_CONFIGURATION", "Invalid request")).json())
 
 
 @app.get("/health")
@@ -103,24 +107,38 @@ def generate(payload: GenerateRequest) -> JSONResponse:
         search_restarts=restarts, beam_width=beam_width, candidates_per_state=candidates,
         allow_repeat_partners=payload.allow_repeat_partners, level_mix=payload.level_mix,
         team_difference_tolerance=payload.tolerance, random_seed=payload.generation_seed,
+        time_budget_seconds=TIME_BUDGETS[payload.search_profile],
     )
     try:
-        rounds, diagnostics = generate_schedule(players, payload.courts, settings)
-        return JSONResponse(status_code=200, content={
+        request_identity = payload.model_dump(exclude={"checkpoint"})
+        receipt = None
+        if payload.checkpoint is not None:
+            if payload.checkpoint_context is None:
+                raise CheckpointError()
+            receipt = consume(payload.checkpoint, request_identity)
+            rounds, diagnostics = generate_schedule(players, payload.courts, settings,
+                replay_checkpoint=tuple(receipt["boundary"]))
+            diagnostics["optimization_completed"] = receipt["completed"]
+        else:
+            rounds, diagnostics = generate_schedule(players, payload.courts, settings)
+        result = {
             "seed": payload.generation_seed,
             "schedule": schedule_rows(rounds, payload.courts, players, settings),
             "statistics": player_statistics(rounds, players, diagnostics),
             "diagnostics": json_safe(diagnostics),
-        })
+        }
+        if receipt is not None:
+            if fingerprint(result) != receipt["result"]:
+                raise CheckpointError()
+        elif payload.checkpoint_context is not None:
+            result["checkpoint"] = issue(request_identity, result, diagnostics["search_checkpoint"])
+        return JSONResponse(status_code=200, content=result)
     except PlannerInputError as error:
         return JSONResponse(status_code=422, content=input_failure(error).json())
-    except RuntimeError:
-        try:
-            failure = diagnose_search_failure(
-                players, payload.courts, settings, payload.search_profile
-            )
-        except Exception:
-            return JSONResponse(status_code=500, content={"error": "temporarily-unavailable"})
-        return JSONResponse(status_code=422, content=failure.json())
+    except (CheckpointError, InvalidSearchCheckpoint):
+        return JSONResponse(status_code=409, content={"error": "INVALID_CHECKPOINT"})
+    except SearchDeadlineReached:
+        return JSONResponse(status_code=504, content={"error": "SEARCH_DEADLINE_REACHED"})
     except Exception:
-        return JSONResponse(status_code=500, content={"error": "temporarily-unavailable"})
+        logging.getLogger(__name__).error("PLANNER_INTERNAL_ERROR")
+        return JSONResponse(status_code=500, content={"error": "PLANNER_INTERNAL_ERROR"})

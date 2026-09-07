@@ -17,6 +17,8 @@ export type PlannerGenerateRequest = Readonly<{
   level_mix: number;
   tolerance: number;
   generation_seed: number;
+  checkpoint_context?: string;
+  checkpoint?: string;
 }>;
 
 export type PrivateScheduleRow = Readonly<{
@@ -34,6 +36,7 @@ export type PrivateScheduleRow = Readonly<{
 }>;
 
 export type PlannerGeneration = Readonly<{
+  checkpoint?: string;
   seed: number;
   schedule: readonly PrivateScheduleRow[];
   statistics: readonly Readonly<Record<string, string | number>>[];

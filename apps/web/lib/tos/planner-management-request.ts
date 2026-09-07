@@ -16,6 +16,7 @@ export type PlannerError =
   | "conflict"
   | "planner-input-invalid"
   | "planner-unavailable"
+  | "checkpoint-invalid"
   | "schedule-unavailable"
   | "publication-forbidden"
   | "temporarily-unavailable"
@@ -36,6 +37,7 @@ const ERRORS: Record<PlannerError, string> = {
   conflict: "De planneropzet is intussen gewijzigd. Herlaad de pagina.",
   "planner-input-invalid": "Controleer de spelers, beschikbaarheid, banen en plannerinstellingen.",
   "planner-unavailable": "De plannergenerator is tijdelijk niet beschikbaar.",
+  "checkpoint-invalid": "Dit voorstel is verlopen of niet meer exact te reconstrueren. Genereer een nieuw voorstel voordat je opslaat.",
   "schedule-unavailable": "Het schema is tijdelijk niet beschikbaar.",
   "publication-forbidden": "Je mag dit schema niet publiceren.",
   "temporarily-unavailable": "De planner is tijdelijk niet beschikbaar.",

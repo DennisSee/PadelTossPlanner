@@ -5,6 +5,7 @@ import { loginPathFor } from "../../../../../../../lib/auth/return-path";
 import { loadAccountContextWithClient } from "../../../../../../../lib/auth/session";
 import { readAppBaseUrl } from "../../../../../../../lib/config/public-supabase";
 import { generatePlannerSchedule, PlannerApiError } from "../../../../../../../lib/planner-api/client";
+import { plannerCheckpointContext } from "../../../../../../../lib/planner-api/checkpoint";
 import { createServerSupabaseClient } from "../../../../../../../lib/supabase/server";
 import { PlannerDraftRepository } from "../../../../../../../lib/tos/planner-draft-repository";
 import { parseScheduleSaveRequest } from "../../../../../../../lib/tos/planner-draft-request";
@@ -36,7 +37,8 @@ export async function POST(request: NextRequest) {
     if (draft.revision !== parsed.expectedRevision) return plannerRedirect(appBaseUrl, parsed.slug, { error: "conflict" });
     const courts = await new CourtRepository(client).list(event.sport);
     const selectedCourtNames = draft.selectedCourts.map((id) => courts.find((court) => court.id === id)?.name);
-    const generated = await generatePlannerSchedule(plannerGenerateRequest(event, draft, parsed.generationSeed, courts));
+    const generated = await generatePlannerSchedule({ ...plannerGenerateRequest(event, draft, parsed.generationSeed, courts),
+      checkpoint_context: plannerCheckpointContext(event, draft, courts), checkpoint: parsed.checkpoint });
     const repository = new StaffScheduleRepository(client);
     const scheduleId = await repository.save(event, draft, generated);
     const stored = await repository.detail(event.id, scheduleId);
@@ -53,7 +55,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     if (error instanceof StaffScheduleConflictError) return plannerRedirect(appBaseUrl, parsed.slug, { error: "conflict" });
     if (error instanceof InvalidPlannerGenerationError) return plannerRedirect(appBaseUrl, parsed.slug, { error: "planner-input-invalid" });
-    if (error instanceof PlannerApiError) return plannerRedirect(appBaseUrl, parsed.slug, { error: "planner-unavailable" });
+    if (error instanceof PlannerApiError) return plannerRedirect(appBaseUrl, parsed.slug, { error: error.code === "INVALID_CHECKPOINT" ? "checkpoint-invalid" : "planner-unavailable" });
     if (error instanceof StaffScheduleDataError) return plannerRedirect(appBaseUrl, parsed.slug, { error: "schedule-unavailable" });
     return plannerRedirect(appBaseUrl, parsed.slug, { error: "temporarily-unavailable" });
   }

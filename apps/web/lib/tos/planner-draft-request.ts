@@ -114,14 +114,17 @@ export function parsePlannerLocatorJson(value: unknown): Readonly<{ slug: string
   return Object.freeze({ slug: row.slug, expectedRevision: row.expected_revision });
 }
 
-export function parseScheduleSaveRequest(form: FormData): Readonly<{ slug: string; expectedRevision: number; generationSeed: number }> {
-  exactFields(form, new Set(["slug", "expected_revision", "generation_seed"]));
+export function parseScheduleSaveRequest(form: FormData): Readonly<{ slug: string; expectedRevision: number; generationSeed: number; checkpoint: string }> {
+  exactFields(form, new Set(["slug", "expected_revision", "generation_seed", "checkpoint"]));
   const slug = oneText(form, "slug", 80);
   if (!isTosEventSlug(slug)) throw new InvalidPlannerDraftError();
+  const checkpoint = oneText(form, "checkpoint", 2048);
+  if (!/^[A-Za-z0-9_-]+\.[0-9a-f]{64}$/u.test(checkpoint)) throw new InvalidPlannerDraftError();
   return Object.freeze({
     slug,
     expectedRevision: integer(oneText(form, "expected_revision", 16), 1, Number.MAX_SAFE_INTEGER),
     generationSeed: integer(oneText(form, "generation_seed", 20), 0, Number.MAX_SAFE_INTEGER),
+    checkpoint,
   });
 }
 

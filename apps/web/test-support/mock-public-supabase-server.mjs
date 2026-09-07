@@ -18,6 +18,7 @@ const XSS_NAME = "<img src=x onerror=alert(1)>";
 const LONG_PLAYER_NAME = "Alexandria van den Berg-van der Meer met een bijzonder lange testnaam";
 const LONG_COURT_NAME = "Seppworks/Bax Baan met een bijzonder lange sponsornaam";
 const TIME_ZONE = "Europe/Amsterdam";
+const plannerReceipts = new Map();
 const LIVE_KEYS = [1, 2, 3, 4, 5].map((n) => `a4600000-0000-4000-8000-00000000000${n}`);
 // Synthetic publication fixture: keys are snapshot identities, not account IDs.
 function personalLiveFixture(slug) {
@@ -1007,18 +1008,19 @@ const server = createServer(async (request, response) => {
       players: Array.from({ length: 12 }, (_, index) => ({
         row_id: `be${String(index + 1).padStart(2, "0")}0000-0000-4000-8000-000000000001`,
         name: `Best effort ${String(index + 1).padStart(2, "0")}`,
-        ranking: (index % 5) + 1, included: true,
+        ranking: [5, 3, 3, 1, 4, 4, 3, 3, 4, 2, 4, 2][index], included: true,
         available_from: "20:00", available_until: "22:00",
       })),
       selected_courts: initialClubCourts.slice(0, 3).map(({ id }) => id),
       match_minutes: 20, rest_minutes: 0, search_profile: "Normaal",
-      allow_repeat_partners: false, level_mix: 100, team_difference_tolerance: 0.5,
+      allow_repeat_partners: false, level_mix: 100, team_difference_tolerance: 1,
       revision: 1, updated_by: null, updated_by_name: "Planner", updated_at: now, created_at: now,
     });
     json(response, 200, { status: "ok" });
     return;
   }
   if (request.method === "POST" && requestUrl.pathname === "/__test/reset-state") {
+    plannerReceipts.clear();
     tosEvents.splice(0, tosEvents.length, ...initialTosEvents.map((event) => ({ ...event })));
     authUsers.clear();
     sessions.clear();
@@ -1042,7 +1044,8 @@ const server = createServer(async (request, response) => {
   }
   if (request.method === "POST" && requestUrl.pathname === "/generate") {
     const body = await requestJson(request);
-    const expected = ["players","courts","start_time","end_time","match_minutes","rest_minutes","search_profile","allow_repeat_partners","level_mix","tolerance","generation_seed"];
+    const expected = ["players","courts","start_time","end_time","match_minutes","rest_minutes","search_profile","allow_repeat_partners","level_mix","tolerance","generation_seed","checkpoint_context"];
+    if (body.checkpoint !== undefined) expected.push("checkpoint");
     const validPlayers = Array.isArray(body.players) && body.players.length >= 4 && body.players.every((player) =>
       exactKeys(player, ["name","ranking","available_from","available_until"]) &&
       typeof player.name === "string" && Number.isInteger(player.ranking) &&
@@ -1051,6 +1054,18 @@ const server = createServer(async (request, response) => {
     if (!exactKeys(body, expected) || !validPlayers || !Array.isArray(body.courts) || body.courts.length < 1 ||
         !Number.isSafeInteger(body.generation_seed)) {
       json(response, 422, { error: "invalid-input" });
+      return;
+    }
+    const { checkpoint, ...input } = body;
+    const inputHash = createHash("sha256").update(JSON.stringify(input)).digest("hex");
+    if (checkpoint !== undefined) {
+      const receipt = plannerReceipts.get(checkpoint);
+      if (!receipt || receipt.inputHash !== inputHash) {
+        json(response, 409, { error: "INVALID_CHECKPOINT" });
+        return;
+      }
+      plannerReceipts.delete(checkpoint);
+      json(response, 200, receipt.result);
       return;
     }
     if (plannerDiagnosticFailure) {
@@ -1087,7 +1102,7 @@ const server = createServer(async (request, response) => {
         });
       }
     }
-    json(response, 200, {
+    const result = {
       seed: body.generation_seed,
       schedule,
       statistics: names.map((name) => ({ Speler: name, Ranking: 3, Wedstrijden: 1 })),
@@ -1099,7 +1114,10 @@ const server = createServer(async (request, response) => {
           compromises: opponentRepeats ? ["OPPONENT_REPEATS"] : [],
         },
       },
-    });
+    };
+    const token = `${randomBytes(16).toString("hex")}.${randomBytes(32).toString("hex")}`;
+    plannerReceipts.set(token, { inputHash, result });
+    json(response, 200, { ...result, checkpoint: token });
     return;
   }
   if (request.method === "GET" && requestUrl.pathname === "/auth/v1/authorize") {

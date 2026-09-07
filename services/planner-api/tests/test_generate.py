@@ -104,7 +104,9 @@ def test_generate_supports_midnight_and_minute_precision() -> None:
 def test_generate_accepts_server_resolved_courts_and_rejects_unsafe_values() -> None:
     with TestClient(app) as client:
         extra = payload() | {"event_id": "private"}
-        assert client.post("/generate", json=extra).json() == {"error": "invalid-input"}
+        failure = client.post("/generate", json=extra).json()
+        assert failure["error"] == "INVALID_PLANNER_INPUT"
+        assert failure["diagnostics"][0]["code"] == "INVALID_CONFIGURATION"
         tennis = payload()
         tennis["courts"] = ["Tennisbaan Noord", "Tennisbaan Zuid"]
         assert client.post("/generate", json=tennis).status_code == 200
@@ -137,13 +139,9 @@ def test_unexpected_diagnostic_failure_remains_a_finite_server_error(
     def generation_failure(*_args: object) -> None:
         raise RuntimeError("private generation detail")
 
-    def diagnostic_failure(*_args: object) -> None:
-        raise ValueError("private diagnostic detail")
-
     monkeypatch.setattr(main_module, "generate_schedule", generation_failure)
-    monkeypatch.setattr(main_module, "diagnose_search_failure", diagnostic_failure)
     with TestClient(app) as client:
         response = client.post("/generate", json=payload())
     assert response.status_code == 500
-    assert response.json() == {"error": "temporarily-unavailable"}
+    assert response.json() == {"error": "PLANNER_INTERNAL_ERROR"}
     assert "private" not in response.text.lower()

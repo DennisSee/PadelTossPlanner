@@ -32,6 +32,30 @@ async function addManualPlayer(page: Page, index: number, name: string, ranking:
   await row.getByLabel("Niveau").fill(ranking);
 }
 
+test("technical planner failures never claim an impossible schedule or suggest an already selected profile", async ({ page, request }) => {
+  expect((await request.post(`${MOCK_URL}/__test/planner-best-effort-fixture`)).ok()).toBe(true);
+  await page.goto("/login?next=/beheer");
+  await signIn(page, request, "planner-no-member", /\/beheer$/u, "Beheeromgeving");
+  await page.goto("/beheer/tos/web5b1-padel");
+  await page.getByLabel("Zoekprofiel").selectOption("Uitgebreid");
+  await page.getByRole("button", { name: "Planneropzet opslaan" }).click();
+  await expect(page.getByText("Planneropzet opgeslagen.")).toBeVisible();
+  for (const [error, title] of [
+    ["SEARCH_DEADLINE_REACHED", "Geen schema gevonden binnen de beschikbare zoektijd."],
+    ["TRANSPORT_TIMEOUT", "De planner reageerde niet op tijd."],
+    ["PLANNER_UNAVAILABLE", "Planner tijdelijk niet bereikbaar"],
+    ["PLANNER_INTERNAL_ERROR", "Er ging iets mis tijdens het genereren."],
+  ]) {
+    await page.route("**/api/beheer/tos/planner/generate", (route) => route.fulfill({ status: 504, json: { error } }));
+    await page.getByRole("button", { name: "Schema genereren" }).click();
+    await expect(page.getByRole("heading", { name: title, exact: true })).toBeVisible();
+    await expect(page.getByText("Geen geldig schema gevonden.", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("Kies zoekprofiel Uitgebreid.", { exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Dit schema privé opslaan" })).toHaveCount(0);
+    await page.unroute("**/api/beheer/tos/planner/generate");
+  }
+});
+
 test("staff completes the event-scoped draft, private save and publication workflow", async ({ page, request }) => {
   await page.goto("/login?next=/beheer");
   await signIn(page, request, "planner-no-member", /\/beheer$/u, "Beheeromgeving");
@@ -133,6 +157,8 @@ test("12-player three-court planner succeeds best effort with and without pause"
   await expect(page.getByText("Ronde 6", { exact: false }).first()).toBeVisible();
 
   await page.getByLabel("Pauze").fill("5");
+  await page.getByLabel("Zoekprofiel").selectOption("Uitgebreid");
+  await page.getByLabel("Meer ruimte voor partnerherhaling").check();
   await page.getByRole("button", { name: "Planneropzet opslaan" }).click();
   await expect(page.getByText("Planneropzet opgeslagen.")).toBeVisible();
   await page.getByRole("button", { name: "Schema genereren" }).click();

@@ -137,7 +137,8 @@ describe("PlannerWorkspace", () => {
     render(<PlannerWorkspace event={event} draft={draft} importPreview={[]} courts={[court]} schedules={[]} selectedSchedule={null} />);
     fireEvent.click(screen.getByRole("button", { name: "Schema genereren" }));
     const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent("De planner kon geen betrouwbare specifieke oorzaak bepalen binnen de huidige zoektijd.");
+    expect(alert).toHaveTextContent("Planner tijdelijk niet bereikbaar");
+    expect(alert).not.toHaveTextContent("Geen geldig schema");
     expect(alert).not.toHaveTextContent("private upstream stack");
   });
 });

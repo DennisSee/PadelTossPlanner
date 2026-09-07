@@ -14,6 +14,26 @@ const result = {
 };
 
 describe("internal planner API client", () => {
+  it.each(["SEARCH_DEADLINE_REACHED", "PLANNER_INTERNAL_ERROR", "INVALID_CHECKPOINT"])("preserves the finite technical code %s without upstream details", async (code) => {
+    await expect(generatePlannerSchedule({} as never, { baseUrl: "http://planner-api:8000",
+      fetcher: vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: code }), { status: 500 })),
+    })).rejects.toMatchObject({ code });
+  });
+
+  it("distinguishes timeout from unavailable transport and malformed output", async () => {
+    const options = { baseUrl: "http://planner-api:8000" };
+    await expect(generatePlannerSchedule({} as never, { ...options, timeoutMilliseconds: 1,
+      fetcher: vi.fn((_url, init) => new Promise<Response>((_resolve, reject) => {
+        init.signal.addEventListener("abort", () => reject(new Error("aborted")));
+      })),
+    })).rejects.toMatchObject({ code: "TRANSPORT_TIMEOUT" });
+    await expect(generatePlannerSchedule({} as never, { ...options,
+      fetcher: vi.fn().mockRejectedValue(new Error("private network details")),
+    })).rejects.toMatchObject({ code: "PLANNER_UNAVAILABLE" });
+    await expect(generatePlannerSchedule({} as never, { ...options,
+      fetcher: vi.fn().mockResolvedValue(new Response("not json")),
+    })).rejects.toMatchObject({ code: "MALFORMED_RESPONSE" });
+  });
   it("accepts only credential-free internal or loopback HTTP origins", () => {
     expect(readPlannerApiBaseUrl({ PLANNER_API_BASE_URL: "http://planner-api:8000", APP_ENV: "staging" } as unknown as NodeJS.ProcessEnv)).toBe("http://planner-api:8000");
     expect(readPlannerApiBaseUrl({ PLANNER_API_BASE_URL: "http://127.0.0.1:8000", APP_ENV: "test" } as unknown as NodeJS.ProcessEnv)).toBe("http://127.0.0.1:8000");

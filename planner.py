@@ -14,6 +14,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta
 from typing import Iterable, Sequence
+from time import monotonic
 
 
 # Kwaliteitshiërarchie binnen een structureel geldig schema. Opeenvolgende rust
@@ -23,6 +24,14 @@ CONSECUTIVE_REST_PENALTY = 2_500.0
 PARTNER_REPEAT_AVOID_PENALTY = 600.0
 PARTNER_REPEAT_ALLOWED_PENALTY = 80.0
 OPPONENT_REPEAT_PENALTY = 8.0
+
+
+class SearchDeadlineReached(RuntimeError):
+    """The execution deadline expired without a complete result."""
+
+
+class InvalidSearchCheckpoint(ValueError):
+    """The requested deterministic boundary cannot be reproduced."""
 
 
 class PlannerInputError(ValueError):
@@ -80,6 +89,7 @@ class PlannerSettings:
     # Bij 0.5 zijn bijvoorbeeld 4.0 tegen 4.5 en 3.0 tegen 3.5 gelijkwaardig genoeg.
     team_difference_tolerance: float = 0.5
     random_seed: int = 2026
+    time_budget_seconds: float | None = None
 
 
 @dataclass
@@ -664,8 +674,22 @@ def generate_schedule(
     players: Sequence[Player],
     courts: Sequence[str],
     settings: PlannerSettings,
+    *,
+    replay_checkpoint: tuple[int, int] | None = None,
 ) -> tuple[list[RoundPlan], dict[str, object]]:
     """Genereer een schema met individuele beschikbaarheidsvensters per speler."""
+    started = monotonic()
+    budget = settings.time_budget_seconds
+    if budget is not None and (not math.isfinite(budget) or budget <= 0):
+        raise ValueError("Invalid execution budget")
+    deadline = started + budget if budget is not None else math.inf
+    if replay_checkpoint is not None and (
+        len(replay_checkpoint) != 2
+        or any(type(value) is not int for value in replay_checkpoint)
+        or not 0 <= replay_checkpoint[0] < settings.search_restarts
+        or replay_checkpoint[1] < 1
+    ):
+        raise InvalidSearchCheckpoint()
     if len(players) < 4:
         raise PlannerInputError(
             "INSUFFICIENT_PLAYERS",
@@ -739,12 +763,26 @@ def generate_schedule(
 
     best_state: SearchState | None = None
     best_score = math.inf
+    best_checkpoint: tuple[int, int] | None = None
+    terminated = False
+
+    def expired() -> bool:
+        return budget is not None and monotonic() >= deadline
 
     for restart in range(settings.search_restarts):
+        if replay_checkpoint is not None and restart != replay_checkpoint[0]:
+            continue
+        if expired():
+            terminated = True
+            break
         rng = random.Random(settings.random_seed + restart * 7919)
         states = [SearchState()]
+        attempts = 0
 
         for round_index in range(rounds):
+            if expired():
+                terminated = True
+                break
             next_states: list[SearchState] = []
             available_names = available_by_round[round_index]
             unavailable = unavailable_by_round[round_index]
@@ -754,6 +792,9 @@ def generate_schedule(
             target_rest = rest_targets[round_index]
 
             for state in states:
+                if expired():
+                    terminated = True
+                    break
                 rest_limit = min(10, max(1, settings.candidates_per_state // 10))
                 rest_options = _rest_options(
                     available_names,
@@ -774,6 +815,10 @@ def generate_schedule(
                     rest_set = set(resters)
                     active = [name for name in available_names if name not in rest_set]
                     for _ in range(samples_per_rest):
+                        if attempts % 8 == 0 and expired():
+                            terminated = True
+                            break
+                        attempts += 1
                         candidate = _candidate_matches(active, ranks, state, settings, rng)
                         if candidate is None:
                             continue
@@ -804,6 +849,24 @@ def generate_schedule(
                                 arrangement_score,
                             )
                         )
+                        if round_index == rounds - 1 and (budget is not None or replay_checkpoint is not None):
+                            complete = next_states[-1]
+                            score = _final_score(complete, names, play_targets[-1], rest_targets[-1])
+                            if replay_checkpoint is not None:
+                                if attempts == replay_checkpoint[1]:
+                                    best_state, best_score = complete, score
+                                    best_checkpoint = (restart, attempts)
+                                    break
+                            elif score < best_score:
+                                best_state, best_score = complete, score
+                                best_checkpoint = (restart, attempts)
+                    if terminated or (replay_checkpoint is not None and best_state is not None):
+                        break
+                if terminated or (replay_checkpoint is not None and best_state is not None):
+                    break
+
+            if terminated or (replay_checkpoint is not None and best_state is not None):
+                break
 
             if not next_states:
                 states = []
@@ -822,13 +885,19 @@ def generate_schedule(
                 if len(states) >= settings.beam_width:
                     break
 
-        for state in states:
+        if terminated or replay_checkpoint is not None:
+            break
+        for state in states if budget is None else []:
             score = _final_score(state, names, play_targets[-1], rest_targets[-1])
             if score < best_score:
                 best_score = score
                 best_state = state
 
     if best_state is None:
+        if terminated:
+            raise SearchDeadlineReached()
+        if replay_checkpoint is not None:
+            raise InvalidSearchCheckpoint()
         raise RuntimeError(
             "Geen structureel geldig schema gevonden binnen het beschikbare zoekbudget. "
             "Probeer 'Uitgebreid zoeken' of genereer opnieuw met een andere seed."
@@ -874,6 +943,9 @@ def generate_schedule(
         "team_difference_tolerance": settings.team_difference_tolerance,
         "quality_summary": _quality_summary(best_state.rounds, players, settings, best_state),
     }
+    if best_checkpoint is not None:
+        diagnostics["search_checkpoint"] = list(best_checkpoint)
+        diagnostics["optimization_completed"] = not terminated and replay_checkpoint is None
     return best_state.rounds, diagnostics
 
 def schedule_rows(

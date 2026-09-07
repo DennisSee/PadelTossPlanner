@@ -5,7 +5,9 @@ import { privateAuthRedirect } from "../../../../../../lib/auth/finalize";
 import { loginPathFor } from "../../../../../../lib/auth/return-path";
 import { loadAccountContextWithClient } from "../../../../../../lib/auth/session";
 import { readAppBaseUrl } from "../../../../../../lib/config/public-supabase";
-import { generatePlannerSchedule, PlannerGenerationError } from "../../../../../../lib/planner-api/client";
+import { generatePlannerSchedule, PlannerGenerationError, PlannerApiError } from "../../../../../../lib/planner-api/client";
+import { plannerCheckpointContext } from "../../../../../../lib/planner-api/checkpoint";
+import { PLANNER_TECHNICAL_ERRORS } from "../../../../../../lib/planner-api/errors";
 import { serializePlannerGenerationFailure } from "../../../../../../lib/planner-api/failure";
 import { createServerSupabaseClient } from "../../../../../../lib/supabase/server";
 import { PlannerDraftRepository } from "../../../../../../lib/tos/planner-draft-repository";
@@ -39,7 +41,9 @@ export async function POST(request: NextRequest) {
     if (draft.revision !== parsed.expectedRevision) return jsonError("conflict", 409);
     const courts = await new CourtRepository(client).list(event.sport);
     const seed = randomInt(0, 2_147_483_647);
-    const generated = await generatePlannerSchedule(plannerGenerateRequest(event, draft, seed, courts));
+    const generated = await generatePlannerSchedule({ ...plannerGenerateRequest(event, draft, seed, courts),
+      checkpoint_context: plannerCheckpointContext(event, draft, courts) });
+    if (!generated.checkpoint) throw new PlannerApiError("MALFORMED_RESPONSE");
     return Response.json(generated, { headers: { "Cache-Control": "private, no-store, max-age=0" } });
   } catch (error) {
     if (error instanceof PlannerGenerationError) {
@@ -48,6 +52,7 @@ export async function POST(request: NextRequest) {
         { status: 422, headers: { "Cache-Control": "private, no-store, max-age=0" } },
       );
     }
-    return jsonError("generation-failed", 422);
+    const code = error instanceof PlannerApiError ? error.code : "PLANNER_INTERNAL_ERROR";
+    return jsonError(code, PLANNER_TECHNICAL_ERRORS[code].status);
   }
 }
