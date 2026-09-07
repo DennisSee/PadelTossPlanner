@@ -32,6 +32,7 @@ import type {
 
 import styles from "./live-schedule.module.css";
 import { TeamNames } from "./team-names";
+import { PersonalLive } from "./personal-live";
 
 const EVERYONE = "Iedereen";
 const PLAYER_PREFERENCE_EVENT = "tc-zuid-tos:preferred-player";
@@ -373,11 +374,7 @@ function LiveContent({
   if (state.kind === "after") {
     return (
       <>
-        <LiveBanner
-          title="De TOS-avond is afgelopen"
-          text="Alle rondes blijven hieronder zichtbaar."
-          countdown="Afgelopen"
-        />
+        <p className={styles.hint}>Alle rondes blijven hieronder zichtbaar.</p>
         <FullSchedule schedule={schedule} selectedPlayer={selectedPlayer} state={state} />
       </>
     );
@@ -449,12 +446,15 @@ export function LiveSchedule({
   schedule,
   initialNowIso,
   navigation = ANONYMOUS_NAVIGATION,
+  ownPlayerKey = null,
 }: {
   schedule: PublicSchedule;
   initialNowIso: string;
   navigation?: NavigationModel;
+  ownPlayerKey?: string | null;
 }) {
   const participants = useMemo(() => sortedParticipants(schedule.participants), [schedule.participants]);
+  const participantCount = schedule.liveIdentity?.players.length ?? participants.length;
   const [selectedPlayer, setSelectedPlayer] = usePlayerPreference(participants, schedule.eventSlug);
   const [now, setNow] = useState(() => new Date(initialNowIso));
 
@@ -465,6 +465,10 @@ export function LiveSchedule({
 
   const state = getLiveRoundState(schedule.rows, schedule.eventDate, now);
   const status = eventStatus(state);
+  const currentEvent = schedule.eventStartsAt && schedule.eventEndsAt
+    ? Date.parse(schedule.eventStartsAt) <= now.getTime() && now.getTime() < Date.parse(schedule.eventEndsAt)
+    : state.kind === "current" || state.kind === "between";
+  const personal = currentEvent && ownPlayerKey && schedule.liveIdentity && schedule.liveIdentity.players.some((player) => player.key === ownPlayerKey);
 
   return (
     <main className={styles.page}>
@@ -477,22 +481,24 @@ export function LiveSchedule({
         <Card className={styles.eventCard}>
           <CourtLines className={styles.eventLines} />
           <div className={styles.eventSummary} data-testid="event-summary">
-            <p className={styles.eventEyebrow}>Wedstrijdprogramma</p>
-            <h1 className={styles.eventTitle}>{schedule.eventTitle ?? "Live TOS-schema"}</h1>
+            <p className={styles.eventEyebrow}>{state.kind === "after" ? "Laatste schema" : state.kind === "before" ? "Volgende TOS" : "Wedstrijdprogramma"}</p>
+            <h1 className={styles.eventTitle}>{schedule.eventTitle ?? (currentEvent ? "Live TOS-schema" : "TOS-schema")}</h1>
             <p className={styles.eventDate}>{formatEventDate(schedule.eventDate)}</p>
             <p className={styles.eventMeta}>
               <span>{schedule.startTime}–{schedule.endTime}</span>
               <span>{schedule.courts.length} {schedule.courts.length === 1 ? "baan" : "banen"}</span>
-              <span>{participants.length} deelnemers</span>
+              <span>{participantCount} deelnemers</span>
             </p>
           </div>
           <div className={styles.eventStatus} data-testid="event-status">
-            <Badge tone={status.tone}>{status.label}</Badge>
+            <Badge tone={currentEvent ? status.tone : "neutral"}>{!currentEvent && status.label === "Live" ? "Schema" : status.label}</Badge>
           </div>
         </Card>
 
+        {!currentEvent ? <p className={styles.noCurrent} role="status">Er is nu geen TOS bezig.{state.kind === "before" && schedule.eventSlug ? <> <a href={`/tos/${schedule.eventSlug}`}>Bekijk TOS →</a></> : null}</p> : null}
+        {personal ? <PersonalLive key={`${schedule.id}-${ownPlayerKey}`} identity={schedule.liveIdentity!} ownKey={ownPlayerKey!} now={now} slug={schedule.eventSlug!} /> : null}
         <Card className={styles.controlSurface}>
-          <div className={styles.selectBlock}>
+          {!personal ? <div className={styles.selectBlock}>
             <label className={styles.label} htmlFor="player-select">Kies je naam</label>
             <select
               className={styles.select}
@@ -506,11 +512,11 @@ export function LiveSchedule({
               ))}
             </select>
             <p className={styles.hint}>Alleen onthouden op dit apparaat.</p>
-          </div>
+          </div> : null}
 
           <div className={styles.participants}>
             <details>
-              <summary>Deelnemers ({participants.length})</summary>
+              <summary>Deelnemers ({participantCount})</summary>
               <div className={styles.chips}>
                 {participants.map((participant) => (
                   <span className={styles.chip} key={participant}>{participant}</span>
@@ -521,11 +527,11 @@ export function LiveSchedule({
         </Card>
 
         <h2 className={styles.scheduleTitle}>
-          {selectedPlayer === EVERYONE ? "Wedstrijdschema" : `Schema voor ${selectedPlayer}`}
+          {personal || selectedPlayer === EVERYONE ? "Wedstrijdschema" : `Schema voor ${selectedPlayer}`}
         </h2>
 
         {schedule.rows.length > 0 ? (
-          <LiveContent schedule={schedule} selectedPlayer={selectedPlayer} state={state} />
+          personal ? <FullSchedule schedule={schedule} selectedPlayer={EVERYONE} state={state} /> : <LiveContent schedule={schedule} selectedPlayer={selectedPlayer} state={state} />
         ) : (
           <StateMessage title="Nog geen wedstrijden">
             Het gepubliceerde schema bevat nog geen ronde-indeling.
@@ -533,6 +539,8 @@ export function LiveSchedule({
         )}
 
         <footer className={styles.footer}>
+          <button className={styles.refreshButton} type="button" onClick={() => window.location.reload()}>Schema verversen</button>
+          <p>De rondeklok loopt automatisch door. Ververs voor wijzigingen in de publicatie.</p>
           Gepubliceerd door {schedule.createdByName || "T.C. Zuid"} · {formatCreatedAt(schedule.createdAt)}
         </footer>
       </div>

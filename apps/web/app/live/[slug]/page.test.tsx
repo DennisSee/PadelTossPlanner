@@ -34,7 +34,7 @@ describe("canonical event live page", () => {
   it("levert een veilige lege status voor unpublished/onbekend en geen sluglookup voor invalid input", async () => {
     loadEventPublicSchedule.mockResolvedValueOnce(null);
     render(await EventLivePage({ params: Promise.resolve({ slug: "niet-gepubliceerd" }) }));
-    expect(screen.getByText("Er is nog geen gepubliceerd TOS-schema.")).toBeVisible();
+    expect(screen.getByText(/Er is nu geen TOS bezig/)).toBeVisible();
     await expect(EventLivePage({ params: Promise.resolve({ slug: "Unsafe Slug" }) })).rejects.toThrow("NEXT_NOT_FOUND");
     expect(loadEventPublicSchedule).toHaveBeenCalledTimes(1);
   });

@@ -21,17 +21,13 @@ async function expectNoHorizontalOverflow(page: Page) {
   expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth + 1);
 }
 
-test("homepage toont de publieke stagingingang en navigeert met toetsenbord", async ({ page }, testInfo) => {
+test("homepage toont de publieke ingang zonder staginglabel en navigeert met toetsenbord", async ({ page }) => {
   const response = await page.goto("/");
   expect(response?.status()).toBe(200);
   await expect(page.getByRole("img", { name: "Logo T.C. Zuid" })).toBeVisible();
   await expect(page.getByText("T.C. Zuid TOS", { exact: true })).toBeVisible();
   const stagingBadge = page.getByText("Staging", { exact: true });
-  if ((testInfo.project.use.viewport?.width ?? 0) <= 480) {
-    await expect(stagingBadge).toBeHidden();
-  } else {
-    await expect(stagingBadge).toBeVisible();
-  }
+  await expect(stagingBadge).toHaveCount(0);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(
     "Samen spelen. Iedere ronde anders.",
   );

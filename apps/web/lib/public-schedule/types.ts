@@ -25,6 +25,7 @@ export type PublicScheduleRow = {
 };
 
 export type PublicSchedule = {
+  liveIdentity?: import("./identity").LiveIdentity | null;
   id: string;
   eventDate: string;
   createdByName: string;

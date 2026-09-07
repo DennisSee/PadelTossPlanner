@@ -17,7 +17,7 @@ export function LivePageState({
   const copy = kind === "empty"
     ? {
         title: "Geen gepubliceerd schema",
-        text: "Er is nog geen gepubliceerd TOS-schema.",
+        text: "Er is nu geen TOS bezig. Er is nog geen gepubliceerd TOS-schema.",
       }
     : {
         title: "Live schema tijdelijk niet bereikbaar",

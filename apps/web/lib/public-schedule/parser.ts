@@ -1,4 +1,5 @@
 import type { PublicSchedule, PublicScheduleRow } from "./types";
+import { parseLiveIdentity } from "./identity";
 
 type ParseResult =
   | { ok: true; value: PublicSchedule }
@@ -155,5 +156,6 @@ export function parseEventPublicSchedule(value: unknown): ParseResult {
   if (!base.ok || !slug || !title || (value.event_sport !== "padel" && value.event_sport !== "tennis") ||
       !startsAt || !endsAt || Number.isNaN(Date.parse(startsAt)) || Number.isNaN(Date.parse(endsAt))) return { ok: false };
   return { ok: true, value: Object.freeze({ ...base.value, eventSlug: slug, eventTitle: title,
-    eventSport: value.event_sport, eventStartsAt: startsAt, eventEndsAt: endsAt }) };
+    eventSport: value.event_sport, eventStartsAt: startsAt, eventEndsAt: endsAt,
+    liveIdentity: parseLiveIdentity(value.live_identity) }) };
 }

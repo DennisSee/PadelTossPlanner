@@ -184,10 +184,10 @@ describe("WEB-2 routes", () => {
     expect(screen.getByRole("link", { name: "Naar TOS-avonden" })).toHaveAttribute("href", "/tos");
   });
 
-  it("shows the staging badge from runtime APP_ENV", async () => {
+  it("does not expose the staging badge while runtime APP_ENV stays staging", async () => {
     vi.stubEnv("APP_ENV", "staging");
     render(await Home());
-    expect(screen.getByText("Staging")).toBeInTheDocument();
+    expect(screen.queryByText("Staging")).not.toBeInTheDocument();
     vi.unstubAllEnvs();
   });
 

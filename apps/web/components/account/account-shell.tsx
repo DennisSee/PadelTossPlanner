@@ -45,7 +45,7 @@ export function AccountShell({
           <AppHeader subtitle={title} />
           <SiteNavigation model={navigationModelFromAccount(account)} currentPath={currentPath ?? (variant === "management" ? "/beheer" : variant === "tos" ? "/tos" : "/account")} />
         </div>
-        <header className={`${styles.pageHeader} ${styles[`pageHeader${variant[0].toUpperCase()}${variant.slice(1)}`]}`}>
+        <header className={`${styles.pageHeader} ${styles[`pageHeader${variant[0].toUpperCase()}${variant.slice(1)}`]} ${currentPath === "/historie" ? styles.pageHeaderAccount : ""}`}>
           <CourtLines className={styles.headerLines} />
           <div className={styles.headerCopy}>
             <h1>{title}</h1>

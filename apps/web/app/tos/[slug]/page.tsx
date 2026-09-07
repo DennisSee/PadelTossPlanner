@@ -121,6 +121,10 @@ function RegistrationCard({
       ) : (
         <p className={styles.muted}>Deze aanmelding kan niet meer worden gewijzigd.</p>
       )}
+      {position?.placementStatus === "placed" && registration?.response === "attending" && event.status !== "cancelled" ? <div className={styles.actions}>
+        <a href={`/tos/${event.slug}/agenda`}>Toevoegen aan agenda</a>
+        <small>Momentopname; wijzigingen worden niet automatisch bijgewerkt.</small>
+      </div> : null}
     </Card>
   );
 }

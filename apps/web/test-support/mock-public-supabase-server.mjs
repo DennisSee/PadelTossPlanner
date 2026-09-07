@@ -18,6 +18,28 @@ const XSS_NAME = "<img src=x onerror=alert(1)>";
 const LONG_PLAYER_NAME = "Alexandria van den Berg-van der Meer met een bijzonder lange testnaam";
 const LONG_COURT_NAME = "Seppworks/Bax Baan met een bijzonder lange sponsornaam";
 const TIME_ZONE = "Europe/Amsterdam";
+const LIVE_KEYS = [1, 2, 3, 4, 5].map((n) => `a4600000-0000-4000-8000-00000000000${n}`);
+// Synthetic publication fixture: keys are snapshot identities, not account IDs.
+function personalLiveFixture(slug) {
+  const offset = slug === "personal-past" ? -24 * 60 : slug === "personal-future" ? 24 * 60 : 0;
+  const start = new Date(Date.now() + (offset - 5) * 60_000);
+  start.setSeconds(0, 0);
+  const clock = (date) => new Intl.DateTimeFormat("nl-NL", { timeZone: TIME_ZONE, hour: "2-digit", minute: "2-digit" }).format(date);
+  const rounds = [0, 1].map((index) => ({ number: index + 1,
+    starts_at: new Date(start.getTime() + index * 20 * 60_000).toISOString(),
+    ends_at: new Date(start.getTime() + (index + 1) * 20 * 60_000).toISOString(),
+    slots: LIVE_KEYS.map((key, i) => ({ key, state: i === 4 ? "rest" : "playing", court: i === 4 ? null : "Kremer Baan", team: i === 4 ? null : i < 2 ? 1 : 2 })),
+  }));
+  const end = new Date(rounds[1].ends_at);
+  return { id: "a4600000-0000-4000-8000-000000000099", event_slug: slug, event_title: "Persoonlijke TOS", event_sport: "padel",
+    event_starts_at: start.toISOString(), event_ends_at: end.toISOString(),
+    event_date: new Intl.DateTimeFormat("sv-SE", { timeZone: TIME_ZONE }).format(start), start_time: clock(start), end_time: clock(end),
+    created_by_name: "Testplanner", created_at: start.toISOString(), is_published: true, courts: ["Kremer Baan"],
+    participants_public: ["Dezelfde Naam", "Speler 2", "Speler 3", "Rust Speler"],
+    schedule_public: rounds.map((round) => ({ Ronde: String(round.number), Tijd: `${clock(new Date(round.starts_at))}–${clock(new Date(round.ends_at))}`, Baan: "Kremer Baan", "Team 1": "Dezelfde Naam & Dezelfde Naam", "Team 2": "Speler 2 & Speler 3", Rust: "Rust Speler", "Nog niet aanwezig": "", "Niet meer beschikbaar": "" })),
+    live_identity: { players: LIVE_KEYS.map((key, i) => ({ key, name: i < 2 ? "Dezelfde Naam" : i === 4 ? "Rust Speler" : `Speler ${i}` })), rounds },
+  };
+}
 const jwtSecret = randomBytes(32);
 const authUsers = new Map();
 const sessions = new Map();
@@ -2112,6 +2134,7 @@ const server = createServer(async (request, response) => {
     if (!exactKeys(body, ["p_slug"]) || typeof body.p_slug !== "string") {
       rejectMockContract(response, "event live read bevat onverwachte velden"); return;
     }
+    if (["personal-live", "personal-past", "personal-future"].includes(body.p_slug)) { json(response, 200, [personalLiveFixture(body.p_slug)]); return; }
     const event = tosEvents.find((candidate) => candidate.slug === body.p_slug && candidate.status !== "cancelled");
     const eventSchedule = event ? [...staffSchedules.values()]
       .filter((schedule) => schedule.event_id === event.id && schedule.is_published)
@@ -2134,6 +2157,15 @@ const server = createServer(async (request, response) => {
       event_starts_at: new Date(now - 20 * 60_000).toISOString(),
       event_ends_at: new Date(now + 55 * 60_000).toISOString(),
     }]);
+    return;
+  }
+  if (request.method === "POST" && requestUrl.pathname === "/rest/v1/rpc/my_published_event_schedule_identity") {
+    const body = await requestJson(request);
+    const user = bearerUser(request);
+    if (!user) { json(response, 403, { code: "42501" }); return; }
+    if (!exactKeys(body, ["p_slug"])) { rejectMockContract(response, "unexpected identity arguments"); return; }
+    const matches = validParticipant(user) && body.p_slug === "personal-live" && user.email.startsWith("live-member");
+    json(response, 200, matches ? [{ schedule_id: "a4600000-0000-4000-8000-000000000099", player_key: LIVE_KEYS[user.email.includes("rest") ? 4 : 1] }] : []);
     return;
   }
   if (request.method !== "GET") {

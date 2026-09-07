@@ -1,7 +1,6 @@
 import Link from "next/link";
 
 import {
-  Badge,
   AppHeader,
   Card,
   CourtLines,
@@ -12,7 +11,6 @@ import {
 } from "../components/ui";
 import { TosEventCard } from "../components/tos/event-card";
 import { loadAccountContextWithClient } from "../lib/auth/session";
-import { readAppEnvironment } from "../lib/config/public-supabase";
 import { loadEventPublicSchedule } from "../lib/supabase/public-schedule-repository";
 import { createServerSupabaseClient } from "../lib/supabase/server";
 import { selectHomeEvent, type HomeEventSelection } from "../lib/tos/home-event";
@@ -25,7 +23,6 @@ import styles from "./home.module.css";
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const isStaging = readAppEnvironment() === "staging";
   const now = new Date();
   let account = null;
   let homeSnapshot: Parameters<typeof TosEventCard>[0] | null = null;
@@ -93,9 +90,8 @@ export default async function Home() {
     <main className={styles.page}>
       <div className={styles.shell}>
         <div className={styles.topbar}>
-          <AppHeader subtitle="Padelavonden voor iedereen" />
+          <AppHeader subtitle="Tennis en padel voor iedereen" />
           <SiteNavigation model={navigation} currentPath="/" />
-          {isStaging ? <Badge tone="warning">Staging</Badge> : null}
         </div>
 
         <div className={styles.hero}>

@@ -54,7 +54,7 @@ describe("live schedule UI", () => {
 
   it("shows safe empty and load-error states", () => {
     const { rerender } = render(<LivePageState kind="empty" />);
-    expect(screen.getByText("Er is nog geen gepubliceerd TOS-schema.")).toBeInTheDocument();
+    expect(screen.getByText(/Er is nu geen TOS bezig/)).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "← Terug" })).not.toBeInTheDocument();
     rerender(<LivePageState kind="error" />);
     expect(screen.getByText(/kan momenteel niet worden geladen/i)).toBeInTheDocument();
@@ -160,7 +160,7 @@ describe("live schedule UI", () => {
   it("uses a logical h1, h2 and round h3 heading structure", async () => {
     const user = userEvent.setup();
     render(<LiveSchedule schedule={schedule()} initialNowIso="2026-08-21T17:55:00.000Z" />);
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Live TOS-schema");
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("TOS-schema");
     expect(screen.getByText("vrijdag 21 augustus 2026", { exact: true })).toBeVisible();
     expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("Wedstrijdschema");
     expect(screen.getAllByRole("heading", { level: 3 }).length).toBeGreaterThan(0);
@@ -219,7 +219,7 @@ describe("live schedule UI", () => {
     });
     render(<LiveSchedule schedule={schedule()} initialNowIso="2026-08-21T17:55:00.000Z" />);
     expect(screen.getByLabelText("Kies je naam")).toHaveValue("Iedereen");
-    expect(screen.getByRole("heading", { name: "Live TOS-schema" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "TOS-schema" })).toBeInTheDocument();
   });
 
   it("keeps the select usable when localStorage writes throw", async () => {

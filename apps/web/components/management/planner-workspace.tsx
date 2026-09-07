@@ -362,7 +362,7 @@ export type { SafeDraft };
 
 function QualitySummary({ summary }: { summary: NonNullable<ReturnType<typeof parsePlannerQualitySummary>> }) {
   return <aside className={styles.qualityCard} aria-label="Kwaliteit van het schema">
-    <strong>Speelbaar schema met kwaliteitscompromissen</strong>
+    <strong>Planningkwaliteit</strong>
     <span>Partnerherhalingen: {summary.partnerRepeats} · tegenstanderherhalingen: {summary.opponentRepeats}</span>
     <span>Maximaal rustverschil: {summary.maxRestDifference} · maximaal teamverschil: {summary.maxTeamDifference}</span>
     <small>De planning blijft volledig speelbaar.</small>

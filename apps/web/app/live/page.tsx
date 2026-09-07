@@ -17,10 +17,11 @@ export default async function LivePage() {
     return <LivePageState kind="error" navigation={navigation} />;
   }
 
-  const resolution = resolveLiveCandidates(candidates, new Date());
+  const now = new Date();
+  const resolution = resolveLiveCandidates(candidates, now);
   if (resolution.kind === "empty") {
     return <LivePageState kind="empty" navigation={navigation} />;
   }
   if (resolution.kind === "redirect") redirect(`/live/${resolution.slug}`);
-  return <LiveSelection candidates={resolution.candidates} navigation={navigation} />;
+  return <LiveSelection candidates={resolution.candidates} navigation={navigation} nowIso={now.toISOString()} />;
 }

@@ -28,10 +28,10 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: var(--space-4);
-  min-height: 13rem;
+  min-height: 0;
   margin-top: var(--space-4);
   overflow: hidden;
-  padding: clamp(1.2rem, 4vw, 2.3rem);
+  padding: clamp(1rem, 2vw, 1.4rem);
   border: 0;
   border-radius: var(--radius-md);
   color: var(--surface);
@@ -68,7 +68,7 @@
   margin: 0;
   color: var(--surface);
   font-family: var(--font-display);
-  font-size: clamp(3rem, 7vw, 5.7rem);
+  font-size: clamp(2rem, 4vw, 3rem);
   font-weight: 800;
   line-height: 0.9;
   letter-spacing: 0.012em;
@@ -170,7 +170,7 @@
 
 .participants summary,
 .allRounds summary {
-  min-height: 2rem;
+  min-height: 2.75rem;
   color: var(--club-green-dark);
   font-weight: 700;
   cursor: pointer;
@@ -637,7 +637,7 @@
   .eventCard {
     grid-template-columns: 1fr;
     gap: 0.65rem;
-    min-height: 9.25rem;
+    min-height: 0;
     padding: 0.9rem 1rem;
     background:
       linear-gradient(150deg, var(--club-green) 0 78%, transparent 78%),
@@ -651,8 +651,8 @@
   }
 
   .eventTitle {
-    max-width: 8.5ch;
-    font-size: clamp(2.2rem, 10vw, 2.9rem);
+    max-width: none;
+    font-size: clamp(1.8rem, 7vw, 2.2rem);
     line-height: 0.96;
   }
 
@@ -711,7 +711,7 @@
   .matchup {
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     gap: 0.35rem;
-    font-size: 0.76rem;
+    font-size: 0.88rem;
   }
 
   .personalBody {
@@ -724,3 +724,34 @@
 .selectionGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr)); gap: var(--space-3); }
 .selectionCard { display: grid; gap: var(--space-2); padding: 1rem; }
 .selectionCard a { color: var(--club-green-dark); font-weight: 800; text-decoration: none; }
+
+.noCurrent { margin-block: 0.8rem; font-weight: 600; }
+.refreshButton { min-height: 44px; padding: 0.5rem 1rem; border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--club-green-dark); background: var(--surface); font: inherit; cursor: pointer; }
+.personalLive { margin-top: 1rem; font-family: var(--font-interface); }
+.personalPicker { display: grid; gap: 0.3rem; max-width: 24rem; }
+.personalPicker label { font-weight: 700; }
+.personalPicker select { min-height: 44px; width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font: inherit; }
+.personalPicker select:focus-visible { outline: 3px solid var(--club-green); outline-offset: 2px; }
+.personalFocusGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; margin-top: 0.6rem; }
+.personalFocus { min-width: 0; padding: 1rem; border: 1px solid #b9decf; border-top: 4px solid var(--club-green); border-radius: var(--radius-sm); background: var(--success-soft); overflow-wrap: anywhere; }
+.personalFocus + .personalFocus { border-top-color: var(--club-yellow); background: var(--warning-soft); }
+.personalFocusLabel { font-weight: 800; text-transform: uppercase; }
+.personalFocus h2 { margin: 0.25rem 0; font: 750 1.35rem/1.2 var(--font-interface); }
+.personalFocusTime { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; }
+.personalFocus dl { display: grid; gap: 0.6rem; margin: 0.75rem 0; }
+.personalFocus dt { color: var(--text-muted); font-size: 0.85rem; }
+.personalFocus dd { margin: 0; font-weight: 650; }
+.personalFocus small { color: var(--text-muted); }
+.mobileLiveLink { display: none; }
+@media (max-width: 42rem) {
+  .personalFocusGrid { grid-template-columns: 1fr; }
+  .mobileLiveLink { display: flex; align-items: center; min-height: 44px; font-weight: 700; }
+  .eventEyebrow { display: none; }
+  .eventCard { gap: 0.4rem; padding: 0.75rem 1rem; }
+  .eventDate { font-size: 1rem; }
+  .personalLive { margin-top: 0.25rem; }
+  .personalFocus { padding: 0.75rem; }
+  .personalFocus dl { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0.7rem; }
+  .personalFocus dd { font-size: 0.95rem; }
+  .eventMeta { max-width: none; font-size: 0.82rem; }
+}
