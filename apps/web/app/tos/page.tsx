@@ -117,7 +117,7 @@ export default async function TosPage({ searchParams }: { searchParams: SearchPa
     <AccountShell
       account={account}
       title="TOS-avonden"
-      intro={`Hoi ${account.membership.displayName ?? account.profile?.displayName ?? "clublid"}. Bekijk en wijzig hier je TOS-aanmeldingen.`}
+      intro="Bekijk en beheer je TOS-aanmeldingen."
       variant="tos"
     >
       <div className={styles.stack}>

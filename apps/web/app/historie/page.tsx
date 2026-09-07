@@ -11,7 +11,7 @@ import { createServerSupabaseClient } from "../../lib/supabase/server";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-type SearchParams = Promise<{ year?: string | string[]; sport?: string | string[]; q?: string | string[]; notice?: string | string[]; error?: string | string[] }>;
+type SearchParams = Promise<{ tab?: string | string[]; year?: string | string[]; sport?: string | string[]; q?: string | string[]; notice?: string | string[]; error?: string | string[] }>;
 const last = (value: string | string[] | undefined) => Array.isArray(value) ? value.at(-1) : value;
 
 async function loadHistoryPage(repository: HistoryRepository, params: Awaited<SearchParams>) {
@@ -51,7 +51,7 @@ export default async function HistoryRoute({ searchParams }: { searchParams: Sea
   return (
     <AccountShell account={account} title="Mijn TOS-historie" intro="Herbeleef je officiële TOS-avonden en speelcontacten." variant="tos" currentPath="/historie">
       {message ? <p className={`${styles.message} ${message.tone === "success" ? styles.messageSuccess : styles.messageDanger}`} role={message.tone === "danger" ? "alert" : "status"}>{message.text}</p> : null}
-      <HistoryPage {...loaded} />
+      <HistoryPage {...loaded} initialTab={last(params.tab) === "clubmates" ? "clubmates" : "events"} />
     </AccountShell>
   );
 }

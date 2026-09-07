@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { HistoryPage } from "./history-page";
 
@@ -9,11 +9,15 @@ const clubmate = { memberId, displayName: "Anna", sharedMatches: 1, sharedEvents
 describe("participant history UI", () => {
   it("shows official rounds and privacy-bounded clubmate contact actions", () => {
     const { container } = render(<HistoryPage events={[event]} years={[2026]} filters={{ year: 2026, sport: null, query: "" }} summary={{ evenings: 1, matches: 1, clubmates: 1, mostPlayed: { displayName: "Anna", matches: 1 } }} clubmates={[{ clubmate, shared: [{ eventId: event.eventId, title: event.title, sport: "padel", startsAt: event.startsAt, sharedMatches: 1 }], contact: null, email: null }]} />);
-    container.querySelector("details")?.setAttribute("open", "");
+    screen.getByRole("heading", { name: "Padel vrijdag" }).closest("details")?.setAttribute("open", "");
     expect(screen.getByRole("heading", { name: "Padel vrijdag" })).toBeVisible();
-    expect(screen.getByRole("heading", { name: "Vaak mee gespeeld" })).toBeVisible();
     expect(screen.getByText("21", { selector: "time strong" })).toBeVisible();
     expect(screen.getByText("Kremer Baan")).toBeInTheDocument();
+    fireEvent.keyDown(screen.getByRole("tab", { name: "Avonden" }), { key: "ArrowRight" });
+    expect(screen.getByRole("tab", { name: "Clubgenoten" })).toHaveFocus();
+    expect(screen.getByRole("tab", { name: "Clubgenoten" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("heading", { name: "Vaak mee gespeeld" })).toBeVisible();
+    expect(container.querySelector("#panel-events")).not.toBeVisible();
     expect(screen.getAllByText(/Laatst samen/u).length).toBeGreaterThan(0);
     expect(screen.getByText("Lid van T.C. Zuid TOS", { exact: true })).toBeInTheDocument();
     expect(screen.getByText("Geen contact gedeeld", { exact: true })).toBeInTheDocument();
@@ -33,6 +37,7 @@ describe("participant history UI", () => {
       { clubmate, shared: [], contact: null, email: null },
       { clubmate: { ...clubmate, memberId: otherMemberId }, shared: [], contact: null, email: null },
     ]} />);
+    fireEvent.click(screen.getByRole("tab", { name: "Clubgenoten" }));
     expect(screen.getAllByRole("heading", { name: "Anna", level: 3 })).toHaveLength(2);
     expect([...container.querySelectorAll('[name="other_member_id"]')].map((input) => input.getAttribute("value"))).toEqual([memberId, otherMemberId]);
   });

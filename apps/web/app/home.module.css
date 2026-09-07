@@ -121,14 +121,15 @@
 
 .intro a {
   border-color: var(--club-yellow);
-  color: var(--club-green-ink);
-  background: var(--club-yellow);
-  box-shadow: 0 0.45rem 0 rgb(177 127 0 / 35%);
+  color: var(--club-yellow);
+  background: var(--club-green);
+  box-shadow: none;
   text-transform: uppercase;
 }
 
 .intro a:hover {
   border-color: var(--club-yellow-soft);
+  color: var(--club-green-ink);
   background: var(--club-yellow-soft);
 }
 
@@ -288,7 +289,7 @@
 
   .title {
     max-width: 16ch;
-    font-size: clamp(1.95rem, 9.2vw, 2.8rem);
+    font-size: clamp(2.125rem, 9.2vw, 2.625rem);
     line-height: 0.92;
   }
 
@@ -331,9 +332,9 @@
   }
 
   .intro a {
-    min-height: 2.65rem;
+    min-height: 2.75rem;
     margin-top: 0.8rem;
-    font-size: 0.78rem;
+    font-size: 0.9375rem;
   }
 
   .nextTosHeading {

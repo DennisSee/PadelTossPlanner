@@ -38,6 +38,7 @@ test("empty official history has a calm private empty state", async ({ page, req
 test("clubmate contact starts as consent request and keeps e-mail hidden", async ({ page, request }) => {
   await page.goto("/login?next=/historie");
   await signIn(page, request, email("web7-contact"));
+  await page.getByRole("tab", { name: "Clubgenoten" }).click();
   await page.getByRole("button", { name: "Bekijk gedeelde historie" }).click();
   const dialog = page.getByRole("dialog", { name: "Ready Hele Avond" });
   await expect(dialog).toBeVisible();
@@ -45,6 +46,7 @@ test("clubmate contact starts as consent request and keeps e-mail hidden", async
   await dialog.getByRole("button", { name: "Contactverzoek sturen" }).click();
   await expect(page).toHaveURL(/\/historie\?notice=contact-requested$/u);
   await expect(page.getByRole("status")).toHaveText("Contactverzoek verstuurd.");
+  await page.getByRole("tab", { name: "Clubgenoten" }).click();
   await page.getByRole("button", { name: "Bekijk gedeelde historie" }).click();
   const pendingDialog = page.getByRole("dialog", { name: "Ready Hele Avond" });
   await expect(pendingDialog).toContainText("E-mailadressen blijven verborgen");
@@ -62,6 +64,7 @@ test("incoming consent reveals contact e-mail only after acceptance and revoke h
   await page.goto("/login?next=/historie");
   await signIn(page, request, address);
   await expect(page).toHaveURL(/\/historie$/u);
+  await page.getByRole("tab", { name: "Clubgenoten" }).click();
   await page.getByRole("button", { name: "Bekijk gedeelde historie" }).click();
   const incomingDialog = page.getByRole("dialog", { name: "Ready Hele Avond" });
   await expect(incomingDialog).toContainText("wil contactgegevens uitwisselen");
@@ -69,6 +72,7 @@ test("incoming consent reveals contact e-mail only after acceptance and revoke h
   await noOverflow(page);
   await incomingDialog.getByRole("button", { name: "Accepteren" }).click();
   await expect(page).toHaveURL(/\/historie\?notice=contact-accepted$/u);
+  await page.getByRole("tab", { name: "Clubgenoten" }).click();
   await page.getByRole("button", { name: "Bekijk gedeelde historie" }).click();
   const acceptedDialog = page.getByRole("dialog", { name: "Ready Hele Avond" });
   await expect(acceptedDialog.getByRole("link", { name: "clubgenoot@example.test" })).toBeVisible();

@@ -90,7 +90,7 @@ export function TosEventCard({
       <div className={styles.eventBody}>
         <div className={styles.badges}>
           <SportBadge sport={event.sport} compact />
-          {!compact || !registration ? <Badge tone={statusTone(event, now)}>{status}</Badge> : null}
+          {!compact || !registration ? <span className={registration ? styles.secondaryEventStatus : undefined}><Badge tone={statusTone(event, now)}>{status}</Badge></span> : null}
           {registration ? (
             <Badge tone={registrationPosition?.placementStatus === "waitlist" ? "warning" : registration.response === "attending" ? "success" : "neutral"}>
               {personalLabel ?? (registration.response === "attending" ? "✓ Aangemeld" : "Afgemeld")}

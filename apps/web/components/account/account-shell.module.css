@@ -29,10 +29,10 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-4);
-  min-height: 12rem;
+  min-height: 0;
   margin: var(--space-4) 0 var(--space-5);
   overflow: hidden;
-  padding: clamp(1.35rem, 4vw, 2.5rem);
+  padding: clamp(1rem, 2.5vw, 1.5rem);
   border-radius: var(--radius-md);
   color: var(--surface);
   background:
@@ -56,7 +56,7 @@
 }
 
 .pageHeaderTos {
-  min-height: 9.5rem;
+  min-height: 0;
 }
 
 .headerLines {
@@ -74,7 +74,7 @@
   margin: 0;
   color: var(--surface);
   font-family: var(--font-display);
-  font-size: clamp(2.8rem, 7vw, 5rem);
+  font-size: clamp(2.125rem, 4vw, 3rem);
   font-weight: 800;
   line-height: 0.9;
   letter-spacing: 0.015em;
@@ -99,6 +99,9 @@
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: var(--space-2);
+  padding: 0.35rem;
+  border-radius: var(--radius-sm);
+  background: var(--club-green);
 }
 
 .contentGrid {
@@ -109,6 +112,7 @@
 }
 
 .contentCard {
+  container-type: inline-size;
   padding: clamp(1rem, 3vw, 1.5rem);
 }
 
@@ -167,6 +171,8 @@
 
 .nameAction {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
   gap: var(--space-2);
   margin-top: var(--space-4);
 }
@@ -176,11 +182,8 @@
 }
 
 .nameHint {
-  padding: 0.75rem 0.85rem;
-  border-radius: var(--radius-sm);
-  color: var(--club-green-dark) !important;
-  background: var(--surface-green);
-  font-size: 0.86rem;
+  grid-column: 1 / -1;
+  font-size: 0.9375rem;
 }
 
 .nameForm input {
@@ -253,12 +256,8 @@
   display: flex;
   align-items: flex-start;
   gap: var(--space-3);
-  margin-top: var(--space-4);
-  padding: 0.85rem;
-  border: 1px solid #c9d9cf;
-  border-radius: var(--radius-sm);
+  margin-top: var(--space-3);
   color: var(--club-green-dark);
-  background: var(--surface-green);
 }
 
 .sessionStatus > span {
@@ -278,7 +277,7 @@
 .sessionStatus p {
   margin-top: var(--space-1);
   color: var(--text-muted);
-  font-size: 0.85rem;
+  font-size: 0.9375rem;
 }
 
 .identityBanner {
@@ -330,17 +329,17 @@
 
   .pageHeader {
     display: grid;
-    min-height: 9.25rem;
+    min-height: 0;
     margin-top: var(--space-3);
-    padding: 1.25rem;
+    padding: 1rem;
     background:
       linear-gradient(155deg, var(--club-green) 0 78%, transparent 78%),
       var(--club-yellow);
   }
 
   .pageHeader h1 {
-    font-size: clamp(2.45rem, 11vw, 3.65rem);
-    line-height: 0.98;
+    font-size: clamp(2.125rem, 9vw, 2.625rem);
+    line-height: 1;
   }
 
   .pageHeaderManagement {
@@ -356,7 +355,7 @@
   }
 
   .pageHeaderTos {
-    min-height: 8.75rem;
+    min-height: 0;
   }
 
   .pageHeaderManagement .headerCopy {
@@ -395,7 +394,18 @@
     font-size: 2rem;
   }
 
-  .nameTrigger,
+  .nameAction {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.5rem;
+  }
+
+  .nameTrigger {
+    border: 0;
+    padding-inline: 0;
+    text-align: left;
+    background: transparent;
+  }
+
   .logoutButton {
     width: 100%;
   }
@@ -409,5 +419,12 @@
 
 /* Account/history are task surfaces, not landing-page heroes. */
 .pageHeaderAccount { min-height: 0; padding: 1rem 1.2rem; gap: 0.75rem; margin-bottom: 1rem; }
-.pageHeaderAccount h1 { font-size: clamp(2rem, 4vw, 3rem); line-height: 1; }
+.pageHeaderAccount h1 { font-size: clamp(2.125rem, 4vw, 3rem); line-height: 1; }
 .pageHeaderAccount p { font-size: 0.9rem; line-height: 1.4; }
+.srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.nameAction p { overflow-wrap: anywhere; }
+
+@container (max-width: 17rem) {
+  .identityBanner, .nameAction { grid-template-columns: minmax(0, 1fr); }
+  .nameTrigger { justify-self: start; }
+}

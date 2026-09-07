@@ -26,7 +26,7 @@ export function RegistrationForm({
   return (
     <form className={styles.form} action="/api/tos/registration" method="post">
       <input type="hidden" name="slug" value={slug} />
-      <fieldset className={styles.field}>
+      <fieldset className={`${styles.field} ${styles.participationChoice}`}>
         <legend>Jouw keuze</legend>
         <div className={styles.choiceRow}>
           <label className={styles.choice}>

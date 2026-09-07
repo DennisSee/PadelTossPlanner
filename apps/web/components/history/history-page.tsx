@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useState } from "react";
 
 import type { HistoryContactRequest, HistoryClubmate, HistoryEvent, SharedHistoryEvent } from "../../lib/history/types";
 import type { HistoryFilters, HistorySummary } from "../../lib/history/filters";
@@ -12,6 +15,7 @@ const WEEKDAY = new Intl.DateTimeFormat("nl-NL", { timeZone: "Europe/Amsterdam",
 const DAY = new Intl.DateTimeFormat("nl-NL", { timeZone: "Europe/Amsterdam", day: "2-digit" });
 const MONTH = new Intl.DateTimeFormat("nl-NL", { timeZone: "Europe/Amsterdam", month: "short" });
 const YEAR = new Intl.DateTimeFormat("nl-NL", { timeZone: "Europe/Amsterdam", year: "numeric" });
+const SHORT_DATE = new Intl.DateTimeFormat("nl-NL", { timeZone: "Europe/Amsterdam", day: "numeric", month: "short", year: "numeric" });
 
 type ClubmateView = Readonly<{
   clubmate: HistoryClubmate;
@@ -75,12 +79,9 @@ function HistoryEventCard({ event }: { event: HistoryEvent }) {
         <div className={styles.eventSummaryCopy}>
           <SportBadge sport={event.sport} compact />
           <h3>{event.title}</h3>
-          <p>{DATE.format(startsAt)} · {TIME.format(startsAt)}–{TIME.format(new Date(event.endsAt))}</p>
+          <p>{SHORT_DATE.format(startsAt)} · {TIME.format(startsAt)}–{TIME.format(new Date(event.endsAt))}</p>
         </div>
-        <div className={styles.eventCounts}>
-          <strong>{event.matchCount}</strong><span>{event.matchCount === 1 ? "wedstrijd" : "wedstrijden"}</span>
-          <strong>{event.restCount}</strong><span>rust</span>
-        </div>
+        <p className={styles.eventCounts}>{event.matchCount} {event.matchCount === 1 ? "wedstrijd" : "wedstrijden"} · {event.restCount} rust <span aria-hidden="true">⌄</span></p>
       </summary>
       <ol className={styles.rounds}>{event.rounds.map((round) => <RoundCard key={round.roundNumber} round={round} />)}</ol>
     </details>
@@ -102,11 +103,11 @@ function ClubmateCard({ view }: { view: ClubmateView }) {
       <div className={styles.clubmateInitials} aria-hidden="true">{clubmate.displayName.trim().slice(0, 2).toLocaleUpperCase("nl-NL")}</div>
       <div className={styles.clubmateCopy}>
         <h3>{clubmate.displayName}</h3>
-        <p>{clubmate.sharedMatches} samen {clubmate.sharedMatches === 1 ? "gespeelde wedstrijd" : "gespeelde wedstrijden"} · {clubmate.sharedEvents} TOS-avonden</p>
-        <p>Laatst samen {DATE.format(new Date(clubmate.lastSharedAt))}</p>
+        <p>{clubmate.sharedMatches} {clubmate.sharedMatches === 1 ? "wedstrijd" : "wedstrijden"} · {clubmate.sharedEvents} TOS</p>
+        <p>Laatst samen · {SHORT_DATE.format(new Date(clubmate.lastSharedAt))}</p>
       </div>
       <ActionDialog
-        triggerLabel="Bekijk gedeelde historie"
+        triggerLabel={<><span className={styles.rowActionLabel}>Bekijk gedeelde historie</span><span aria-hidden="true">›</span></>}
         title={clubmate.displayName}
         description="Jullie officiële gezamenlijke TOS-historie."
         triggerClassName={styles.clubmateTrigger}
@@ -167,13 +168,16 @@ export function HistoryPage({
   filters,
   summary,
   clubmates,
+  initialTab = "events",
 }: {
   events: readonly HistoryEvent[];
   years: readonly number[];
   filters: HistoryFilters;
   summary: HistorySummary;
   clubmates: readonly ClubmateView[];
+  initialTab?: "events" | "clubmates";
 }) {
+  const [tab, setTab] = useState(initialTab);
   if (years.length === 0 && clubmates.length === 0) {
     return <Card className={styles.emptyHistory}>
       <h2>Nog geen TOS-historie</h2>
@@ -183,31 +187,47 @@ export function HistoryPage({
   }
   return (
     <div className={styles.stack}>
-      <nav className={styles.mobileTabs} aria-label="Historieonderdelen">
-        <a href="#avonden">Avonden</a><a href="#clubgenoten">Clubgenoten</a>
-      </nav>
-      <section className={styles.stats} aria-label="Historiesamenvatting">
-        <Card><strong>{summary.evenings}</strong><span>TOS-avonden</span></Card>
-        <Card><strong>{summary.matches}</strong><span>Wedstrijden</span></Card>
-        <Card><strong>{summary.clubmates}</strong><span>Clubgenoten</span></Card>
-        <Card><strong>{summary.mostPlayed?.displayName ?? "—"}</strong><span>Meest mee/tegen gespeeld{summary.mostPlayed ? ` · ${summary.mostPlayed.matches}` : ""}</span></Card>
-      </section>
+      <div className={styles.tabs} role="tablist" aria-label="Historieonderdelen">
+        {([['events', 'Avonden'], ['clubmates', 'Clubgenoten']] as const).map(([key, label]) => (
+          <button key={key} id={`tab-${key}`} role="tab" type="button" aria-selected={tab === key} aria-controls={`panel-${key}`} tabIndex={tab === key ? 0 : -1}
+            onClick={() => setTab(key)} onKeyDown={(event) => {
+              if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+              event.preventDefault();
+              const next = event.key === "Home" ? "events" : event.key === "End" ? "clubmates" : key === "events" ? "clubmates" : "events";
+              setTab(next);
+              document.getElementById(`tab-${next}`)?.focus();
+            }}>{label}</button>
+        ))}
+      </div>
+      <details className={styles.filterDisclosure} open={Boolean(filters.query || filters.sport)}>
+      <summary>Filters · {filters.year ?? "Alle jaren"}{filters.sport ? ` · ${filters.sport}` : ""}</summary>
       <form className={styles.filters} method="get">
+        <input type="hidden" name="tab" value={tab} />
         <label>Jaar<select name="year" defaultValue={filters.year ?? "all"}><option value="all">Alle jaren</option>{years.map((year) => <option key={year} value={year}>{year}</option>)}</select></label>
         <label>Sport<select name="sport" defaultValue={filters.sport ?? "all"}><option value="all">Alle sporten</option><option value="padel">Padel</option><option value="tennis">Tennis</option></select></label>
         <label>Clubgenoot<input name="q" type="search" maxLength={80} defaultValue={filters.query} placeholder="Zoek op naam" /></label>
         <button type="submit">Filteren</button>
       </form>
+      </details>
       <div className={styles.columns}>
-        <section id="avonden" className={styles.section} aria-labelledby="history-events-title">
+        <section id="panel-events" role="tabpanel" hidden={tab !== "events"} tabIndex={0} className={styles.section} aria-labelledby="tab-events">
           <div className={styles.sectionHeading}><h2 id="history-events-title">Mijn TOS-avonden</h2><p>Alleen officiële, gepubliceerde en afgelopen schema’s.</p></div>
           {events.length ? <div className={styles.eventList}>{events.map((event) => <HistoryEventCard key={event.eventId} event={event} />)}</div> : <p className={styles.empty}>Nog geen officiële TOS-historie gevonden met deze filters.</p>}
         </section>
-        <section id="clubgenoten" className={styles.section} aria-labelledby="clubmates-title">
+        <section id="panel-clubmates" role="tabpanel" hidden={tab !== "clubmates"} tabIndex={0} className={styles.section} aria-labelledby="tab-clubmates">
           <div className={styles.sectionHeading}><h2 id="clubmates-title">Vaak mee gespeeld</h2><p>Alleen leden met wie je in een officieel schema speelde.</p></div>
           {clubmates.length ? <div className={styles.clubmateList}>{clubmates.map((view) => <ClubmateCard key={view.clubmate.memberId} view={view} />)}</div> : <p className={styles.empty}>Nog geen clubgenoten in je officiële historie.</p>}
         </section>
       </div>
+      <details className={styles.summaryDisclosure}>
+        <summary>Historiesamenvatting · {summary.evenings} TOS-avonden · {summary.matches} wedstrijden</summary>
+        <section className={styles.stats} aria-label="Historiesamenvatting">
+          <Card><strong>{summary.evenings}</strong><span>TOS-avonden</span></Card>
+          <Card><strong>{summary.matches}</strong><span>Wedstrijden</span></Card>
+          <Card><strong>{summary.clubmates}</strong><span>Clubgenoten</span></Card>
+          <Card><strong>{summary.mostPlayed?.displayName ?? "—"}</strong><span>Meest mee/tegen gespeeld{summary.mostPlayed ? ` · ${summary.mostPlayed.matches}` : ""}</span></Card>
+        </section>
+      </details>
     </div>
   );
 }

@@ -25,7 +25,7 @@ export default async function AccountPage({ searchParams }: PageProps) {
     <AccountShell
       account={account}
       title="Mijn account"
-      intro="Je identiteit, clubstatus en huidige mogelijkheden binnen T.C. Zuid TOS."
+      intro="Je clubprofiel en accountinstellingen."
       variant="account"
     >
       {message ? (
@@ -43,23 +43,18 @@ export default async function AccountPage({ searchParams }: PageProps) {
             <span className={styles.initials} aria-hidden="true">{displayInitials(displayName)}</span>
             <span className={styles.identityCopy}>
               <strong className={styles.identityName}>{displayName}</strong>
-              <span>Lid van T.C. Zuid TOS</span>
+              <span>{membershipLabel(account.membership.state)}</span>
             </span>
           </div>
           <dl className={styles.details}>
-            <dt>Naam</dt>
-            <dd>{displayName}</dd>
             <dt>E-mailadres</dt>
             <dd>{account.identity.email}</dd>
-            <dt>Clubstatus</dt>
-            <dd>{membershipLabel(account.membership.state)}</dd>
-            <dt>Zichtbare naam</dt>
-            <dd>{displayName}</dd>
           </dl>
           {account.profile?.active && account.profile.memberId ? (
             <div className={styles.nameAction}>
+              <div><strong>Zichtbare naam</strong><p>{displayName}</p></div>
               <ActionDialog
-                triggerLabel="✎ Zichtbare naam wijzigen"
+                triggerLabel={<span><span className={styles.srOnly}>Zichtbare naam </span>wijzigen <span aria-hidden="true">→</span></span>}
                 title="Zichtbare naam wijzigen"
                 description="Deze naam is zichtbaar voor andere deelnemers."
                 triggerClassName={styles.nameTrigger}
@@ -78,7 +73,7 @@ export default async function AccountPage({ searchParams }: PageProps) {
                   <button type="submit">Naam opslaan</button>
                 </form>
               </ActionDialog>
-              <p className={styles.nameHint}>Deze naam is zichtbaar voor andere deelnemers.</p>
+              <p className={styles.nameHint}>Deze naam zien andere deelnemers in schema’s en deelnemerslijsten.</p>
             </div>
           ) : (
             <p>Maak eerst je clubprofiel af om je zichtbare naam te wijzigen.</p>
@@ -86,10 +81,9 @@ export default async function AccountPage({ searchParams }: PageProps) {
         </Card>
         <Card className={styles.contentCard}>
           <h2>Sessie</h2>
-          <p>Je gebruikt één veilige sessie voor deelnemen en eventuele beheertaken.</p>
           <div className={styles.sessionStatus} role="status">
             <span aria-hidden="true" />
-            <div><strong>Actieve sessie</strong><p>Je bent momenteel ingelogd.</p></div>
+            <div><strong>Ingelogd</strong><p>Veilige sessie actief.</p></div>
           </div>
           <div className={styles.logoutWrap}><LogoutForm /></div>
         </Card>

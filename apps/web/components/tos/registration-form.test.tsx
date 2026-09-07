@@ -34,6 +34,11 @@ describe("self-service registration form", () => {
     fireEvent.click(screen.getByLabelText("Ik doe niet mee"));
     expect(screen.getByLabelText("Ik doe niet mee")).toBeChecked();
     expect(screen.getByLabelText("Vanaf")).not.toBeRequired();
+    expect(screen.getByLabelText("Vanaf")).not.toBeVisible();
+    expect(screen.getByRole("group", { name: "Jouw keuze" })).toBeVisible();
+    fireEvent.click(screen.getByRole("radio", { name: "Ik doe mee" }));
+    expect(screen.getByLabelText("Vanaf")).toBeVisible();
+    expect(screen.getByLabelText("Vanaf")).toBeRequired();
     expect(screen.getByRole("button", { name: "Aanmelding wijzigen" })).toBeInTheDocument();
     expect(container.querySelectorAll('input[name="slug"]')).toHaveLength(1);
     for (const name of ["event_id", "registration_id", "user_id", "member_id", "source", "role"]) {

@@ -121,8 +121,8 @@ function RegistrationCard({
       ) : (
         <p className={styles.muted}>Deze aanmelding kan niet meer worden gewijzigd.</p>
       )}
-      {position?.placementStatus === "placed" && registration?.response === "attending" && event.status !== "cancelled" ? <div className={styles.actions}>
-        <a href={`/tos/${event.slug}/agenda`}>Toevoegen aan agenda</a>
+      {position?.placementStatus === "placed" && registration?.response === "attending" && event.status !== "cancelled" ? <div className={styles.calendarAction}>
+        <a href={`/tos/${event.slug}/agenda`}><span aria-hidden="true">▦ </span>Toevoegen aan agenda</a>
         <small>Momentopname; wijzigingen worden niet automatisch bijgewerkt.</small>
       </div> : null}
     </Card>
@@ -147,15 +147,18 @@ function AttendeeCard({
         <h2 className={styles.formTitle}>Wie doen er mee?</h2>
         {!unavailable ? <Badge tone="success">{placed.length} {placed.length === 1 ? "deelnemer" : "deelnemers"}</Badge> : null}
       </div>
-      <EventCapacityPanel capacity={capacity} sport={event.sport} />
+      <EventCapacityPanel capacity={capacity} sport={event.sport} compact />
       {unavailable ? (
         <p className={styles.muted}>De deelnemerslijst is tijdelijk niet beschikbaar.</p>
-      ) : placed.length ? (
-        <p className={styles.attendeeNames}>{placed.map((person) => person.displayName).join(" · ")}</p>
-      ) : (
+      ) : !placed.length ? (
         <p className={styles.muted}>Er zijn nog geen deelnemers zichtbaar.</p>
-      )}
-      {!unavailable ? <ParticipantsSheet event={event} capacity={capacity} attendance={attendance} /> : null}
+      ) : null}
+      {!unavailable ? <ParticipantsSheet event={event} capacity={capacity} attendance={attendance} triggerContent={
+        <span className={styles.compactAttendeePreview}>
+          <span>{placed.slice(0, 2).map((person) => person.displayName).join(", ")}{placed.length > 2 ? ` +${placed.length - 2}` : ""}</span>
+          <span>Bekijk deelnemers <span aria-hidden="true">›</span></span>
+        </span>
+      } /> : null}
     </Card>
   );
 }

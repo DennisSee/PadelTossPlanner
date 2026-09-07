@@ -50,8 +50,11 @@ test("openbare detaildeeplink bewaart exact dezelfde OTP-return zonder private d
   await signIn(page, request, testEmail("detail-otp"));
   await expect(page).toHaveURL(/\/tos\/vrijdag-padel$/u);
   await expect(page.getByRole("heading", { name: "Wie doen er mee?" })).toBeVisible();
-  await expect(page.locator("p").filter({ hasText: "<b>Veilige testnaam</b>" }).first()).toBeVisible();
+  await page.getByRole("button", { name: /Bekijk deelnemers/u }).click();
+  const participants = page.getByRole("dialog", { name: "Padel TOS vrijdagavond" });
+  await expect(participants.getByText("<b>Veilige testnaam</b>", { exact: true })).toBeVisible();
   await expect(page.locator("b", { hasText: "Veilige testnaam" })).toHaveCount(0);
+  await page.keyboard.press("Escape");
   await assertNoHorizontalOverflow(page);
   await page.getByRole("link", { name: "Naar startpagina" }).click();
   await expect(page).toHaveURL(/\/$/u);
@@ -62,6 +65,7 @@ test("Google PKCE gebruikt dezelfde dynamische eventreturn en malicious next val
   await page.goto("/login?next=/tos/vrijdag-padel");
   await page.getByRole("button", { name: "Doorgaan met Google" }).click();
   await expect(page).toHaveURL(/\/tos\/vrijdag-padel$/u);
+  await expect(page.getByRole("heading", { name: "Aanmelden", exact: true })).toBeVisible();
 
   await page.goto("/account");
   await page.getByRole("button", { name: "Uitloggen" }).click();

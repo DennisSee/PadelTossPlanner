@@ -34,7 +34,7 @@ function PersonalFocus({ identity, round, playerKey, label }: { identity: LiveId
   const peers = round.slots.filter((slot) => slot.key !== playerKey && slot.state === "playing" && slot.court === own.court);
   const clock = (value: string) => new Intl.DateTimeFormat("nl-NL", { timeZone: "Europe/Amsterdam", hour: "2-digit", minute: "2-digit" }).format(new Date(value));
   const status = own.state === "playing" ? own.court : own.state === "rest" ? "Rust" : own.state === "not_arrived" ? "Nog niet aanwezig" : "Niet meer beschikbaar";
-  return <article className={styles.personalFocus} aria-label={`${label}: ${status}`}>
+  return <article className={`${styles.personalFocus} ${label === "Nu" ? styles.personalFocusCurrent : ""}`.trim()} aria-label={`${label}: ${status}`}>
     <span className={styles.personalFocusLabel}>{label}</span>
     <h2>{status}</h2>
     <p className={styles.personalFocusTime}>{clock(round.starts_at)}–{clock(round.ends_at)}</p>

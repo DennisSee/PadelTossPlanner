@@ -369,8 +369,12 @@ export type { SafeDraft };
 function QualitySummary({ summary }: { summary: NonNullable<ReturnType<typeof parsePlannerQualitySummary>> }) {
   return <aside className={styles.qualityCard} aria-label="Kwaliteit van het schema">
     <strong>Planningkwaliteit</strong>
-    <span>Partnerherhalingen: {summary.partnerRepeats} · tegenstanderherhalingen: {summary.opponentRepeats}</span>
-    <span>Maximaal rustverschil: {summary.maxRestDifference} · maximaal teamverschil: {summary.maxTeamDifference}</span>
+    <dl className={styles.qualityMetrics}>
+      <div><dt>Partner<wbr />herhalingen: </dt><dd>{summary.partnerRepeats}</dd></div>
+      <div><dt>tegenstander<wbr />herhalingen: </dt><dd>{summary.opponentRepeats}</dd></div>
+      <div><dt>Maximaal rustverschil: </dt><dd>{summary.maxRestDifference}</dd></div>
+      <div><dt>maximaal teamverschil: </dt><dd>{summary.maxTeamDifference}</dd></div>
+    </dl>
     <small>De planning blijft volledig speelbaar.</small>
   </aside>;
 }

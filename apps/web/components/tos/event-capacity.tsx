@@ -28,7 +28,6 @@ export function EventCapacityPanel({
         <span>Plekken bezet</span>
       </div>
       <p>{capacity.availableCount} {capacity.availableCount === 1 ? "plek" : "plekken"} vrij</p>
-      {compact ? <span className={styles.capacityProgress} style={style} aria-hidden="true" /> : null}
       {capacity.waitlistCount ? (
         <p className={styles.waitlistCount}>{capacity.waitlistCount} op wachtlijst</p>
       ) : null}

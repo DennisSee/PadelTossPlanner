@@ -15,6 +15,8 @@ it("selects the exact opaque own key despite duplicate names and permits Everyon
   render(<PersonalLive identity={identity} ownKey={keys[1]} now={new Date("2026-09-07T18:05:00Z")} slug="live-event" />);
   expect(screen.getByLabelText("Schema voor")).toHaveValue(keys[1]);
   const current = screen.getByRole("article", { name: "Nu: Kremer Baan" });
+  expect(current.className).toContain("personalFocusCurrent");
+  expect(screen.getByRole("article", { name: "Hierna: Kremer Baan" }).className).not.toContain("personalFocusCurrent");
   expect(within(current).getByText("Dezelfde Naam")).toBeInTheDocument();
   expect(current).toHaveTextContent("Speler 2 & Speler 3");
   expect(screen.getAllByRole("article")).toHaveLength(2);

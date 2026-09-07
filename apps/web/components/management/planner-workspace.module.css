@@ -35,6 +35,11 @@
 .qualityCard { display: grid; gap: .2rem; margin: var(--space-3) 0; padding: .7rem .8rem; border: 1px solid #b8d8ca; border-left: .35rem solid var(--club-green); border-radius: var(--radius-sm); background: #edf8f2; color: var(--club-green-dark); }
 .qualityCard span, .qualityCard small { overflow-wrap: anywhere; }
 .qualityCard small { color: var(--text-muted); }
+.qualityMetrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.75rem; margin: 0.5rem 0; }
+.qualityMetrics div { min-width: 0; }
+.qualityMetrics dt { font-size: 0.9375rem; overflow-wrap: anywhere; }
+.qualityMetrics dd { margin: 0.15rem 0 0; font-size: 1.25rem; font-weight: 750; }
+@media (max-width: 42rem) { .qualityMetrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .scheduleRows { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); margin: var(--space-3) 0; }
 .scheduleRows > div { position: relative; display: grid; gap: .2rem; overflow: hidden; padding: .65rem .75rem; border: 1px solid var(--border); border-left: .3rem solid var(--club-green); border-radius: var(--radius-sm); background: var(--surface); }
 .scheduleRows span, .scheduleRows small { overflow-wrap: anywhere; }
