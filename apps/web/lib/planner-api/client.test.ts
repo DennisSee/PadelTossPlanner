@@ -47,10 +47,10 @@ describe("internal planner API client", () => {
       error: "NO_VALID_SCHEDULE",
       summary: "Geen geldig schema gevonden.",
       diagnostics: [{
-        code: "LEVEL_MIX_TOO_RESTRICTIVE", severity: "likely",
-        message: "Met een hogere niveaumix vond de planner wel een geldig schema.",
-        suggested_change: "Verhoog Niveaumix van 80 naar 100.",
-        setting: "level_mix", current_value: 80, suggested_value: 100,
+        code: "SEARCH_BUDGET_TOO_SMALL", severity: "likely",
+        message: "Met een uitgebreider zoekprofiel vond de planner wel een geldig schema.",
+        suggested_change: "Kies zoekprofiel Uitgebreid.",
+        setting: "search_profile", current_value: "Snel", suggested_value: "Uitgebreid",
       }],
       probes_run: 1,
     };

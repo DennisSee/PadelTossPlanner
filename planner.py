@@ -16,6 +16,15 @@ from datetime import date, datetime, time, timedelta
 from typing import Iterable, Sequence
 
 
+# Kwaliteitshiërarchie binnen een structureel geldig schema. Opeenvolgende rust
+# raakt eerlijke speeltijd het zwaarst. Partnerherhaling blijft daaronder een
+# sterke voorkeur, tegenstanderherhaling en wedstrijdbalans zijn verfijning.
+CONSECUTIVE_REST_PENALTY = 2_500.0
+PARTNER_REPEAT_AVOID_PENALTY = 600.0
+PARTNER_REPEAT_ALLOWED_PENALTY = 80.0
+OPPONENT_REPEAT_PENALTY = 8.0
+
+
 class PlannerInputError(ValueError):
     """Machineleesbare, veilige categorie voor deterministische invoerfouten."""
 
@@ -154,8 +163,11 @@ def _match_penalty(
     team_difference_tolerance: float,
 ) -> float:
     repeat_partners = sum(partner_counts[pair_key(*team)] for team in (team1, team2))
-    if repeat_partners and not allow_repeat_partners:
-        return math.inf
+    partner_repeat_penalty = (
+        PARTNER_REPEAT_ALLOWED_PENALTY
+        if allow_repeat_partners
+        else PARTNER_REPEAT_AVOID_PENALTY
+    )
 
     team1_ranks = [ranks[name] for name in team1]
     team2_ranks = [ranks[name] for name in team2]
@@ -203,8 +215,8 @@ def _match_penalty(
         + teammate_gap_weight * sum(teammate_gaps)
         + extreme_gap_weight * extreme_gap
         + mix_target_penalty
-        + 2.0 * repeated_opponents
-        + 100.0 * repeat_partners
+        + OPPONENT_REPEAT_PENALTY * repeated_opponents
+        + partner_repeat_penalty * repeat_partners
     )
 
 
@@ -236,8 +248,6 @@ def _best_match_for_group(
             settings.level_mix,
             settings.team_difference_tolerance,
         )
-        if math.isinf(penalty):
-            continue
         match = Match(team1=team1, team2=team2, quality_penalty=penalty)
         candidates.append((penalty + rng.random() * 0.35, match))
 
@@ -487,10 +497,10 @@ def _rest_options(
     if rest_count == 0:
         return [tuple()]
 
-    # Alleen echte rust telt voor de regel 'niet twee rondes achter elkaar'.
-    eligible = [name for name in available_names if name not in state.previous_rest]
-    if len(eligible) < rest_count:
-        return []
+    # Opeenvolgende echte rust is onwenselijk maar niet structureel ongeldig.
+    # Alle beschikbare spelers blijven daarom kandidaat; de score ontmoedigt de
+    # herhaling sterk en laat haar alleen door wanneer de arithmetic dat vraagt.
+    eligible = list(available_names)
 
     total = math.comb(len(eligible), rest_count)
     if total <= 500:
@@ -516,6 +526,7 @@ def _rest_options(
         score = (
             _count_deviation_penalty(projected_play, target_play, all_names, 11.0)
             + _count_deviation_penalty(projected_rest, target_rest, all_names, 8.0)
+            + CONSECUTIVE_REST_PENALTY * len(state.previous_rest.intersection(rest_set))
             + rng.random() * 0.5
         )
         scored.append((score, tuple(sorted(resters))))
@@ -547,7 +558,11 @@ def _extend_state(
         play_counts=state.play_counts.copy(),
         rest_counts=state.rest_counts.copy(),
         previous_rest=frozenset(resters),
-        score=state.score + arrangement_score,
+        score=(
+            state.score
+            + arrangement_score
+            + CONSECUTIVE_REST_PENALTY * len(state.previous_rest.intersection(resters))
+        ),
     )
     new_state.rounds.append(
         RoundPlan(
@@ -601,6 +616,48 @@ def _final_score(
         + _count_deviation_penalty(state.play_counts, target_play, names, 30.0)
         + _count_deviation_penalty(state.rest_counts, target_rest, names, 22.0)
     )
+
+
+def _repeat_count(counts: Counter[tuple[str, str]]) -> int:
+    return sum(max(0, count - 1) for count in counts.values())
+
+
+def _quality_summary(
+    rounds: Sequence[RoundPlan],
+    players: Sequence[Player],
+    settings: PlannerSettings,
+    state: SearchState,
+) -> dict[str, object]:
+    ranks = {player.name: float(player.ranking) for player in players}
+    partner_repeats = _repeat_count(state.partner_counts)
+    opponent_repeats = _repeat_count(state.opponent_counts)
+    rest_values = [state.rest_counts[player.name] for player in players]
+    max_rest_difference = max(rest_values) - min(rest_values) if rest_values else 0
+    team_differences = [
+        abs(
+            statistics.mean(ranks[name] for name in match.team1)
+            - statistics.mean(ranks[name] for name in match.team2)
+        )
+        for round_plan in rounds
+        for match in round_plan.matches
+    ]
+    max_team_difference = max(team_differences, default=0.0)
+    compromises: list[str] = []
+    if partner_repeats:
+        compromises.append("PARTNER_REPEATS")
+    if opponent_repeats:
+        compromises.append("OPPONENT_REPEATS")
+    if max_rest_difference > 1:
+        compromises.append("REST_IMBALANCE")
+    if max_team_difference > settings.team_difference_tolerance:
+        compromises.append("TEAM_DIFFERENCE_ABOVE_TOLERANCE")
+    return {
+        "partner_repeats": partner_repeats,
+        "opponent_repeats": opponent_repeats,
+        "max_rest_difference": max_rest_difference,
+        "max_team_difference": round(max_team_difference, 2),
+        "compromises": compromises,
+    }
 
 
 def generate_schedule(
@@ -679,20 +736,6 @@ def generate_schedule(
         available_by_round, active_slots, names
     )
     rest_counts_per_round = [len(available) - active_slots for available in available_by_round]
-
-    # Een snelle haalbaarheidscontrole voor de regel zonder opeenvolgende echte rust.
-    for round_index in range(1, rounds):
-        previous_rest = rest_counts_per_round[round_index - 1]
-        current_rest = rest_counts_per_round[round_index]
-        available_count = len(available_by_round[round_index])
-        if previous_rest + current_rest > available_count:
-            start, _ = round_times(settings, round_index)
-            raise PlannerInputError(
-                "CONSECUTIVE_REST_IMPOSSIBLE",
-                f"Rond {start:%H:%M} kan de regel 'niet twee echte rustbeurten achter elkaar' "
-                "niet worden gehaald. Selecteer meer banen of gebruik minder spelers.",
-                round_time=f"{start:%H:%M}",
-            )
 
     best_state: SearchState | None = None
     best_score = math.inf
@@ -787,8 +830,8 @@ def generate_schedule(
 
     if best_state is None:
         raise RuntimeError(
-            "Geen geldig schema gevonden. Probeer 'Uitgebreid zoeken', sta dubbele partners toe, "
-            "verkort de avond of pas het aantal spelers, beschikbaarheid, pauzeduur of banen aan."
+            "Geen structureel geldig schema gevonden binnen het beschikbare zoekbudget. "
+            "Probeer 'Uitgebreid zoeken' of genereer opnieuw met een andere seed."
         )
 
     late_players = [
@@ -829,6 +872,7 @@ def generate_schedule(
         "rest_minutes": settings.rest_minutes,
         "level_mix": settings.level_mix,
         "team_difference_tolerance": settings.team_difference_tolerance,
+        "quality_summary": _quality_summary(best_state.rounds, players, settings, best_state),
     }
     return best_state.rounds, diagnostics
 

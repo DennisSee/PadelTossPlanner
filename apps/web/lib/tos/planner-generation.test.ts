@@ -11,7 +11,16 @@ it("builds the exact identity-free engine payload from included server draft row
   const request = plannerGenerateRequest(event, { ...emptyPlannerDraft(event), revision: 1, selectedCourts: [court.id], players }, 42, [court]);
   expect(Object.keys(request).sort()).toEqual(["allow_repeat_partners","courts","end_time","generation_seed","level_mix","match_minutes","players","rest_minutes","search_profile","start_time","tolerance"].sort());
   expect(request.players[0]).toEqual({ name: "Speler 0", ranking: 3, available_from: "20:07", available_until: "22:07" });
+  expect(request.allow_repeat_partners).toBe(false);
   expect(JSON.stringify(request)).not.toMatch(/member|user|registration|event_id/iu);
+});
+
+it("preserves both partner-repeat preference values in the engine request", () => {
+  const players = Array.from({ length: 4 }, (_, index) => ({ rowId: `${index + 1}1111111-1111-4111-8111-111111111111`, name: `Speler ${index}`, ranking: 3, included: true, availableFrom: "20:07", availableUntil: "22:07" }));
+  const court = { id: "c9000000-0000-4000-8000-000000000001", sport: "padel" as const, name: "Kremer Baan", active: true, sortOrder: 10 };
+  const base = { ...emptyPlannerDraft(event), revision: 1, selectedCourts: [court.id], players };
+  expect(plannerGenerateRequest(event, { ...base, allowRepeatPartners: false }, 1, [court]).allow_repeat_partners).toBe(false);
+  expect(plannerGenerateRequest(event, { ...base, allowRepeatPartners: true }, 1, [court]).allow_repeat_partners).toBe(true);
 });
 
 it("rejects empty, inactive and cross-sport court selections", () => {

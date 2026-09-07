@@ -15,6 +15,7 @@ import type { ImportPreviewItem } from "../../lib/tos/planner-draft";
 import type { PlannerGeneration } from "../../lib/planner-api/types";
 import type { PlannerGenerationFailure } from "../../lib/planner-api/types";
 import { parsePlannerGenerationFailure } from "../../lib/planner-api/failure";
+import { parsePlannerQualitySummary } from "../../lib/planner-api/quality";
 import { Card } from "../ui";
 
 import styles from "./planner-workspace.module.css";
@@ -117,6 +118,8 @@ export function PlannerWorkspace({
     availableFrom: player.availableFrom,
     availableUntil: player.availableUntil,
   }))), [players]);
+  const generationQuality = generation ? parsePlannerQualitySummary(generation.diagnostics) : null;
+  const selectedQuality = selectedSchedule ? parsePlannerQualitySummary(selectedSchedule.diagnostics) : null;
 
   function markDirty() {
     setDirty(true);
@@ -170,10 +173,10 @@ export function PlannerWorkspace({
         code: "NO_VALID_SCHEDULE",
         summary: "Geen geldig schema gevonden.",
         diagnostics: [{
-          code: "COMBINED_OR_SEARCH_LIMIT",
+          code: "SEARCH_BUDGET_EXHAUSTED",
           severity: "unknown",
-          message: "De planner kon geen betrouwbare specifieke oorzaak bepalen.",
-          suggestedChange: "Controleer spelers, beschikbaarheid, banen en instellingen en probeer opnieuw.",
+          message: "De planner kon geen betrouwbare specifieke oorzaak bepalen binnen de huidige zoektijd.",
+          suggestedChange: "Kies Uitgebreid zoeken of genereer opnieuw met een nieuwe seed.",
           setting: null,
           currentValue: null,
           suggestedValue: null,
@@ -250,8 +253,9 @@ export function PlannerWorkspace({
             <label>Zoekprofiel<select name="search_profile" defaultValue={draft.searchProfile}>{PLANNER_SEARCH_PROFILES.map((value) => <option key={value}>{value}</option>)}</select></label>
             <label>Niveaumix<input name="level_mix" type="number" min="0" max="100" defaultValue={draft.levelMix} /></label>
             <label>Teamtolerantie<input name="team_difference_tolerance" type="number" min="0" max="1.5" step="0.1" defaultValue={draft.teamDifferenceTolerance} /></label>
-            <label className={styles.checkbox}><input type="checkbox" checked={allowRepeatPartners} onChange={(event) => setAllowRepeatPartners(event.target.checked)} /> Herhaalde partners toestaan</label>
+            <label className={styles.checkbox}><input type="checkbox" checked={allowRepeatPartners} onChange={(event) => setAllowRepeatPartners(event.target.checked)} /> Meer ruimte voor partnerherhaling</label>
           </div>
+          <p className={styles.muted}>Niveaumix, teamtolerantie en partnerherhaling sturen de kwaliteit; ze maken een speelbare indeling niet absoluut onmogelijk.</p>
           <button className={styles.primaryButton} type="submit">Planneropzet opslaan</button>
           {dirty ? <p className={styles.unsaved} role="status">Niet-opgeslagen wijzigingen — sla eerst op voordat je genereert.</p> : null}
         </Card>
@@ -266,7 +270,7 @@ export function PlannerWorkspace({
         {generationFailure ? (
           <div className={styles.failureCard} role="alert" aria-live="assertive">
             <h3>{generationFailure.summary}</h3>
-            <p>Met de huidige instellingen kan de planner geen geldige indeling maken.</p>
+            <p>{generationFailure.code === "INVALID_PLANNER_INPUT" ? "De planneropzet is structureel niet speelbaar." : "Geen schema gevonden binnen de huidige zoektijd."}</p>
             <ul>
               {generationFailure.diagnostics.map((diagnostic) => (
                 <li key={diagnostic.code}>
@@ -285,6 +289,7 @@ export function PlannerWorkspace({
           <div className={styles.generation}>
             <h3>Controleer het voorstel</h3>
             <p>{generation.schedule.length} baanindelingen · seed {generation.seed}</p>
+            {generationQuality?.compromises.length ? <QualitySummary summary={generationQuality} /> : null}
             <div className={styles.scheduleRows}>
               {generation.schedule.map((row, index) => (
                 <div key={`${row.Ronde}-${row.Baan}-${index}`}>
@@ -345,6 +350,7 @@ export function PlannerWorkspace({
             <small>Niveau {row["Niveau T1"]} – {row["Niveau T2"]} · verschil {row.Teamverschil}</small>
           </div>)}
         </div>
+        {selectedQuality?.compromises.length ? <QualitySummary summary={selectedQuality} /> : null}
         <details><summary>Spelerstatistieken</summary><pre>{JSON.stringify(selectedSchedule.statistics, null, 2)}</pre></details>
         <details><summary>Plannerdiagnostiek</summary><pre>{JSON.stringify(selectedSchedule.diagnostics, null, 2)}</pre></details>
       </Card> : null}
@@ -353,3 +359,12 @@ export function PlannerWorkspace({
 }
 
 export type { SafeDraft };
+
+function QualitySummary({ summary }: { summary: NonNullable<ReturnType<typeof parsePlannerQualitySummary>> }) {
+  return <aside className={styles.qualityCard} aria-label="Kwaliteit van het schema">
+    <strong>Speelbaar schema met kwaliteitscompromissen</strong>
+    <span>Partnerherhalingen: {summary.partnerRepeats} · tegenstanderherhalingen: {summary.opponentRepeats}</span>
+    <span>Maximaal rustverschil: {summary.maxRestDifference} · maximaal teamverschil: {summary.maxTeamDifference}</span>
+    <small>De planning blijft volledig speelbaar.</small>
+  </aside>;
+}

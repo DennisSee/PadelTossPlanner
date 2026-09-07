@@ -977,6 +977,25 @@ const server = createServer(async (request, response) => {
     json(response, 200, { status: "ok" });
     return;
   }
+  if (request.method === "POST" && requestUrl.pathname === "/__test/planner-best-effort-fixture") {
+    const event = tosEvents.find(({ slug }) => slug === "web5b1-padel");
+    const now = new Date().toISOString();
+    plannerDrafts.set(event.id, {
+      event_id: event.id,
+      players: Array.from({ length: 12 }, (_, index) => ({
+        row_id: `be${String(index + 1).padStart(2, "0")}0000-0000-4000-8000-000000000001`,
+        name: `Best effort ${String(index + 1).padStart(2, "0")}`,
+        ranking: (index % 5) + 1, included: true,
+        available_from: "20:00", available_until: "22:00",
+      })),
+      selected_courts: initialClubCourts.slice(0, 3).map(({ id }) => id),
+      match_minutes: 20, rest_minutes: 0, search_profile: "Normaal",
+      allow_repeat_partners: false, level_mix: 100, team_difference_tolerance: 0.5,
+      revision: 1, updated_by: null, updated_by_name: "Planner", updated_at: now, created_at: now,
+    });
+    json(response, 200, { status: "ok" });
+    return;
+  }
   if (request.method === "POST" && requestUrl.pathname === "/__test/reset-state") {
     tosEvents.splice(0, tosEvents.length, ...initialTosEvents.map((event) => ({ ...event })));
     authUsers.clear();
@@ -1012,32 +1031,52 @@ const server = createServer(async (request, response) => {
       json(response, 422, { error: "invalid-input" });
       return;
     }
-    if (plannerDiagnosticFailure && body.level_mix < 100) {
+    if (plannerDiagnosticFailure) {
+      plannerDiagnosticFailure = false;
       json(response, 422, {
-        error: "NO_VALID_SCHEDULE",
-        summary: "Geen geldig schema gevonden.",
+        error: "INVALID_PLANNER_INPUT",
+        summary: "De planneropzet is niet speelbaar.",
         diagnostics: [{
-          code: "LEVEL_MIX_TOO_RESTRICTIVE", severity: "likely",
-          message: "Met een hogere niveaumix vond de planner wel een geldig schema.",
-          suggested_change: `Verhoog Niveaumix van ${body.level_mix} naar 100.`,
-          setting: "level_mix", current_value: body.level_mix, suggested_value: 100,
+          code: "AVAILABILITY_SHORTAGE", severity: "blocking",
+          message: "Om 20:40 zijn 8 spelers beschikbaar; voor 3 banen zijn er 12 nodig.",
+          suggested_change: "Pas beschikbaarheid of het aantal banen aan.",
+          setting: "availability", current_value: 8, suggested_value: 12,
         }],
-        probes_run: 1,
+        probes_run: 0,
       });
       return;
     }
     const names = body.players.map(({ name }) => String(name));
+    const totalMinutes = 120;
+    const roundCount = Math.floor((totalMinutes + body.rest_minutes) / (body.match_minutes + body.rest_minutes));
+    const bestEffortFixture = names.length === 12 && body.courts.length === 3;
+    const opponentRepeats = bestEffortFixture ? (body.rest_minutes === 0 ? 6 : 2) : 0;
+    const schedule = [];
+    for (let round = 0; round < roundCount; round += 1) {
+      const rotated = names.map((_, index) => names[(index + round) % names.length]);
+      for (let courtIndex = 0; courtIndex < body.courts.length; courtIndex += 1) {
+        const offset = courtIndex * 4;
+        schedule.push({
+          Ronde: round + 1, Tijd: `${body.start_time} - ${body.end_time}`, Baan: body.courts[courtIndex],
+          "Team 1": `${rotated[offset]} & ${rotated[offset + 1]}`, "Niveau T1": 3,
+          "Team 2": `${rotated[offset + 2]} & ${rotated[offset + 3]}`, "Niveau T2": 3,
+          Teamverschil: 0, Rust: "Niemand", "Nog niet aanwezig": "Niemand",
+          "Niet meer beschikbaar": "Niemand",
+        });
+      }
+    }
     json(response, 200, {
       seed: body.generation_seed,
-      schedule: body.courts.map((court, index) => ({
-        Ronde: 1, Tijd: `${body.start_time} - ${body.end_time}`, Baan: court,
-        "Team 1": `${names[index * 4]} & ${names[index * 4 + 1]}`, "Niveau T1": 3,
-        "Team 2": `${names[index * 4 + 2]} & ${names[index * 4 + 3]}`, "Niveau T2": 3,
-        Teamverschil: 0, Rust: "Niemand", "Nog niet aanwezig": "Niemand",
-        "Niet meer beschikbaar": "Niemand",
-      })),
+      schedule,
       statistics: names.map((name) => ({ Speler: name, Ranking: 3, Wedstrijden: 1 })),
-      diagnostics: { rounds: 1, unused_minutes: 0, courts_used: body.courts.length },
+      diagnostics: {
+        rounds: roundCount, unused_minutes: 0, courts_used: body.courts.length,
+        quality_summary: {
+          partner_repeats: 0, opponent_repeats: opponentRepeats,
+          max_rest_difference: 0, max_team_difference: 0,
+          compromises: opponentRepeats ? ["OPPONENT_REPEATS"] : [],
+        },
+      },
     });
     return;
   }

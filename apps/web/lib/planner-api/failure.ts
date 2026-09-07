@@ -7,9 +7,8 @@ const FAILURE_DIAGNOSTIC_KEYS = [
 const FAILURE_CODES = new Set(["INVALID_PLANNER_INPUT", "NO_VALID_SCHEDULE"]);
 const DIAGNOSTIC_CODES = new Set([
   "INSUFFICIENT_PLAYERS", "AVAILABILITY_SHORTAGE", "INVALID_AVAILABILITY",
-  "REST_DISTRIBUTION_IMPOSSIBLE", "SESSION_TOO_SHORT", "NO_COURTS", "INVALID_CONFIGURATION",
-  "LEVEL_MIX_TOO_RESTRICTIVE", "TEAM_TOLERANCE_TOO_RESTRICTIVE", "REPEAT_PARTNERS_REQUIRED",
-  "SEARCH_BUDGET_TOO_SMALL", "COMBINED_OR_SEARCH_LIMIT",
+  "SESSION_TOO_SHORT", "NO_COURTS", "INVALID_CONFIGURATION",
+  "SEARCH_BUDGET_TOO_SMALL", "DIFFERENT_SEED_MAY_HELP", "SEARCH_BUDGET_EXHAUSTED",
 ]);
 const CONTROL = /[\u0000-\u001f\u007f]/u;
 
@@ -61,7 +60,7 @@ export function parsePlannerGenerationFailure(value: unknown): PlannerGeneration
       !FAILURE_CODES.has(failure.error) || !safeText(failure.summary, 160) ||
       !Array.isArray(failure.diagnostics) || failure.diagnostics.length < 1 || failure.diagnostics.length > 3 ||
       !Number.isSafeInteger(failure.probes_run) || typeof failure.probes_run !== "number" ||
-      failure.probes_run < 0 || failure.probes_run > 4) throw new Error("Invalid planner failure.");
+      failure.probes_run < 0 || failure.probes_run > 2) throw new Error("Invalid planner failure.");
   return Object.freeze({
     code: failure.error as PlannerGenerationFailure["code"],
     summary: failure.summary,

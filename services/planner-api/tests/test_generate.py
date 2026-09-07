@@ -38,6 +38,57 @@ def test_generate_is_deterministic_and_json_safe() -> None:
     assert set(first.json()) == {"seed", "schedule", "statistics", "diagnostics"}
     assert first.json()["seed"] == 20260821
     assert first.json()["schedule"]
+    assert set(first.json()["diagnostics"]["quality_summary"]) == {
+        "partner_repeats", "opponent_repeats", "max_rest_difference",
+        "max_team_difference", "compromises",
+    }
+
+
+@pytest.mark.parametrize("allowed", [False, True])
+def test_generate_preserves_partner_repeat_preference(
+    monkeypatch: pytest.MonkeyPatch, allowed: bool
+) -> None:
+    seen: list[bool] = []
+
+    def capture(_players: object, _courts: object, settings: object):
+        seen.append(settings.allow_repeat_partners)
+        return [], {"quality_summary": {
+            "partner_repeats": 0, "opponent_repeats": 0,
+            "max_rest_difference": 0, "max_team_difference": 0,
+            "compromises": [],
+        }}
+
+    monkeypatch.setattr(main_module, "generate_schedule", capture)
+    monkeypatch.setattr(main_module, "schedule_rows", lambda *_args: [])
+    monkeypatch.setattr(main_module, "player_statistics", lambda *_args: [])
+    value = payload()
+    value["allow_repeat_partners"] = allowed
+    with TestClient(app) as client:
+        response = client.post("/generate", json=value)
+    assert response.status_code == 200
+    assert seen == [allowed]
+
+
+def test_generate_twelve_players_three_courts_without_pause() -> None:
+    value = payload()
+    value["players"] = [
+        {
+            "name": f"Speler {index:02d}", "ranking": ((index - 1) % 5) + 1,
+            "available_from": "20:00", "available_until": "22:00",
+        }
+        for index in range(1, 13)
+    ]
+    value.update({
+        "courts": ["Baan 1", "Baan 2", "Baan 3"], "search_profile": "Normaal",
+        "level_mix": 100, "tolerance": 0.5,
+    })
+    with TestClient(app) as client:
+        response = client.post("/generate", json=value)
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body["schedule"]) == 18
+    assert body["diagnostics"]["rounds"] == 6
+    assert body["diagnostics"]["quality_summary"]["opponent_repeats"] >= 6
 
 
 def test_generate_supports_midnight_and_minute_precision() -> None:

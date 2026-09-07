@@ -63,17 +63,14 @@ test("staff completes the event-scoped draft, private save and publication workf
   });
   expect(diagnosticFixture.ok()).toBe(true);
   await page.getByRole("button", { name: "Schema genereren" }).click();
-  const diagnosticHeading = page.getByRole("heading", { name: "Geen geldig schema gevonden" });
+  const diagnosticHeading = page.getByRole("heading", { name: "De planneropzet is niet speelbaar." });
   const diagnostic = page.getByRole("alert").filter({ has: diagnosticHeading });
   await expect(diagnosticHeading).toBeVisible();
-  await expect(diagnostic).toContainText("Verhoog Niveaumix van 80 naar 100.");
+  await expect(diagnostic).toContainText("Om 20:40 zijn 8 spelers beschikbaar; voor 3 banen zijn er 12 nodig.");
+  await expect(diagnostic).toContainText("De planneropzet is structureel niet speelbaar.");
   await expect(diagnostic.getByRole("link", { name: "Instellingen aanpassen" })).toHaveAttribute("href", "#planner-settings");
   await expect(page.locator('input[value="Handmatig Eén"]')).toBeVisible();
 
-  await page.getByLabel("Niveaumix").fill("100");
-  await page.getByRole("button", { name: "Planneropzet opslaan" }).click();
-  await expect(page.getByText("Planneropzet opgeslagen.")).toBeVisible();
-  await expect(page.getByText("Revisie 3", { exact: false })).toBeVisible();
   await page.getByRole("button", { name: "Schema genereren" }).click();
   const review = page.getByRole("heading", { name: "Controleer het voorstel" }).locator("xpath=ancestor::div[contains(@class,'generation')]");
   await expect(review).toBeVisible();
@@ -117,6 +114,32 @@ test("staff completes the event-scoped draft, private save and publication workf
   await page.goto("/live");
   await expect(page.locator("body")).not.toContainText("Ready Hele Avond");
 
+  const widths = await page.evaluate(() => ({ client: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
+  expect(widths.scroll).toBeLessThanOrEqual(widths.client + 1);
+});
+
+test("12-player three-court planner succeeds best effort with and without pause", async ({ page, request }) => {
+  const fixture = await request.post(`${MOCK_URL}/__test/planner-best-effort-fixture`);
+  expect(fixture.ok()).toBe(true);
+  await page.goto("/login?next=/beheer");
+  await signIn(page, request, "planner-no-member", /\/beheer$/u, "Beheeromgeving");
+  await page.goto("/beheer/tos/web5b1-padel");
+
+  await expect(page.getByText("12 geselecteerd")).toBeVisible();
+  await page.getByRole("button", { name: "Schema genereren" }).click();
+  await expect(page.getByRole("heading", { name: "Controleer het voorstel" })).toBeVisible();
+  await expect(page.getByLabel("Kwaliteit van het schema")).toContainText("tegenstanderherhalingen: 6");
+  await expect(page.getByText("Geen geldig schema gevonden.")).toHaveCount(0);
+  await expect(page.getByText("Ronde 6", { exact: false }).first()).toBeVisible();
+
+  await page.getByLabel("Pauze").fill("5");
+  await page.getByRole("button", { name: "Planneropzet opslaan" }).click();
+  await expect(page.getByText("Planneropzet opgeslagen.")).toBeVisible();
+  await page.getByRole("button", { name: "Schema genereren" }).click();
+  await expect(page.getByRole("heading", { name: "Controleer het voorstel" })).toBeVisible();
+  await expect(page.getByLabel("Kwaliteit van het schema")).toContainText("tegenstanderherhalingen: 2");
+  await expect(page.getByText("Ronde 5", { exact: false }).first()).toBeVisible();
+  await expect(page.getByText("Ronde 6", { exact: false })).toHaveCount(0);
   const widths = await page.evaluate(() => ({ client: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
   expect(widths.scroll).toBeLessThanOrEqual(widths.client + 1);
 });

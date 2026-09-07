@@ -40,13 +40,14 @@ describe("PlannerWorkspace", () => {
     const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({
       seed: 19,
       schedule: [{ Ronde: 1, Tijd: "20:00 - 20:20", Baan: "Kremer Baan", "Team 1": "Ada & Bea", "Niveau T1": 3, "Team 2": "Cleo & Dora", "Niveau T2": 3, Teamverschil: 0, Rust: "Niemand", "Nog niet aanwezig": "Niemand", "Niet meer beschikbaar": "Niemand" }],
-      statistics: [], diagnostics: { rounds: 1 },
+      statistics: [], diagnostics: { rounds: 1, quality_summary: { partner_repeats: 0, opponent_repeats: 0, max_rest_difference: 0, max_team_difference: 0, compromises: [] } },
     }), { status: 200, headers: { "Content-Type": "application/json" } }));
     vi.stubGlobal("fetch", fetcher);
     render(<PlannerWorkspace event={event} draft={draft} importPreview={[]} courts={[court]} schedules={[]} selectedSchedule={null} />);
     fireEvent.click(screen.getByRole("button", { name: "Schema genereren" }));
     await waitFor(() => expect(screen.getByRole("heading", { name: "Controleer het voorstel" })).toBeVisible());
     expect(screen.getByText("Plannerdiagnostiek")).toBeVisible();
+    expect(screen.queryByLabelText("Kwaliteit van het schema")).not.toBeInTheDocument();
     const options = fetcher.mock.calls[0][1] as RequestInit;
     expect(JSON.parse(String(options.body))).toEqual({ slug: event.slug, expected_revision: 2 });
     expect(String(options.body)).not.toContain("Ada");
@@ -57,6 +58,21 @@ describe("PlannerWorkspace", () => {
     fireEvent.change(screen.getByDisplayValue("Ada"), { target: { value: "Ada gewijzigd" } });
     expect(screen.queryByRole("heading", { name: "Controleer het voorstel" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Dit schema privé opslaan" })).not.toBeInTheDocument();
+  });
+
+  it("shows a compact non-error quality summary only for actual compromises", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      seed: 23,
+      schedule: [{ Ronde: 1, Tijd: "20:00 - 20:20", Baan: "Kremer Baan", "Team 1": "Ada & Bea", "Niveau T1": 3, "Team 2": "Cleo & Dora", "Niveau T2": 3, Teamverschil: 0.8, Rust: "Niemand", "Nog niet aanwezig": "Niemand", "Niet meer beschikbaar": "Niemand" }],
+      statistics: [], diagnostics: { quality_summary: { partner_repeats: 1, opponent_repeats: 6, max_rest_difference: 0, max_team_difference: 0.8, compromises: ["PARTNER_REPEATS", "OPPONENT_REPEATS"] } },
+    }), { status: 200, headers: { "Content-Type": "application/json" } })));
+    render(<PlannerWorkspace event={event} draft={draft} importPreview={[]} courts={[court]} schedules={[]} selectedSchedule={null} />);
+    fireEvent.click(screen.getByRole("button", { name: "Schema genereren" }));
+    const summary = await screen.findByLabelText("Kwaliteit van het schema");
+    expect(summary).toHaveTextContent("Partnerherhalingen: 1");
+    expect(summary).toHaveTextContent("tegenstanderherhalingen: 6");
+    expect(summary).toHaveTextContent("De planning blijft volledig speelbaar.");
+    expect(summary).not.toHaveAttribute("role", "alert");
   });
 
   it("shows event-scoped private schedule detail without identity metadata", () => {
@@ -83,16 +99,16 @@ describe("PlannerWorkspace", () => {
         summary: "Geen geldig schema gevonden.",
         diagnostics: [
           {
-            code: "LEVEL_MIX_TOO_RESTRICTIVE", severity: "likely",
-            message: "Met een hogere niveaumix vond de planner wel een geldig schema.",
-            suggested_change: "Verhoog Niveaumix van 50 naar 100.",
-            setting: "level_mix", current_value: 50, suggested_value: 100,
+            code: "SEARCH_BUDGET_TOO_SMALL", severity: "likely",
+            message: "Met een uitgebreider zoekprofiel vond de planner wel een geldig schema.",
+            suggested_change: "Kies zoekprofiel Uitgebreid.",
+            setting: "search_profile", current_value: "Normaal", suggested_value: "Uitgebreid",
           },
           {
-            code: "TEAM_TOLERANCE_TOO_RESTRICTIVE", severity: "likely",
-            message: "Met ruimere teamtolerantie vond de planner wel een geldig schema.",
-            suggested_change: "Verhoog Teamtolerantie van 0.5 naar 1,5.",
-            setting: "team_difference_tolerance", current_value: 0.5, suggested_value: 1.5,
+            code: "DIFFERENT_SEED_MAY_HELP", severity: "likely",
+            message: "Met een andere seed vond de planner wel een geldig schema.",
+            suggested_change: "Genereer opnieuw om een andere geldige indeling te proberen.",
+            setting: null, current_value: null, suggested_value: null,
           },
         ],
         probes_run: 2,
@@ -103,14 +119,14 @@ describe("PlannerWorkspace", () => {
     fireEvent.click(screen.getByRole("button", { name: "Schema genereren" }));
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("Geen geldig schema gevonden.");
-    expect(alert).toHaveTextContent("Verhoog Niveaumix van 50 naar 100.");
-    expect(alert).toHaveTextContent("Verhoog Teamtolerantie van 0.5 naar 1,5.");
+    expect(alert).toHaveTextContent("Kies zoekprofiel Uitgebreid.");
+    expect(alert).toHaveTextContent("Genereer opnieuw om een andere geldige indeling te proberen.");
     expect(alert).toHaveTextContent("Wijzig één instelling tegelijk");
     expect(screen.getByRole("link", { name: "Instellingen aanpassen" })).toHaveAttribute("href", "#planner-settings");
     expect(screen.getByDisplayValue("Ada")).toBeVisible();
     expect(screen.getByDisplayValue("50")).toBeVisible();
     expect(container.innerHTML).not.toMatch(/stacktrace|sql|token|private engine detail/iu);
-    fireEvent.change(screen.getByDisplayValue("50"), { target: { value: "100" } });
+    fireEvent.change(screen.getByDisplayValue("50"), { target: { value: "80" } });
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(screen.getByDisplayValue("Ada")).toBeVisible();
     expect(screen.getByText(/Niet-opgeslagen wijzigingen/u)).toBeVisible();
@@ -121,7 +137,7 @@ describe("PlannerWorkspace", () => {
     render(<PlannerWorkspace event={event} draft={draft} importPreview={[]} courts={[court]} schedules={[]} selectedSchedule={null} />);
     fireEvent.click(screen.getByRole("button", { name: "Schema genereren" }));
     const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent("De planner kon geen betrouwbare specifieke oorzaak bepalen.");
+    expect(alert).toHaveTextContent("De planner kon geen betrouwbare specifieke oorzaak bepalen binnen de huidige zoektijd.");
     expect(alert).not.toHaveTextContent("private upstream stack");
   });
 });

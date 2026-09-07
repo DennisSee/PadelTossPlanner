@@ -40,6 +40,20 @@ export type PlannerGeneration = Readonly<{
   diagnostics: Readonly<Record<string, unknown>>;
 }>;
 
+export type PlannerQualityCompromise =
+  | "PARTNER_REPEATS"
+  | "OPPONENT_REPEATS"
+  | "REST_IMBALANCE"
+  | "TEAM_DIFFERENCE_ABOVE_TOLERANCE";
+
+export type PlannerQualitySummary = Readonly<{
+  partnerRepeats: number;
+  opponentRepeats: number;
+  maxRestDifference: number;
+  maxTeamDifference: number;
+  compromises: readonly PlannerQualityCompromise[];
+}>;
+
 export type PlannerFailureDiagnostic = Readonly<{
   code: string;
   severity: "blocking" | "likely" | "unknown";

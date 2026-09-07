@@ -13,7 +13,7 @@ SEARCH_PROFILES = {
     "Normaal": (8, 12, 70),
     "Uitgebreid": (14, 18, 105),
 }
-MAX_DIAGNOSTIC_PROBES = 4
+MAX_DIAGNOSTIC_PROBES = 2
 MAX_LIKELY_DIAGNOSTICS = 2
 
 SettingValue = str | int | float | bool | None
@@ -99,13 +99,6 @@ def input_failure(error: PlannerInputError) -> GenerationFailure:
             ),
             suggested_change="Controleer Vanaf, Tot, wedstrijdduur en pauze.",
         )
-    elif error.code == "CONSECUTIVE_REST_IMPOSSIBLE":
-        diagnostic = FailureDiagnostic(
-            code="REST_DISTRIBUTION_IMPOSSIBLE",
-            severity="blocking",
-            message="De regel tegen twee opeenvolgende rustbeurten is met deze spelers en banen niet uitvoerbaar.",
-            suggested_change="Selecteer meer banen of gebruik minder spelers.",
-        )
     elif error.code == "SESSION_TOO_SHORT":
         diagnostic = FailureDiagnostic(
             code="SESSION_TOO_SHORT",
@@ -154,49 +147,8 @@ def diagnose_search_failure(
     search_profile: str,
     generator: Generator = generate_schedule,
 ) -> GenerationFailure:
-    """Probeer maximaal vier geïsoleerde relaxaties, zonder input te muteren."""
+    """Onderscheid een uitgeput zoekbudget van structurele invoerfouten."""
     probes: list[tuple[PlannerSettings, FailureDiagnostic]] = []
-    if settings.level_mix < 100:
-        probes.append((
-            replace(settings, level_mix=100),
-            FailureDiagnostic(
-                code="LEVEL_MIX_TOO_RESTRICTIVE",
-                severity="likely",
-                message="Met een hogere niveaumix vond de planner wel een geldig schema.",
-                suggested_change=f"Verhoog Niveaumix van {settings.level_mix} naar 100.",
-                setting="level_mix",
-                current_value=settings.level_mix,
-                suggested_value=100,
-            ),
-        ))
-    if settings.team_difference_tolerance < 1.5:
-        probes.append((
-            replace(settings, team_difference_tolerance=1.5),
-            FailureDiagnostic(
-                code="TEAM_TOLERANCE_TOO_RESTRICTIVE",
-                severity="likely",
-                message="Met ruimere teamtolerantie vond de planner wel een geldig schema.",
-                suggested_change=(
-                    f"Verhoog Teamtolerantie van {settings.team_difference_tolerance:g} naar 1,5."
-                ),
-                setting="team_difference_tolerance",
-                current_value=settings.team_difference_tolerance,
-                suggested_value=1.5,
-            ),
-        ))
-    if not settings.allow_repeat_partners:
-        probes.append((
-            replace(settings, allow_repeat_partners=True),
-            FailureDiagnostic(
-                code="REPEAT_PARTNERS_REQUIRED",
-                severity="likely",
-                message="Met herhaalde partners toegestaan vond de planner wel een geldig schema.",
-                suggested_change="Sta herhaalde partners toe.",
-                setting="allow_repeat_partners",
-                current_value=False,
-                suggested_value=True,
-            ),
-        ))
     extended = SEARCH_PROFILES["Uitgebreid"]
     if search_profile != "Uitgebreid":
         probes.append((
@@ -216,12 +168,22 @@ def diagnose_search_failure(
                 suggested_value="Uitgebreid",
             ),
         ))
+    probes.append((
+        replace(settings, random_seed=settings.random_seed + 104_729),
+        FailureDiagnostic(
+            code="DIFFERENT_SEED_MAY_HELP",
+            severity="likely",
+            message="Met dezelfde instellingen en een nieuwe indelingseed vond de planner wel een schema.",
+            suggested_change="Genereer opnieuw om een andere geldige indeling te proberen.",
+            setting=None,
+            current_value=None,
+            suggested_value=None,
+        ),
+    ))
 
     likely: list[FailureDiagnostic] = []
     probes_run = 0
     for probe_settings, diagnostic in probes[:MAX_DIAGNOSTIC_PROBES]:
-        if likely and diagnostic.code == "SEARCH_BUDGET_TOO_SMALL":
-            break
         probes_run += 1
         if _probe_succeeds(generator, players, courts, probe_settings):
             likely.append(diagnostic)
@@ -230,10 +192,10 @@ def diagnose_search_failure(
 
     if not likely:
         likely.append(FailureDiagnostic(
-            code="COMBINED_OR_SEARCH_LIMIT",
+            code="SEARCH_BUDGET_EXHAUSTED",
             severity="unknown",
-            message="Met één eenvoudige aanpassing kon nog geen geldig schema worden gevonden.",
-            suggested_change="Controleer beschikbaarheid, baanselectie en balansinstellingen en wijzig één instelling tegelijk.",
+            message="De invoer lijkt structureel speelbaar, maar de zoekruimte leverde binnen het beschikbare budget geen schema op.",
+            suggested_change="Gebruik het zoekprofiel Uitgebreid of genereer opnieuw met een nieuwe indelingseed.",
         ))
     return GenerationFailure(
         code="NO_VALID_SCHEDULE",
