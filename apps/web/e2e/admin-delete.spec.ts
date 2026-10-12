@@ -37,14 +37,14 @@ test("admin deletes a TOS event only after an explicit safe confirmation", async
   const createDisclosure = createSummary.locator("xpath=ancestor::details[1]");
   if ((await createDisclosure.getAttribute("open")) === null) await createSummary.click();
   await page.getByLabel("Titel").first().fill(title);
-  await page.getByRole("button", { name: "TOS-avond aanmaken" }).click();
+  await page.getByRole("button", { name: "TOS-moment aanmaken" }).click();
   const card = page.getByRole("heading", { name: title, exact: true }).locator("xpath=ancestor::section[1]");
-  await card.getByRole("button", { name: "TOS-avond verwijderen" }).click();
-  const dialog = page.getByRole("dialog", { name: "TOS-avond definitief verwijderen?" });
+  await card.getByRole("button", { name: "TOS-moment verwijderen" }).click();
+  const dialog = page.getByRole("dialog", { name: "TOS-moment definitief verwijderen?" });
   await expect(dialog.getByRole("button", { name: "Annuleren" })).toBeFocused();
   await dialog.getByRole("button", { name: "Annuleren" }).click();
   await expect(page.getByRole("heading", { name: title, exact: true })).toBeVisible();
-  await card.getByRole("button", { name: "TOS-avond verwijderen" }).click();
+  await card.getByRole("button", { name: "TOS-moment verwijderen" }).click();
   await dialog.getByRole("button", { name: "Definitief verwijderen" }).click();
   await expect(page).toHaveURL(/\/beheer\?notice=event-deleted$/u);
   await expect(page.getByRole("heading", { name: title, exact: true })).toHaveCount(0);

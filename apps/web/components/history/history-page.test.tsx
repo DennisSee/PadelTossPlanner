@@ -13,7 +13,7 @@ describe("participant history UI", () => {
     expect(screen.getByRole("heading", { name: "Padel vrijdag" })).toBeVisible();
     expect(screen.getByText("21", { selector: "time strong" })).toBeVisible();
     expect(screen.getByText("Kremer Baan")).toBeInTheDocument();
-    fireEvent.keyDown(screen.getByRole("tab", { name: "Avonden" }), { key: "ArrowRight" });
+    fireEvent.keyDown(screen.getByRole("tab", { name: "TOS-momenten" }), { key: "ArrowRight" });
     expect(screen.getByRole("tab", { name: "Clubgenoten" })).toHaveFocus();
     expect(screen.getByRole("tab", { name: "Clubgenoten" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("heading", { name: "Vaak mee gespeeld" })).toBeVisible();
@@ -45,7 +45,7 @@ describe("participant history UI", () => {
   it("shows calm empty states without inventing history or clubmates", () => {
     render(<HistoryPage events={[]} years={[]} filters={{ year: null, sport: null, query: "" }} summary={{ evenings: 0, matches: 0, clubmates: 0, mostPlayed: null }} clubmates={[]} />);
     expect(screen.getByRole("heading", { name: "Nog geen TOS-historie" })).toBeVisible();
-    expect(screen.getByRole("link", { name: "Bekijk komende TOS-avonden" })).toHaveAttribute("href", "/tos");
+    expect(screen.getByRole("link", { name: "Bekijk komende TOS-momenten" })).toHaveAttribute("href", "/tos");
     expect(screen.queryByRole("form")).not.toBeInTheDocument();
     expect(screen.queryByText("0", { exact: true })).not.toBeInTheDocument();
   });

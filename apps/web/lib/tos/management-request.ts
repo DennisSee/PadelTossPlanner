@@ -9,15 +9,15 @@ export type ManagementErrorCode =
   | "temporarily-unavailable";
 
 const NOTICE_TEXT: Record<ManagementNotice, string> = {
-  "event-created": "De TOS-avond is aangemaakt.",
-  "event-updated": "De TOS-avond is bijgewerkt.",
-  "event-deleted": "De TOS-avond en bijbehorende gegevens zijn verwijderd.",
+  "event-created": "De TOS is aangemaakt.",
+  "event-updated": "De TOS is bijgewerkt.",
+  "event-deleted": "De TOS en bijbehorende gegevens zijn verwijderd.",
 };
 const ERROR_TEXT: Record<ManagementErrorCode, string> = {
   "invalid-request": "Controleer de ingevulde eventgegevens.",
   "not-authorized": "Je hebt geen toegang tot eventbeheer.",
-  conflict: "De TOS-avond kon door een conflict niet worden opgeslagen.",
-  "delete-failed": "De TOS-avond kon niet veilig worden verwijderd.",
+  conflict: "De TOS kon door een conflict niet worden opgeslagen.",
+  "delete-failed": "De TOS kon niet veilig worden verwijderd.",
   "temporarily-unavailable": "TOS-eventbeheer is tijdelijk niet beschikbaar.",
 };
 

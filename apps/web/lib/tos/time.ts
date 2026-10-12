@@ -38,9 +38,7 @@ export function formatEventDateTime(value: string): string {
 
 export function eventDisplayTitle(event: TosEvent): string {
   const title = event.title.trim();
-  return title && title.toLocaleLowerCase("nl-NL") !== "tos-avond"
-    ? title
-    : `${event.sport === "padel" ? "Padel" : "Tennis"} TOS-avond`;
+  return title || `${event.sport === "padel" ? "Padel" : "Tennis"} TOS`;
 }
 
 export function formatEventDateTimeInput(value: string): string {

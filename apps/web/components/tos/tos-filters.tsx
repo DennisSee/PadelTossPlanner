@@ -19,7 +19,7 @@ export function TosFilters({
   const form = useRef<HTMLFormElement>(null);
   return (
     <form className={styles.filters} method="get" ref={form}>
-      <strong>Filter TOS-avonden</strong>
+      <strong>Filter TOS-momenten</strong>
       <label>
         Status
         <select name="status" value={status} onChange={() => form.current?.requestSubmit()}>
@@ -48,7 +48,7 @@ export function TosFilters({
           </label>
         </div>
       </fieldset>
-      <span className={styles.resultCount}>{resultCount} {resultCount === 1 ? "TOS-avond" : "TOS-avonden"}</span>
+      <span className={styles.resultCount}>{resultCount} {resultCount === 1 ? "TOS-moment" : "TOS-momenten"}</span>
       <Link href="/tos">Filters wissen</Link>
       <button className={styles.filterSubmit} type="submit">Filters toepassen</button>
     </form>

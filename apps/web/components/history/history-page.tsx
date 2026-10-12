@@ -121,7 +121,7 @@ function ClubmateCard({ view }: { view: ClubmateView }) {
           <Badge tone={email ? "success" : "neutral"}>{contactLabel}</Badge>
           <dl>
             <div><dt>Wedstrijden samen</dt><dd>{clubmate.sharedMatches}</dd></div>
-            <div><dt>TOS-avonden samen</dt><dd>{clubmate.sharedEvents}</dd></div>
+            <div><dt>TOS-momenten samen</dt><dd>{clubmate.sharedEvents}</dd></div>
             <div><dt>Laatst samen</dt><dd>{DATE.format(new Date(clubmate.lastSharedAt))}</dd></div>
           </dl>
         </div>
@@ -181,14 +181,14 @@ export function HistoryPage({
   if (years.length === 0 && clubmates.length === 0) {
     return <Card className={styles.emptyHistory}>
       <h2>Nog geen TOS-historie</h2>
-      <p>Je gespeelde TOS-avonden verschijnen hier nadat een officieel schema is gepubliceerd en de avond is afgelopen.</p>
-      <Link href="/tos">Bekijk komende TOS-avonden</Link>
+      <p>Je gespeelde TOS-momenten verschijnen hier nadat een officieel schema is gepubliceerd en het TOS-moment is afgelopen.</p>
+      <Link href="/tos">Bekijk komende TOS-momenten</Link>
     </Card>;
   }
   return (
     <div className={styles.stack}>
       <div className={styles.tabs} role="tablist" aria-label="Historieonderdelen">
-        {([['events', 'Avonden'], ['clubmates', 'Clubgenoten']] as const).map(([key, label]) => (
+        {([['events', 'TOS-momenten'], ['clubmates', 'Clubgenoten']] as const).map(([key, label]) => (
           <button key={key} id={`tab-${key}`} role="tab" type="button" aria-selected={tab === key} aria-controls={`panel-${key}`} tabIndex={tab === key ? 0 : -1}
             onClick={() => setTab(key)} onKeyDown={(event) => {
               if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
@@ -211,7 +211,7 @@ export function HistoryPage({
       </details>
       <div className={styles.columns}>
         <section id="panel-events" role="tabpanel" hidden={tab !== "events"} tabIndex={0} className={styles.section} aria-labelledby="tab-events">
-          <div className={styles.sectionHeading}><h2 id="history-events-title">Mijn TOS-avonden</h2><p>Alleen officiële, gepubliceerde en afgelopen schema’s.</p></div>
+          <div className={styles.sectionHeading}><h2 id="history-events-title">Mijn TOS-momenten</h2><p>Alleen officiële, gepubliceerde en afgelopen schema’s.</p></div>
           {events.length ? <div className={styles.eventList}>{events.map((event) => <HistoryEventCard key={event.eventId} event={event} />)}</div> : <p className={styles.empty}>Nog geen officiële TOS-historie gevonden met deze filters.</p>}
         </section>
         <section id="panel-clubmates" role="tabpanel" hidden={tab !== "clubmates"} tabIndex={0} className={styles.section} aria-labelledby="tab-clubmates">
@@ -220,9 +220,9 @@ export function HistoryPage({
         </section>
       </div>
       <details className={styles.summaryDisclosure}>
-        <summary>Historiesamenvatting · {summary.evenings} TOS-avonden · {summary.matches} wedstrijden</summary>
+        <summary>Historiesamenvatting · {summary.evenings} TOS-momenten · {summary.matches} wedstrijden</summary>
         <section className={styles.stats} aria-label="Historiesamenvatting">
-          <Card><strong>{summary.evenings}</strong><span>TOS-avonden</span></Card>
+          <Card><strong>{summary.evenings}</strong><span>TOS-momenten</span></Card>
           <Card><strong>{summary.matches}</strong><span>Wedstrijden</span></Card>
           <Card><strong>{summary.clubmates}</strong><span>Clubgenoten</span></Card>
           <Card><strong>{summary.mostPlayed?.displayName ?? "—"}</strong><span>Meest mee/tegen gespeeld{summary.mostPlayed ? ` · ${summary.mostPlayed.matches}` : ""}</span></Card>

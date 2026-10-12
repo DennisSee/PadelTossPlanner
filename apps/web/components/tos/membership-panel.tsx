@@ -58,7 +58,7 @@ export function MembershipPanel({
     <Card className={styles.membershipCard}>
       <h2 className={styles.formTitle}>Maak je clubprofiel aan</h2>
       <p className={styles.muted}>
-        Dit is eenmalig nodig om jezelf voor TOS-avonden aan te melden.
+        Dit is eenmalig nodig om jezelf voor TOS-momenten aan te melden.
         Eventuele planner- of adminrechten blijven ongewijzigd.
       </p>
       <form className={styles.form} action="/api/tos/onboard" method="post">

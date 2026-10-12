@@ -171,7 +171,7 @@ export default async function TosDetailPage({ params, searchParams }: PageProps)
   try {
     client = await createServerSupabaseClient();
   } catch {
-    return <StateMessage title="TOS-avond tijdelijk niet beschikbaar"><p>Probeer het later opnieuw.</p></StateMessage>;
+    return <StateMessage title="TOS-moment tijdelijk niet beschikbaar"><p>Probeer het later opnieuw.</p></StateMessage>;
   }
 
   let account = null;
@@ -186,7 +186,7 @@ export default async function TosDetailPage({ params, searchParams }: PageProps)
     event = await repository.eventBySlug(slug, { openOnly: !account });
   } catch (error) {
     if (error instanceof TosDataUnavailableError) {
-      return <StateMessage title="TOS-avond tijdelijk niet beschikbaar"><p>Probeer het later opnieuw.</p></StateMessage>;
+      return <StateMessage title="TOS-moment tijdelijk niet beschikbaar"><p>Probeer het later opnieuw.</p></StateMessage>;
     }
     throw error;
   }
@@ -248,7 +248,7 @@ export default async function TosDetailPage({ params, searchParams }: PageProps)
 
   if (account) {
     return (
-      <AccountShell account={account} title="TOS-avond" intro="Bekijk de avond en beheer je eigen aanmelding." variant="tos">
+      <AccountShell account={account} title="TOS-moment" intro="Bekijk het TOS-moment en beheer je eigen aanmelding." variant="tos">
         {content}
       </AccountShell>
     );
@@ -257,7 +257,7 @@ export default async function TosDetailPage({ params, searchParams }: PageProps)
     <main className={styles.publicPage}>
       <div className={styles.publicShell}>
         <div className={styles.publicTopbar}>
-          <AppHeader subtitle="TOS-avond" />
+          <AppHeader subtitle="TOS-moment" />
           <SiteNavigation model={navigationModelFromAccount(null)} currentPath="/tos" />
         </div>
         <div className={styles.publicContent}>{content}</div>

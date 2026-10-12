@@ -34,9 +34,9 @@ export function homePresentation(
   }>,
 ): HomePresentation {
   if (event?.status === "cancelled") {
-    const action = eventAction(event, "Bekijk TOS-avond");
+    const action = eventAction(event, "Bekijk TOS");
     return Object.freeze({
-      title: "Deze TOS-avond is geannuleerd.",
+      title: "Deze TOS is geannuleerd.",
       lead: "Bekijk de eventstatus en eventuele vervolginformatie.",
       cue: eventCue(event),
       action,
@@ -46,7 +46,7 @@ export function homePresentation(
   if (kind === "live-placed" && event && options.hasPublishedSchedule) {
     const cardAction = Object.freeze({ href: `/live/${event.slug}`, label: "Bekijk live schema" });
     return Object.freeze({
-      title: "Jouw TOS-avond. Live.",
+      title: "Jouw TOS. Live.",
       lead: "Bekijk de actuele wedstrijden, wie er rust heeft en op welke baan je volgende ronde speelt.",
       cue: "Nu bezig",
       action: Object.freeze({ ...cardAction, label: "Bekijk live TOS-schema" }),
@@ -73,7 +73,7 @@ export function homePresentation(
         cardAction: action,
       });
     }
-    const action = eventAction(event, "Bekijk TOS-avond", "Schema volgt");
+    const action = eventAction(event, "Bekijk TOS", "Schema volgt");
     return Object.freeze({
       title: "Je plaats staat vast.",
       lead: `De inschrijving voor ${eventDisplayTitle(event)} is gesloten. Het schema volgt.`,
@@ -83,9 +83,9 @@ export function homePresentation(
     });
   }
   if (kind === "live-placed" && event) {
-    const action = eventAction(event, "Bekijk TOS-avond", "Schema volgt");
+    const action = eventAction(event, "Bekijk TOS", "Schema volgt");
     return Object.freeze({
-      title: "Je TOS-avond is begonnen.",
+      title: "Je TOS is begonnen.",
       lead: "Er is nog geen gepubliceerd wedstrijdschema beschikbaar.",
       cue: "Nu bezig",
       action,
@@ -108,17 +108,17 @@ export function homePresentation(
       options.hasRegistration ? "Aanmelding wijzigen" : "Aanmelden",
     );
     return Object.freeze({
-      title: "Zin in een TOS-avond?",
-      lead: "Bekijk de eerstvolgende open TOS en meld je eenvoudig aan.",
+      title: "ZIN IN EEN TOS?",
+      lead: "Bekijk alle open TOS-momenten en meld je eenvoudig aan.",
       cue: eventCue(event),
-      action: Object.freeze({ href: "/tos", label: "Bekijk TOS-avonden" }),
+      action: Object.freeze({ href: "/tos", label: "BEKIJK TOS-MOMENTEN" }),
       cardAction,
     });
   }
-  const action = Object.freeze({ href: "/tos", label: "Bekijk TOS-avonden" });
+  const action = Object.freeze({ href: "/tos", label: "BEKIJK TOS-MOMENTEN" });
   return Object.freeze({
-    title: "Samen spelen. Iedere ronde anders.",
-    lead: "Bekijk komende TOS-avonden en meld je aan wanneer het jou uitkomt.",
+    title: "ZIN IN EEN TOS?",
+    lead: "Bekijk komende TOS-momenten en meld je aan wanneer het jou uitkomt.",
     cue: null,
     action,
     cardAction: action,

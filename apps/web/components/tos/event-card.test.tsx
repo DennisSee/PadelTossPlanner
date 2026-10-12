@@ -83,7 +83,7 @@ describe("participant TOS cards", () => {
     expect(container.querySelector('[aria-label="0 van 24 plaatsen bezet"][data-sport="tennis"]')).toBeInTheDocument();
   });
 
-  it("uses the sport fallback only when the stored title is generic", () => {
+  it("preserves a stored legacy title", () => {
     render(
       <TosEventCard
         event={{ ...event, title: " TOS-avond " }}
@@ -92,7 +92,7 @@ describe("participant TOS cards", () => {
         now={new Date("2026-08-20T12:00:00Z")}
       />,
     );
-    expect(screen.getByRole("heading", { level: 3, name: "Padel TOS-avond" })).toBeVisible();
+    expect(screen.getByRole("heading", { level: 3, name: "TOS-avond" })).toBeVisible();
     expect(screen.getAllByRole("heading", { level: 3 })).toHaveLength(1);
   });
 

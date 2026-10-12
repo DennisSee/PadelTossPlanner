@@ -172,7 +172,7 @@ test("12-player three-court planner succeeds best effort with and without pause"
 
 test("participant is denied while staff can prepare a Tennis planner draft", async ({ page, request }) => {
   await page.goto("/login?next=/beheer");
-  await signIn(page, request, "participant", /\/tos$/u, "TOS-avonden");
+  await signIn(page, request, "participant", /\/tos$/u, "TOS-momenten");
   await page.goto("/beheer/tos/web5b1-padel");
   await expect(page).toHaveURL(/\/account$/u);
   await expect(page.getByRole("heading", { name: "Planneropzet" })).toHaveCount(0);

@@ -40,8 +40,8 @@ export default async function ManagementPage({ searchParams }: PageProps) {
     ]);
   } catch {
     return (
-      <AccountShell account={account} title="Beheeromgeving" intro="Beheer TOS-avonden en open per event het read-only deelnemersoverzicht." variant="management">
-        <StateMessage title="TOS-avonden tijdelijk niet beschikbaar"><p>Probeer het later opnieuw.</p></StateMessage>
+      <AccountShell account={account} title="Beheeromgeving" intro="Beheer TOS-momenten en open per event het read-only deelnemersoverzicht." variant="management">
+        <StateMessage title="TOS-momenten tijdelijk niet beschikbaar"><p>Probeer het later opnieuw.</p></StateMessage>
       </AccountShell>
     );
   }
@@ -54,7 +54,7 @@ export default async function ManagementPage({ searchParams }: PageProps) {
     <AccountShell
       account={account}
       title="Beheeromgeving"
-      intro="Beheer TOS-avonden en open per event het read-only deelnemersoverzicht."
+      intro="Beheer TOS-momenten en open per event het read-only deelnemersoverzicht."
       variant="management"
     >
       {message ? (

@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import Home from "./page";
@@ -48,12 +48,12 @@ describe("WEB-2 routes", () => {
   it("links the public homepage to live schedule and the shared login", async () => {
     render(await Home());
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
-      "Samen spelen. Iedere ronde anders.",
+      "ZIN IN EEN TOS?",
     );
     expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
       "Doe mee met de volgende TOS",
     );
-    expect(screen.getByRole("link", { name: "Bekijk TOS-avonden" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "BEKIJK TOS-MOMENTEN" })).toHaveAttribute(
       "href",
       "/tos",
     );
@@ -88,9 +88,9 @@ describe("WEB-2 routes", () => {
     ));
     render(await Home());
     expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
-      "Geen aankomende TOS-avonden",
+      "Geen aankomende TOS-momenten",
     );
-    expect(screen.getByRole("link", { name: "Bekijk alle TOS-avonden" }))
+    expect(screen.getByRole("link", { name: "Bekijk alle TOS-momenten" }))
       .toHaveAttribute("href", "/tos");
     expect(screen.queryByRole("link", { name: "Inloggen / aanmelden" }))
       .not.toBeInTheDocument();
@@ -131,7 +131,7 @@ describe("WEB-2 routes", () => {
     eventAttendance.mockResolvedValueOnce([{ displayName: "Member", placementStatus: "placed", waitlistPosition: null }]);
 
     render(await Home());
-    expect(screen.getByRole("heading", { level: 2, name: "Jouw volgende TOS" })).toBeVisible();
+    expect(screen.getByRole("heading", { level: 2, name: "Open TOS-momenten" })).toBeVisible();
     expect(screen.getByRole("heading", { level: 1, name: "Je volgende TOS staat klaar." })).toBeVisible();
     expect(screen.queryByRole("heading", { level: 1, name: /live/u })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Bekijk je aanmelding" })).toHaveAttribute("href", "/tos/vrijdag-padel");
@@ -141,7 +141,7 @@ describe("WEB-2 routes", () => {
   });
 
   it.each([
-    [false, "Bekijk TOS-avond", "/tos/vrijdag-padel"],
+    [false, "Bekijk TOS", "/tos/vrijdag-padel"],
     [true, "Bekijk je schema", "/live/vrijdag-padel"],
   ] as const)("maps a closed placed registration truthfully when schedule published=%s", async (published, label, href) => {
     const event = {
@@ -159,17 +159,63 @@ describe("WEB-2 routes", () => {
       { id: "user-1", display_name: "Member", role: "participant", active: true, member_id: "member-1" },
       { id: "member-1", display_name: "Member", approval_status: "approved", active: true },
     ));
-    listParticipantEvents.mockResolvedValueOnce([event]);
+    const openEvent = { ...event, id: "open-other", slug: "open-other", title: "Open middag TOS", status: "open" as const, signupDeadline: null };
+    listParticipantEvents.mockResolvedValueOnce([event, openEvent]);
     listOwnUpcomingRegistrations.mockResolvedValueOnce([registration]);
     ownRegistrationPosition.mockResolvedValueOnce({ placementStatus: "placed", waitlistPosition: null });
-    eventCapacity.mockResolvedValueOnce({ maxParticipants: 4, placedCount: 1, availableCount: 3, waitlistCount: 0 });
-    eventAttendance.mockResolvedValueOnce([{ displayName: "Member", placementStatus: "placed", waitlistPosition: null }]);
+    eventCapacity.mockResolvedValue({ maxParticipants: 4, placedCount: 1, availableCount: 3, waitlistCount: 0 });
+    eventAttendance.mockResolvedValue([{ displayName: "Member", placementStatus: "placed", waitlistPosition: null }]);
     loadEventPublicSchedule.mockResolvedValueOnce(published ? { id: "published" } : null);
 
     render(await Home());
+    const personal = screen.getByRole("region", { name: "Jouw volgende TOS" });
+    const open = screen.getByRole("region", { name: "Open TOS-momenten" });
+    expect(within(personal).getByRole("heading", { level: 3, name: event.title })).toBeVisible();
+    expect(within(open).queryByRole("heading", { name: event.title })).not.toBeInTheDocument();
+    expect(within(open).getByRole("heading", { level: 3, name: openEvent.title })).toBeVisible();
+    expect(screen.getAllByRole("heading", { level: 3, name: event.title })).toHaveLength(1);
     expect(screen.getAllByRole("link", { name: label })).not.toHaveLength(0);
     expect(screen.getAllByRole("link", { name: label })[0]).toHaveAttribute("href", href);
     expect(screen.queryByRole("link", { name: "Aanmelding wijzigen" })).not.toBeInTheDocument();
+  });
+
+  it("renders all open cards on the same day in order with each personal response and capacity", async () => {
+    loadAccountContextWithClient.mockResolvedValueOnce(deriveAccountContext(
+      { userId: "user-1", email: "member@example.test" },
+      { id: "user-1", display_name: "Member", role: "participant", active: true, member_id: "member-1" },
+      { id: "member-1", display_name: "Member", approval_status: "approved", active: true },
+    ));
+    const events = [8, 12, 16, 20].map((hour, index) => ({
+      id: `event-${index}`, slug: `tos-${index}`, title: `Club TOS-avond ${index}`,
+      sport: "padel" as const, status: "open" as const, maxParticipants: 4, signupDeadline: null,
+      startsAt: `2099-08-28T${String(hour).padStart(2, "0")}:00:00Z`,
+      endsAt: `2099-08-28T${String(hour + 2).padStart(2, "0")}:00:00Z`,
+    }));
+    const registrations = [events[0], events[1], events[3]].map((event, index) => ({
+      id: `registration-${index}`, eventId: event.id, event,
+      response: index === 1 ? "declined" as const : "attending" as const,
+      availableFrom: index === 1 ? null : event.startsAt,
+      availableUntil: index === 1 ? null : event.endsAt,
+      attendingSince: null, createdAt: "2099-08-01T10:00:00Z", updatedAt: "2099-08-01T10:00:00Z",
+    }));
+    listParticipantEvents.mockResolvedValueOnce([...events].reverse());
+    listOwnUpcomingRegistrations.mockResolvedValueOnce(registrations);
+    ownRegistrationPosition.mockImplementation(async (id) => ({
+      placementStatus: id === "event-0" ? "waitlist" : "placed",
+      waitlistPosition: id === "event-0" ? 2 : null,
+    }));
+    eventCapacity.mockResolvedValue({ maxParticipants: 4, placedCount: 4, availableCount: 0, waitlistCount: 2 });
+    eventAttendance.mockResolvedValue([]);
+    render(await Home());
+    expect(screen.getAllByRole("heading", { level: 3 }).map((node) => node.textContent))
+      .toEqual(events.map((event) => event.title));
+    expect(screen.getByText("Wachtlijst · plek 2")).toBeVisible();
+    expect(screen.getByText("Afgemeld")).toBeVisible();
+    expect(screen.getByText("✓ Geplaatst")).toBeVisible();
+    expect(screen.getByRole("link", { name: "Op wachtlijst" })).toHaveAttribute("href", "/tos/tos-2");
+    expect(screen.getAllByRole("link", { name: "Aanmelding wijzigen" })).toHaveLength(3);
+    expect(eventCapacity).toHaveBeenCalledTimes(4);
+    expect(eventAttendance).toHaveBeenCalledTimes(4);
   });
 
   it("does not load participant data for staff without membership", async () => {
@@ -181,7 +227,7 @@ describe("WEB-2 routes", () => {
     render(await Home());
     expect(listParticipantEvents).not.toHaveBeenCalled();
     expect(loadEventPublicSchedule).not.toHaveBeenCalled();
-    expect(screen.getByRole("link", { name: "Naar TOS-avonden" })).toHaveAttribute("href", "/tos");
+    expect(screen.getByRole("link", { name: "Naar TOS-momenten" })).toHaveAttribute("href", "/tos");
   });
 
   it("does not expose the staging badge while runtime APP_ENV stays staging", async () => {

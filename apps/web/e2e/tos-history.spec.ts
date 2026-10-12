@@ -30,7 +30,7 @@ test("empty official history has a calm private empty state", async ({ page, req
   await signIn(page, request, email("empty-history"));
   await expect(page).toHaveURL(/\/historie$/u);
   await expect(page.getByRole("heading", { name: "Nog geen TOS-historie" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Bekijk komende TOS-avonden" })).toHaveAttribute("href", "/tos");
+  await expect(page.getByRole("link", { name: "Bekijk komende TOS-momenten" })).toHaveAttribute("href", "/tos");
   await expect(page.locator("body")).not.toContainText("clubgenoot@example.test");
   await noOverflow(page);
 });

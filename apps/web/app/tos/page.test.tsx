@@ -31,10 +31,10 @@ describe("participant TOS status overview", () => {
   });
 
   it.each([
-    ["open", "Geen open TOS-avonden gevonden.", false],
-    ["closed", "Geen TOS-avonden met gesloten inschrijving gevonden.", false],
-    ["past", "Geen afgelopen TOS-avonden gevonden.", true],
-    ["all", "Geen TOS-avonden gevonden met deze filters.", true],
+    ["open", "Geen open TOS-momenten gevonden.", false],
+    ["closed", "Geen TOS-momenten met gesloten inschrijving gevonden.", false],
+    ["past", "Geen afgelopen TOS-momenten gevonden.", true],
+    ["all", "Geen TOS-momenten gevonden met deze filters.", true],
   ])("renders the %s empty state and appropriate query scope", async (status, message, includePast) => {
     render(await TosPage({ searchParams: Promise.resolve({ status: String(status) }) }));
     expect(screen.getByText(String(message))).toBeVisible();

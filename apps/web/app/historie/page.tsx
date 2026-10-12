@@ -41,15 +41,15 @@ export default async function HistoryRoute({ searchParams }: { searchParams: Sea
   const params = await searchParams;
   const message = historyMessage(last(params.notice), last(params.error));
   if (!account.capabilities.canParticipate) {
-    return <AccountShell account={account} title="Mijn TOS-historie" intro="Je officiële gespeelde TOS-avonden." variant="tos" currentPath="/historie"><StateMessage title="Historie nog niet beschikbaar"><p>Je hebt een actief en goedgekeurd clublidmaatschap nodig.</p></StateMessage></AccountShell>;
+    return <AccountShell account={account} title="Mijn TOS-historie" intro="Je officiële gespeelde TOS-momenten." variant="tos" currentPath="/historie"><StateMessage title="Historie nog niet beschikbaar"><p>Je hebt een actief en goedgekeurd clublidmaatschap nodig.</p></StateMessage></AccountShell>;
   }
   let loaded: Awaited<ReturnType<typeof loadHistoryPage>> | null;
   try { loaded = await loadHistoryPage(new HistoryRepository(client), params); } catch { loaded = null; }
   if (!loaded) {
-    return <AccountShell account={account} title="Mijn TOS-historie" intro="Je officiële gespeelde TOS-avonden." variant="tos" currentPath="/historie"><StateMessage title="Historie tijdelijk niet beschikbaar"><p>Probeer het later opnieuw.</p></StateMessage></AccountShell>;
+    return <AccountShell account={account} title="Mijn TOS-historie" intro="Je officiële gespeelde TOS-momenten." variant="tos" currentPath="/historie"><StateMessage title="Historie tijdelijk niet beschikbaar"><p>Probeer het later opnieuw.</p></StateMessage></AccountShell>;
   }
   return (
-    <AccountShell account={account} title="Mijn TOS-historie" intro="Herbeleef je officiële TOS-avonden en speelcontacten." variant="tos" currentPath="/historie">
+    <AccountShell account={account} title="Mijn TOS-historie" intro="Herbeleef je officiële TOS-momenten en speelcontacten." variant="tos" currentPath="/historie">
       {message ? <p className={`${styles.message} ${message.tone === "success" ? styles.messageSuccess : styles.messageDanger}`} role={message.tone === "danger" ? "alert" : "status"}>{message.text}</p> : null}
       <HistoryPage {...loaded} initialTab={last(params.tab) === "clubmates" ? "clubmates" : "events"} />
     </AccountShell>

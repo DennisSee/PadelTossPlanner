@@ -78,7 +78,7 @@ export function CreateTosEventForm({ now = new Date() }: { now?: Date }) {
             ))}
           </select>
         </label>
-          <button className={styles.primaryButton} type="submit">TOS-avond aanmaken</button>
+          <button className={styles.primaryButton} type="submit">TOS-moment aanmaken</button>
         </form>
       </ResponsiveCreatePanel>
     </Card>
@@ -116,7 +116,7 @@ function EventCard({ event, capacity, canAdminister }: { event: TosEvent; capaci
             <p className={styles.presentationNote}>{presentation}</p>
           ) : null}
           <div className={styles.eventActions}>
-            <SecondaryLinkButton href={`/beheer/tos/${event.slug}`}>TOS-avond beheren</SecondaryLinkButton>
+            <SecondaryLinkButton href={`/beheer/tos/${event.slug}`}>TOS-moment beheren</SecondaryLinkButton>
             <SecondaryLinkButton href={tosDetailPath(event.slug)}>Eventpagina bekijken</SecondaryLinkButton>
             <ActionDialog
               triggerLabel="Eventgegevens wijzigen"
@@ -159,15 +159,15 @@ function EventCard({ event, capacity, canAdminister }: { event: TosEvent; capaci
             </ActionDialog>
             {canAdminister ? (
               <ActionDialog
-                triggerLabel="TOS-avond verwijderen"
-                title="TOS-avond definitief verwijderen?"
+                triggerLabel="TOS-moment verwijderen"
+                title="TOS-moment definitief verwijderen?"
                 description={`${event.title} · ${formatEventDate(event.startsAt)} · ${formatEventClock(event.startsAt)}–${formatEventClock(event.endsAt)}`}
                 triggerClassName={styles.deleteTrigger}
                 dialogClassName={styles.deleteDialog}
                 initialFocus="cancel"
               >
                 <div className={styles.deleteWarning}>
-                  <p>Alle aanmeldingen, plannerinput, schema’s en historie van deze TOS-avond worden definitief verwijderd.</p>
+                  <p>Alle aanmeldingen, plannerinput, schema’s en historie van dit TOS-moment worden definitief verwijderd.</p>
                   <p><strong>Dit kan niet ongedaan worden gemaakt.</strong></p>
                   <form action="/api/beheer/tos/delete" method="post">
                     <input type="hidden" name="event_id" value={event.id} />
@@ -208,7 +208,7 @@ export function TosEventList({
   return (
     <section className={styles.section} aria-labelledby="tos-events-heading">
       <div className={styles.sectionHeader}>
-        <h2 id="tos-events-heading">TOS-avonden</h2>
+        <h2 id="tos-events-heading">TOS-momenten</h2>
         <p>Alle concept-, open, gesloten, geannuleerde en afgelopen events.</p>
       </div>
       {events.length ? (
@@ -219,7 +219,7 @@ export function TosEventList({
           })}
         </div>
       ) : (
-        <p className={styles.empty}>Er zijn nog geen TOS-avonden aangemaakt.</p>
+        <p className={styles.empty}>Er zijn nog geen TOS-momenten aangemaakt.</p>
       )}
     </section>
   );

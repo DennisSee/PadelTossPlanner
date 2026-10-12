@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { selectHomeEvent } from "./home-event";
+import { homeOverviewEvents, selectHomeEvent } from "./home-event";
 import type { OwnRegistrationPosition, OwnRegistrationWithEvent, TosEvent } from "./types";
 
 function event(id: string, startsAt: string, status: TosEvent["status"] = "open"): TosEvent {
@@ -37,5 +37,30 @@ describe("personalized home event selection", () => {
     const earlier = { ...open, id: "0", slug: "a-first" };
     expect(selectHomeEvent([open, earlier], [], new Map(), now)?.event.id).toBe("0");
     expect(selectHomeEvent([{ ...earlier, status: "cancelled" }], [], new Map(), now)).toBeNull();
+  });
+
+  it("shows every open moment chronologically, including multiple on one day", () => {
+    const morning = event("5", "2026-08-24T08:00:00Z");
+    const evening = event("6", "2026-08-24T18:00:00Z");
+    const tie = { ...evening, id: "7", slug: "a-first" };
+    expect(homeOverviewEvents([evening, morning, tie, open], null, now).map((value) => value.id))
+      .toEqual(["5", "4", "7", "6"]);
+  });
+
+  it("excludes ended, cancelled, draft, closed and deadline-expired moments", () => {
+    const expired = { ...open, signupDeadline: "2026-08-23T11:59:00Z" };
+    const ended = event("8", "2026-08-22T18:00:00Z");
+    const excluded = [expired, ended, ...(["closed", "draft", "cancelled"] as const)
+      .map((status) => ({ ...open, status }))];
+    expect(homeOverviewEvents(excluded, null, now)).toEqual([]);
+    expect(selectHomeEvent([expired], [], new Map(), now)).toBeNull();
+  });
+
+  it("keeps the closed placed moment and never duplicates a personal open card", () => {
+    const closed = { ...futurePlaced, status: "closed" as const };
+    const selected = selectHomeEvent([open], [registration(closed)], new Map([[closed.id, placed]]), now);
+    expect(homeOverviewEvents([open], selected, now).map((value) => value.id)).toEqual(["4", "2"]);
+    const personalOpen = selectHomeEvent([futurePlaced], [registration(futurePlaced)], new Map([[futurePlaced.id, placed]]), now);
+    expect(homeOverviewEvents([futurePlaced, futurePlaced], personalOpen, now)).toEqual([futurePlaced]);
   });
 });

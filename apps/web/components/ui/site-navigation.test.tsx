@@ -24,7 +24,7 @@ function account(role: "participant" | "planner" | "admin", withMember = true) {
 
 describe("capability navigation", () => {
   it("links the shared brand to the internal homepage", () => {
-    render(<AppHeader subtitle="TOS-avonden" />);
+    render(<AppHeader subtitle="TOS-momenten" />);
     expect(screen.getByRole("link", { name: "Naar startpagina" })).toHaveAttribute("href", "/");
     expect(screen.getByRole("img", { name: "Logo T.C. Zuid" })).toBeVisible();
     expect(screen.getByText("T.C. Zuid TOS")).toBeVisible();
@@ -42,13 +42,13 @@ describe("capability navigation", () => {
     const participant = navigationModelFromAccount(account("participant"));
     const plannerWithoutMember = navigationModelFromAccount(account("planner", false));
     const participantView = render(<SiteNavigation model={participant} />);
-    expect(screen.getAllByRole("link", { name: "TOS-avonden" }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("link", { name: "TOS-momenten" }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole("link", { name: "Mijn historie" }).length).toBeGreaterThan(0);
     expect(screen.queryByRole("link", { name: "Beheer" })).not.toBeInTheDocument();
     participantView.unmount();
 
     render(<SiteNavigation model={plannerWithoutMember} />);
-    expect(screen.getAllByRole("link", { name: "TOS-avonden" }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("link", { name: "TOS-momenten" }).length).toBeGreaterThan(0);
     expect(screen.queryByRole("link", { name: "Mijn historie" })).not.toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: "Beheer" }).length).toBeGreaterThan(0);
   });

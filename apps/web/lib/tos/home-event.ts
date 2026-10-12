@@ -3,6 +3,7 @@ import type {
   OwnRegistrationWithEvent,
   TosEvent,
 } from "./types";
+import { eventAllowsSelfService } from "./time";
 
 export type HomeEventSelection = Readonly<{
   event: TosEvent;
@@ -15,6 +16,19 @@ function compare(left: TosEvent, right: TosEvent): number {
   return new Date(left.startsAt).getTime() - new Date(right.startsAt).getTime()
     || left.slug.localeCompare(right.slug)
     || left.id.localeCompare(right.id);
+}
+
+export function homeOverviewEvents(
+  events: readonly TosEvent[],
+  selected: HomeEventSelection | null,
+  now: Date,
+): TosEvent[] {
+  const byId = new Map(events
+    .filter((event) => eventAllowsSelfService(event, now) && new Date(event.endsAt) > now)
+    .map((event) => [event.id, event]));
+  // Keep the personal TOS reachable after signup closes, without a second card.
+  if (selected) byId.set(selected.event.id, selected.event);
+  return [...byId.values()].sort(compare);
 }
 
 export function selectHomeEvent(
@@ -45,7 +59,7 @@ export function selectHomeEvent(
   );
   if (waitlist) return { event: waitlist.registration.event, registration: waitlist.registration, position: waitlist.position, kind: "future-waitlist" };
   const open = [...events]
-    .filter((event) => event.status === "open" && new Date(event.endsAt).getTime() > timestamp)
+    .filter((event) => eventAllowsSelfService(event, now) && new Date(event.endsAt).getTime() > timestamp)
     .sort(compare)[0];
   return open ? { event: open, registration: registrations.find((item) => item.eventId === open.id), position: positions.get(open.id) ?? null, kind: "open" } : null;
 }

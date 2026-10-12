@@ -76,7 +76,7 @@ export default async function TosPage({ searchParams }: { searchParams: SearchPa
     return (
       <AccountShell
         account={account}
-        title="TOS-avonden"
+        title="TOS-momenten"
         intro="Bekijk je clubstatus en meld je daarna eenvoudig aan."
         variant="tos"
       >
@@ -107,11 +107,11 @@ export default async function TosPage({ searchParams }: { searchParams: SearchPa
     return (
       <AccountShell
         account={account}
-        title="TOS-avonden"
+        title="TOS-momenten"
         intro="Bekijk en wijzig hier je eigen TOS-aanmeldingen."
         variant="tos"
       >
-        <StateMessage title="TOS-avonden tijdelijk niet beschikbaar">
+        <StateMessage title="TOS-momenten tijdelijk niet beschikbaar">
           <p>Probeer het later opnieuw.</p>
         </StateMessage>
       </AccountShell>
@@ -121,7 +121,7 @@ export default async function TosPage({ searchParams }: { searchParams: SearchPa
   return (
     <AccountShell
       account={account}
-      title="TOS-avonden"
+      title="TOS-momenten"
       intro="Bekijk en beheer je TOS-aanmeldingen."
       variant="tos"
     >
@@ -137,7 +137,7 @@ export default async function TosPage({ searchParams }: { searchParams: SearchPa
         <TosFilters status={filters.status} sport={filters.sport} resultCount={snapshots.length} />
         <section className={styles.section} aria-labelledby="available-tos">
           <div className={styles.sectionHeader}>
-            <h2 id="available-tos">TOS-avonden</h2>
+            <h2 id="available-tos">TOS-momenten</h2>
             <p>Bekijk capaciteit, deelnemers en je eigen aanmelding.</p>
           </div>
           {snapshots.length ? (
@@ -157,10 +157,10 @@ export default async function TosPage({ searchParams }: { searchParams: SearchPa
             </div>
           ) : (
             <p className={styles.muted}>{({
-              open: "Geen open TOS-avonden gevonden.",
-              closed: "Geen TOS-avonden met gesloten inschrijving gevonden.",
-              past: "Geen afgelopen TOS-avonden gevonden.",
-              all: "Geen TOS-avonden gevonden met deze filters.",
+              open: "Geen open TOS-momenten gevonden.",
+              closed: "Geen TOS-momenten met gesloten inschrijving gevonden.",
+              past: "Geen afgelopen TOS-momenten gevonden.",
+              all: "Geen TOS-momenten gevonden met deze filters.",
             })[filters.status]}</p>
           )}
         </section>

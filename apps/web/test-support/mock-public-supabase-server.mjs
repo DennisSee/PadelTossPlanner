@@ -953,7 +953,7 @@ const server = createServer(async (request, response) => {
     const body = await requestJson(request);
     const email = String(body.email ?? "").trim().toLowerCase();
     const state = String(body.state ?? "");
-    if (!email.includes("@") || !new Set(["live", "closed", "closed-published", "waitlist", "waitlist-closed", "empty"]).has(state)) {
+    if (!email.includes("@") || !new Set(["live", "closed", "closed-published", "waitlist", "waitlist-closed", "same-day", "empty"]).has(state)) {
       json(response, 400, { error: "invalid home state fixture" });
       return;
     }
@@ -962,7 +962,14 @@ const server = createServer(async (request, response) => {
       json(response, 400, { error: "invalid home participant fixture" });
       return;
     }
-    if (state === "live" || state === "closed" || state === "closed-published") {
+    if (state === "same-day") {
+      for (const [slug, hour] of [["vrijdag-padel", 8], ["tennis-avond-2026", 12], ["nacht-tos", 18]]) {
+        const event = tosEvents.find((event) => event.slug === slug);
+        event.starts_at = `2099-08-28T${String(hour).padStart(2, "0")}:00:00.000Z`;
+        event.ends_at = `2099-08-28T${String(hour + 2).padStart(2, "0")}:00:00.000Z`;
+        event.signup_deadline = null;
+      }
+    } else if (state === "live" || state === "closed" || state === "closed-published") {
       const event = tosEvents.find(({ slug }) => slug === "vrijdag-padel");
       if (!event) {
         json(response, 500, { error: "missing live home fixture" });

@@ -50,11 +50,11 @@ test("home kiest de eerstvolgende geplaatste registratie", async ({ page, reques
   await signInHome(page, request, email("dashboard-web10"));
   await expect(page.getByRole("heading", { level: 1, name: "Je volgende TOS staat klaar." })).toBeVisible();
   await expect(page.getByRole("link", { name: "Bekijk je aanmelding" })).toHaveAttribute("href", "/tos/vrijdag-padel");
-  await expect(page.getByRole("heading", { name: "Jouw volgende TOS" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Aanmelding wijzigen" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Open TOS-momenten" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Aanmelding wijzigen" }).first()).toBeVisible();
   await expect(page.getByText("✓ Geplaatst")).toBeVisible();
   await expect(page.getByText(/Je doet mee/u)).toHaveCount(0);
-  await expect(page.getByRole("heading", { level: 3 })).toHaveCount(1);
+  await expect(page.getByRole("heading", { level: 3 })).toHaveCount(3);
   await noHorizontalOverflow(page);
 });
 
@@ -65,7 +65,7 @@ test("home toont uitsluitend tijdens een geplaatste lopende TOS een live hero", 
   });
   expect(fixture.ok()).toBe(true);
   await signInHome(page, request, address);
-  await expect(page.getByRole("heading", { level: 1, name: "Jouw TOS-avond. Live." })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Jouw TOS. Live." })).toBeVisible();
   await expect(page.getByRole("link", { name: "Bekijk live TOS-schema" })).toHaveAttribute(
     "href",
     "/live/vrijdag-padel",
@@ -80,8 +80,10 @@ test("home toont na sluiting zonder publicatie alleen de eventstatus", async ({ 
   })).ok()).toBe(true);
   await signInHome(page, request, address);
   await expect(page.getByRole("heading", { level: 1, name: "Je plaats staat vast." })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Bekijk TOS-avond" }).first()).toHaveAttribute("href", "/tos/vrijdag-padel");
+  await expect(page.getByRole("link", { name: "Bekijk TOS" }).first()).toHaveAttribute("href", "/tos/vrijdag-padel");
   await expect(page.getByText("Schema volgt", { exact: true })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Jouw volgende TOS" }).getByRole("heading", { level: 3 })).toHaveCount(1);
+  await expect(page.getByRole("region", { name: "Open TOS-momenten" }).getByRole("heading", { name: "Padel TOS vrijdagavond" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Aanmelding wijzigen" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Bekijk je schema" })).toHaveCount(0);
   await noHorizontalOverflow(page);
@@ -130,9 +132,9 @@ test("home houdt een gesloten wachtlijst op de statusroute", async ({ page, requ
 
 test("home valt terug op de eerste open TOS", async ({ page, request }) => {
   await signInHome(page, request, email("home-open"));
-  await expect(page.getByRole("heading", { level: 1, name: "Zin in een TOS-avond?" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Bekijk TOS-avonden" })).toHaveAttribute("href", "/tos");
-  await expect(page.getByRole("link", { name: "Aanmelden" })).toHaveAttribute(
+  await expect(page.getByRole("heading", { level: 1, name: "ZIN IN EEN TOS?" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "BEKIJK TOS-MOMENTEN" })).toHaveAttribute("href", "/tos");
+  await expect(page.getByRole("link", { name: "Aanmelden" }).first()).toHaveAttribute(
     "href",
     "/tos/vrijdag-padel",
   );
@@ -146,9 +148,25 @@ test("home heeft een rustige lege participantstate", async ({ page, request }) =
   });
   expect(fixture.ok()).toBe(true);
   await signInHome(page, request, address);
-  await expect(page.getByRole("heading", { level: 1, name: "Samen spelen. Iedere ronde anders." })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Geen aankomende TOS-avonden" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Bekijk alle TOS-avonden" })).toHaveAttribute("href", "/tos");
+  await expect(page.getByRole("heading", { level: 1, name: "ZIN IN EEN TOS?" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Geen aankomende TOS-momenten" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Bekijk alle TOS-momenten" })).toHaveAttribute("href", "/tos");
   await expect(page.getByRole("heading", { level: 3 })).toHaveCount(0);
+  await noHorizontalOverflow(page);
+});
+
+test("home toont alle open TOS-momenten op dezelfde dag in tijdsvolgorde", async ({ page, request }) => {
+  const address = email("home-open");
+  expect((await request.post(`${MOCK_URL}/__test/home-state`, {
+    data: { email: address, state: "same-day" },
+  })).ok()).toBe(true);
+  await signInHome(page, request, address);
+  const titles = page.getByRole("heading", { level: 3 });
+  await expect(titles).toHaveText([
+    "Padel TOS vrijdagavond",
+    "Tennis TOS voor alle clubleden",
+    "TOS over middernacht met een extra lange titel die veilig moet afbreken op mobiel",
+  ]);
+  await expect(page.getByRole("link", { name: "Op wachtlijst" })).toHaveAttribute("href", "/tos/tennis-avond-2026");
   await noHorizontalOverflow(page);
 });

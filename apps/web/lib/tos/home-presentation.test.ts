@@ -6,7 +6,7 @@ import { homePresentation } from "./home-presentation";
 const event: TosEvent = {
   id: "11111111-1111-4111-8111-111111111111",
   slug: "vrijdag-padel",
-  title: "Padel TOS-avond",
+  title: "Padel TOS",
   sport: "padel",
   startsAt: "2026-08-28T18:00:00Z",
   endsAt: "2026-08-28T20:00:00Z",
@@ -38,7 +38,7 @@ describe("truthful status-aware homepage presentation", () => {
 
   it("uses event status after close when no published schedule exists", () => {
     const value = presentation("future-placed", { now: editClosed });
-    expect(value.action).toMatchObject({ href: "/tos/vrijdag-padel", label: "Bekijk TOS-avond", status: "Schema volgt" });
+    expect(value.action).toMatchObject({ href: "/tos/vrijdag-padel", label: "Bekijk TOS", status: "Schema volgt" });
     expect(value.cardAction).toEqual(value.action);
     expect(JSON.stringify(value)).not.toContain("Aanmelding wijzigen");
     expect(JSON.stringify(value)).not.toContain("Bekijk je schema");
@@ -52,7 +52,7 @@ describe("truthful status-aware homepage presentation", () => {
 
   it("gives a current published schedule live priority", () => {
     const value = presentation("live-placed", { now: editClosed, hasPublishedSchedule: true });
-    expect(value.title).toBe("Jouw TOS-avond. Live.");
+    expect(value.title).toBe("Jouw TOS. Live.");
     expect(value.action).toEqual({ href: "/live/vrijdag-padel", label: "Bekijk live TOS-schema" });
     expect(value.cardAction).toEqual({ href: "/live/vrijdag-padel", label: "Bekijk live schema" });
   });
@@ -77,9 +77,9 @@ describe("truthful status-aware homepage presentation", () => {
 
   it("keeps anonymous and open states neutral and formats Amsterdam time", () => {
     expect(presentation(null, {}, null)).toMatchObject({
-      title: "Samen spelen. Iedere ronde anders.",
+      title: "ZIN IN EEN TOS?",
       cue: null,
-      action: { href: "/tos", label: "Bekijk TOS-avonden" },
+      action: { href: "/tos", label: "BEKIJK TOS-MOMENTEN" },
     });
     expect(presentation("open", { hasRegistration: false }).cardAction.label).toBe("Aanmelden");
     expect(presentation("future-placed").cue).toBe("vrijdag · 20:00");

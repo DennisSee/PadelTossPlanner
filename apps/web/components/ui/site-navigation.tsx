@@ -54,7 +54,7 @@ function NavigationLinks({ model, currentPath }: { model: NavigationModel; curre
   return (
     <>
       <NavigationLink href="/live" currentPath={currentPath}>Live TOS-schema</NavigationLink>
-      <NavigationLink href="/tos" currentPath={currentPath}>TOS-avonden</NavigationLink>
+      <NavigationLink href="/tos" currentPath={currentPath}>TOS-momenten</NavigationLink>
       {model.canParticipate ? <NavigationLink href="/historie" currentPath={currentPath}>Mijn historie</NavigationLink> : null}
       <NavigationLink href="/account" currentPath={currentPath}>Mijn account</NavigationLink>
       {model.canPlan ? <NavigationLink href="/beheer" currentPath={currentPath}>Beheer</NavigationLink> : null}

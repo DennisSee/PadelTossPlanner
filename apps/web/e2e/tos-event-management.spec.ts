@@ -86,7 +86,7 @@ test("lists all statuses and creates, opens and cancels a server-slugged event",
     await createSummary.click();
   }
   await page.getByLabel("Titel").first().fill(title);
-  await page.getByRole("button", { name: "TOS-avond aanmaken" }).click();
+  await page.getByRole("button", { name: "TOS-moment aanmaken" }).click();
   await expect(page).toHaveURL(/\/beheer\?notice=event-created$/u);
   const card = page.getByRole("heading", { name: title, exact: true }).locator("xpath=ancestor::section[1]");
   await expect(card).toBeVisible();
@@ -160,6 +160,6 @@ test("rejects participant direct event writes", async ({ page, request }) => {
     }, { ...forgedCreateFields, status: "open" }).catch(() => undefined),
   ]);
   await expect(page).toHaveURL(/\/tos$/u);
-  await expect(page.getByRole("heading", { name: "TOS-avonden", level: 1 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "TOS-momenten", level: 1 })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Forged event" })).toHaveCount(0);
 });

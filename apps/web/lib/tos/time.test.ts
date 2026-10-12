@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   eventAllowsSelfService,
+  eventDisplayTitle,
   eventPresentationStatus,
   fullEventAvailability,
   InvalidAvailabilityError,
@@ -23,6 +24,11 @@ const BASE_EVENT: TosEvent = Object.freeze({
 });
 
 describe("Europe/Amsterdam registration time handling", () => {
+  it("keeps organizer titles and uses neutral copy only for a blank title", () => {
+    expect(eventDisplayTitle({ ...BASE_EVENT, title: "Zomer TOS-avond" })).toBe("Zomer TOS-avond");
+    expect(eventDisplayTitle({ ...BASE_EVENT, title: "TOS-avond" })).toBe("TOS-avond");
+    expect(eventDisplayTitle({ ...BASE_EVENT, title: " " })).toBe("Padel TOS");
+  });
   it("allows every minute in the UI and accepts non-five-minute availability", () => {
     expect(TIME_INPUT_STEP_SECONDS).toBe(60);
     expect(fullEventAvailability(BASE_EVENT)).toEqual({ from: "20:00", until: "22:00" });

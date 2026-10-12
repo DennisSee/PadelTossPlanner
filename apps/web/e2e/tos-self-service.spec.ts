@@ -124,7 +124,7 @@ test("TOS-filters tonen eigen reacties zonder gesloten en geannuleerde events pu
   await expect(page.getByRole("option", { name: "Inschrijving gesloten", exact: true })).toHaveAttribute("value", "closed");
   await page.getByLabel("Status").selectOption("past");
   await expect(page).toHaveURL(/\/tos\?status=past&sport=all$/u);
-  await expect(page.getByText("Geen afgelopen TOS-avonden gevonden.")).toBeVisible();
+  await expect(page.getByText("Geen afgelopen TOS-momenten gevonden.")).toBeVisible();
   await page.getByLabel("Status").selectOption("all");
   await expect(page).toHaveURL(/\/tos\?status=all&sport=all$/u);
   await expect(page.getByRole("heading", { name: "Padel TOS vrijdagavond", level: 3 })).toBeVisible();
