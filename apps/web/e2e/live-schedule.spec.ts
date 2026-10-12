@@ -91,9 +91,9 @@ test("persoonlijke selectie onderscheidt teams, rust, afwezigheid en exacte name
   await select.selectOption({ label: "Zoë Accent" });
   await expect(page.getByRole("heading", { level: 2, name: "Schema voor Zoë Accent" })).toBeVisible();
   await expect(current.getByRole("heading", { level: 3 })).toHaveCount(1);
-  await expect(next.getByRole("heading", { level: 3 })).toHaveCount(1);
+  await expect(next.getByRole("button")).toHaveCount(1);
   await expect(current.getByText("Zoë Accent", { exact: true })).toBeVisible();
-  await expect(current.getByText(LONG_PLAYER_NAME, { exact: true })).toBeVisible();
+  await expect(current.getByText(LONG_PLAYER_NAME, { exact: false })).toBeVisible();
   const selectedHighlights = page.locator('[data-selected-player="true"]');
   expect(await selectedHighlights.count()).toBeGreaterThan(0);
   await expect(selectedHighlights.first()).toContainText("Zoë Accent");

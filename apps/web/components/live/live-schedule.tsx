@@ -32,6 +32,7 @@ import type {
 
 import styles from "./live-schedule.module.css";
 import { TeamNames } from "./team-names";
+import { PersonalSchedule } from "./personal-schedule";
 import { PersonalLive } from "./personal-live";
 
 const EVERYONE = "Iedereen";
@@ -363,6 +364,20 @@ function LiveContent({
   selectedPlayer: string;
   state: LiveRoundState;
 }) {
+  if (selectedPlayer !== EVERYONE) {
+    const next = state.kind === "current" || state.kind === "between" ? state.next : null;
+    return <PersonalSchedule key={`${schedule.id}-${selectedPlayer}`} active={state.kind === "current" || state.kind === "between"}
+      currentId={state.kind === "current" ? state.current.roundNumber : undefined} nextId={next?.roundNumber} playerName={selectedPlayer}
+      rounds={personalScheduleRows(schedule.rows, selectedPlayer).map((round) => {
+        const teamOne = round.teamOne.split(" & ");
+        const teamTwo = round.teamTwo.split(" & ");
+        const matches = (name: string) => name.toLocaleLowerCase("nl-NL") === selectedPlayer.toLocaleLowerCase("nl-NL");
+        const ownTeam = teamOne.some(matches) ? teamOne : teamTwo;
+        const selectedIndex = ownTeam.findIndex(matches);
+        return { id: round.roundNumber, number: round.roundNumber, time: round.roundTime, status: round.status, court: round.court,
+          partner: ownTeam.filter((_, index) => index !== selectedIndex).join(" & "), opponents: teamOne.some(matches) ? round.teamTwo : round.teamOne };
+      })} />;
+  }
   if (state.kind === "untimed") {
     return (
       <>

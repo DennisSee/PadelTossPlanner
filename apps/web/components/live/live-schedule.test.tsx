@@ -107,7 +107,7 @@ describe("live schedule UI", () => {
     const selectedAnna = document.querySelectorAll(
       '[data-selected-player="true"][data-player-name="Anna"]',
     );
-    expect(selectedAnna.length).toBeGreaterThanOrEqual(2);
+    expect(selectedAnna.length).toBe(1);
 
     await user.selectOptions(select, "Ann");
     expect(screen.getByRole("heading", { level: 2, name: "Schema voor Ann" })).toBeInTheDocument();
@@ -162,10 +162,10 @@ describe("live schedule UI", () => {
     render(<LiveSchedule schedule={schedule()} initialNowIso="2026-08-21T17:55:00.000Z" />);
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("TOS-schema");
     expect(screen.getByText("vrijdag 21 augustus 2026", { exact: true })).toBeVisible();
-    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("Wedstrijdschema");
+    expect(screen.getByRole("heading", { level: 2, name: "Wedstrijdschema" })).toBeVisible();
     expect(screen.getAllByRole("heading", { level: 3 }).length).toBeGreaterThan(0);
     await user.selectOptions(screen.getByLabelText("Kies je naam"), "Zoë");
-    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("Schema voor Zoë");
+    expect(screen.getByRole("heading", { level: 2, name: "Schema voor Zoë" })).toBeVisible();
   });
 
   it("restores a valid preference and rejects an obsolete stored player", async () => {
