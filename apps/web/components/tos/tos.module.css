@@ -220,6 +220,11 @@
   border-left-color: var(--club-green);
 }
 
+.homePlaced { border: 1px solid color-mix(in srgb, var(--club-green) 45%, var(--border)); border-left: 0.3rem solid var(--club-green); background: var(--success-soft); }
+.homePlaced .eventBody { background: linear-gradient(110deg, var(--success-soft), var(--surface)); }
+.homeOpen { border-left-color: var(--club-yellow); }
+.homeOpen .eventBody { background: var(--surface); }
+
 .eventCardClosed {
   border-left-color: var(--text-muted);
 }
@@ -1111,3 +1116,18 @@
   .capacityPanel { grid-template-columns: 2.6rem minmax(0, 1fr); }
   .capacityPanel > p { grid-column: 2; grid-row: auto; text-align: left; }
 }
+
+@media (max-width: 30rem) {
+  .homePlaced.eventCardCompact, .homeOpen.eventCardCompact { padding: 0.65rem; gap: 0.5rem 0.65rem; grid-template-columns: 3.75rem minmax(0, 1fr); }
+  .homePlaced.eventCardCompact .eventBody, .homeOpen.eventCardCompact .eventBody { display: contents; }
+  .homePlaced.eventCardCompact > time, .homeOpen.eventCardCompact > time { grid-column: 1; grid-row: 1 / span 3; width: 100%; margin: 0; align-self: stretch; }
+  .homePlaced.eventCardCompact .badges, .homeOpen.eventCardCompact .badges { grid-column: 2; grid-row: 1; }
+  .homePlaced.eventCardCompact .eventTitle, .homeOpen.eventCardCompact .eventTitle { grid-column: 2; grid-row: 2; }
+  .homePlaced.eventCardCompact .metadata, .homeOpen.eventCardCompact .metadata { grid-column: 2; grid-row: 3; }
+  .homePlaced.eventCardCompact .deadline, .homeOpen.eventCardCompact .deadline { grid-column: 1 / -1; grid-row: 4; }
+  .homePlaced.eventCardCompact .capacityPanel, .homeOpen.eventCardCompact .capacityPanel { grid-column: 1 / -1; grid-row: 5; }
+  .homePlaced.eventCardCompact .participantColumn, .homeOpen.eventCardCompact .participantColumn { grid-column: 1 / -1; grid-row: 6; }
+  .homePlaced.eventCardCompact .actions a, .homeOpen.eventCardCompact .actions a { width: 100%; }
+}
+
+.homePlaced .capacityPanel .waitlistCount, .homeOpen .capacityPanel .waitlistCount { grid-column: 1 / -1; grid-row: 3; text-align: left; }

@@ -28,7 +28,7 @@ for (const [width, height] of [[360, 800], [390, 844], [1024, 768], [1440, 900]]
     await expect(current).toContainText("Samen metDezelfde Naam");
     await expect(current).toContainText("Speler 2 & Speler 3");
     await expect(page.getByRole("article", { name: "Hierna: Kremer Baan" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Wedstrijdschema" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Volledig schema" })).toBeVisible();
     if (width < 672) await expect(page.getByRole("link", { name: "Mijn live-schema" })).toBeVisible();
     const box = await current.boundingBox();
     expect(box?.y).toBeLessThan(height);
@@ -36,7 +36,7 @@ for (const [width, height] of [[360, 800], [390, 844], [1024, 768], [1440, 900]]
     await page.screenshot({ path: info.outputPath(`personal-${width}.png`), fullPage: true });
     await page.getByLabel("Schema voor").selectOption("");
     await expect(page.getByRole("article")).toHaveCount(0);
-    await expect(page.getByRole("heading", { name: "Wedstrijdschema" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Volledig schema" })).toBeVisible();
     const routes = ["/", "/live", "/live/personal-past", "/live/personal-future", "/historie", "/account", "/tos/vrijdag-padel"];
     for (const [i, route] of routes.entries()) {
       await page.goto(route);

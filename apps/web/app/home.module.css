@@ -220,6 +220,12 @@
   margin-top: clamp(1.1rem, 2.5vw, 1.7rem);
 }
 
+.enrollmentHeading { display: flex; align-items: center; gap: 0.75rem; padding-inline: 0.35rem; color: var(--club-green-dark); }
+.enrollmentHeading h2 { margin: 0; font: 750 clamp(1.35rem, 2.5vw, 1.75rem)/1.2 var(--font-interface); }
+.enrollmentHeading p { margin: 0.3rem 0 0; color: var(--text-muted); }
+.enrollmentCheck { display: grid; place-items: center; width: 2.5rem; height: 2.5rem; flex: 0 0 auto; border-radius: 50%; color: var(--surface); background: var(--club-green); font-size: 1.5rem; font-weight: 800; }
+.nextTos { scroll-margin-top: 1rem; }
+
 .nextTosHeading {
   display: flex;
   align-items: end;
@@ -372,3 +378,11 @@
     font-size: 0.82rem;
   }
 }
+
+@media (max-width: 30rem) {
+  .nextTosHeading { flex-wrap: wrap; align-items: center; }
+  .nextTosHeading h2 { flex-basis: 100%; }
+  .nextTosHeading > a { min-height: 44px; display: inline-flex; align-items: center; }
+}
+
+@media (min-width: 48rem) { .lead { max-width: min(42rem, 55%); } }

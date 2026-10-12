@@ -22,12 +22,20 @@ export function homeOverviewEvents(
   events: readonly TosEvent[],
   selected: HomeEventSelection | null,
   now: Date,
+  registrations: readonly OwnRegistrationWithEvent[] = [],
+  positions: ReadonlyMap<string, OwnRegistrationPosition | null> = new Map(),
 ): TosEvent[] {
   const byId = new Map(events
     .filter((event) => eventAllowsSelfService(event, now) && new Date(event.endsAt) > now)
     .map((event) => [event.id, event]));
   // Keep the personal TOS reachable after signup closes, without a second card.
   if (selected) byId.set(selected.event.id, selected.event);
+  for (const registration of registrations) {
+    if (registration.response === "attending" && positions.get(registration.eventId)?.placementStatus === "placed" &&
+      ["open", "closed"].includes(registration.event.status) && new Date(registration.event.endsAt) > now) {
+      byId.set(registration.eventId, registration.event);
+    }
+  }
   return [...byId.values()].sort(compare);
 }
 

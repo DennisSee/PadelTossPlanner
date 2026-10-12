@@ -49,12 +49,12 @@ async function noHorizontalOverflow(page: Page) {
 test("home kiest de eerstvolgende geplaatste registratie", async ({ page, request }) => {
   await signInHome(page, request, email("dashboard-web10"));
   await expect(page.getByRole("heading", { level: 1, name: "Je volgende TOS staat klaar." })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Bekijk je aanmelding" })).toHaveAttribute("href", "/tos/vrijdag-padel");
-  await expect(page.getByRole("heading", { name: "Open TOS-momenten" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Bekijk je inschrijvingen" })).toHaveAttribute("href", "#home-enrollments");
+  await expect(page.getByRole("heading", { name: "Andere open TOS-momenten" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Aanmelding wijzigen" }).first()).toBeVisible();
-  await expect(page.getByText("✓ Geplaatst")).toBeVisible();
+  await expect(page.getByText("✓ Je bent geplaatst")).toHaveCount(2);
   await expect(page.getByText(/Je doet mee/u)).toHaveCount(0);
-  await expect(page.getByRole("heading", { level: 3 })).toHaveCount(3);
+  await expect(page.getByRole("heading", { level: 3 })).toHaveCount(4);
   await noHorizontalOverflow(page);
 });
 
@@ -82,8 +82,8 @@ test("home toont na sluiting zonder publicatie alleen de eventstatus", async ({ 
   await expect(page.getByRole("heading", { level: 1, name: "Je plaats staat vast." })).toBeVisible();
   await expect(page.getByRole("link", { name: "Bekijk TOS" }).first()).toHaveAttribute("href", "/tos/vrijdag-padel");
   await expect(page.getByText("Schema volgt", { exact: true })).toBeVisible();
-  await expect(page.getByRole("region", { name: "Jouw volgende TOS" }).getByRole("heading", { level: 3 })).toHaveCount(1);
-  await expect(page.getByRole("region", { name: "Open TOS-momenten" }).getByRole("heading", { name: "Padel TOS vrijdagavond" })).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Jouw inschrijving" }).getByRole("heading", { level: 3 })).toHaveCount(1);
+  await expect(page.getByRole("region", { name: "Andere open TOS-momenten" }).getByRole("heading", { name: "Padel TOS vrijdagavond" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Aanmelding wijzigen" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Bekijk je schema" })).toHaveCount(0);
   await noHorizontalOverflow(page);

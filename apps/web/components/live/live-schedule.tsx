@@ -105,14 +105,14 @@ function RoundStateBadge({ state }: { state?: "current" | "next" }) {
   return null;
 }
 
-function CourtBadge({ court }: { court: string }) {
+function CourtBadge({ court, prominent = false }: { court: string; prominent?: boolean }) {
   const label = court || "Baan";
   return (
     <span
-      className={`${styles.court} ${courtClass(court)}`.trim()}
+      className={`${styles.court} ${prominent ? styles.focusCourtBadge : ""} ${courtClass(court)}`.trim()}
       data-testid="court-badge"
     >
-      <span className={styles.courtDot} aria-hidden="true" />
+      {prominent ? <span className={styles.courtCaption}>BAAN</span> : <span className={styles.courtDot} aria-hidden="true" />}
       <span>{label}</span>
     </span>
   );
@@ -199,8 +199,10 @@ function PersonalRoundCard({
   round,
   selectedPlayer,
   state,
+  focus = false,
 }: {
   round: PersonalRound;
+  focus?: boolean;
   selectedPlayer: string;
   state?: "current" | "next";
 }) {
@@ -209,6 +211,11 @@ function PersonalRoundCard({
     "not-arrived": ["Nog niet aanwezig", "Je bent deze ronde nog niet beschikbaar.", styles.personalStatusMuted],
     unavailable: ["Niet meer beschikbaar", "Deze ronde valt na jouw eindtijd.", styles.personalStatusMuted],
   } as const;
+  const teamOne = round.teamOne.split(" & ");
+  const teamTwo = round.teamTwo.split(" & ");
+  const isSelected = (name: string) => name.toLocaleLowerCase("nl-NL") === selectedPlayer.toLocaleLowerCase("nl-NL");
+  const ownTeam = teamOne.some(isSelected) ? teamOne : teamTwo;
+  const opponents = teamOne.some(isSelected) ? round.teamTwo : round.teamOne;
 
   return (
     <Card
@@ -228,14 +235,21 @@ function PersonalRoundCard({
           <span className={styles.roundTime}>{round.roundTime}</span>
         </div>
       </div>
+      {focus ? <p className={styles.personalFocusLabel}>{state === "current" ? round.status === "playing" ? "Nu spelen" : round.status === "rest" ? "Nu rust" : "Nu" : "Hierna"}</p> : null}
       {round.status === "playing" ? (
-        <div className={`${styles.match} ${styles.personalMatch}`}>
-          <CourtBadge court={round.court} />
-          <div className={styles.matchup}>
+        <div className={`${styles.match} ${styles.personalMatch} ${focus ? styles.focusMatch : ""}`}>
+          <CourtBadge court={round.court} prominent={focus} />
+          {focus ? <div>
+            <p className={styles.manualSelected}>{selectedPlayer}</p>
+            <dl className={styles.focusTeams}>
+              <div><dt>Samen met</dt><dd><TeamNames team={ownTeam.filter((name) => !isSelected(name)).join(" & ")} /></dd></div>
+              <div><dt>Tegen</dt><dd><TeamNames team={opponents} /></dd></div>
+            </dl>
+          </div> : <div className={styles.matchup}>
             <TeamNames team={round.teamOne} selectedPlayer={selectedPlayer} />
             <span className={styles.versus}>vs</span>
             <TeamNames team={round.teamTwo} selectedPlayer={selectedPlayer} />
-          </div>
+          </div>}
         </div>
       ) : (
         <div className={styles.personalBody} data-personal-status={round.status}>
@@ -336,7 +350,7 @@ function FocusRound({
   }
   const personal = personalScheduleRows(round.rows, selectedPlayer)[0];
   return personal
-    ? <PersonalRoundCard round={personal} selectedPlayer={selectedPlayer} state={state} />
+    ? <PersonalRoundCard round={personal} selectedPlayer={selectedPlayer} state={state} focus />
     : null;
 }
 
@@ -420,8 +434,8 @@ function LiveContent({
         ) : null}
       </div>
       <Card className={styles.allRounds}>
-        <details>
-          <summary>{selectedPlayer === EVERYONE ? "Alle rondes bekijken" : "Mijn volledige schema"}</summary>
+        <details open>
+          <summary>{selectedPlayer === EVERYONE ? "Alle rondes bekijken" : "Volledig schema"}</summary>
           <FullSchedule schedule={schedule} selectedPlayer={selectedPlayer} state={state} />
         </details>
       </Card>
@@ -496,7 +510,7 @@ export function LiveSchedule({
         </Card>
 
         {!currentEvent ? <p className={styles.noCurrent} role="status">Er is nu geen TOS bezig.{state.kind === "before" && schedule.eventSlug ? <> <a href={`/tos/${schedule.eventSlug}`}>Bekijk TOS →</a></> : null}</p> : null}
-        {personal ? <PersonalLive key={`${schedule.id}-${ownPlayerKey}`} identity={schedule.liveIdentity!} ownKey={ownPlayerKey!} now={now} slug={schedule.eventSlug!} /> : null}
+        {personal ? <PersonalLive key={`${schedule.id}-${ownPlayerKey}`} identity={schedule.liveIdentity!} ownKey={ownPlayerKey!} now={now} slug={schedule.eventSlug!} everyoneSchedule={<FullSchedule schedule={schedule} selectedPlayer={EVERYONE} state={state} />} /> : null}
         <Card className={styles.controlSurface}>
           {!personal ? <div className={styles.selectBlock}>
             <label className={styles.label} htmlFor="player-select">Kies je naam</label>
@@ -526,17 +540,17 @@ export function LiveSchedule({
           </div>
         </Card>
 
-        <h2 className={styles.scheduleTitle}>
+        {!personal ? <h2 className={styles.scheduleTitle}>
           {personal || selectedPlayer === EVERYONE ? "Wedstrijdschema" : `Schema voor ${selectedPlayer}`}
-        </h2>
+        </h2> : null}
 
-        {schedule.rows.length > 0 ? (
-          personal ? <FullSchedule schedule={schedule} selectedPlayer={EVERYONE} state={state} /> : <LiveContent schedule={schedule} selectedPlayer={selectedPlayer} state={state} />
-        ) : (
+        {!personal && schedule.rows.length > 0 ? (
+          <LiveContent schedule={schedule} selectedPlayer={selectedPlayer} state={state} />
+        ) : !personal ? (
           <StateMessage title="Nog geen wedstrijden">
             Het gepubliceerde schema bevat nog geen ronde-indeling.
           </StateMessage>
-        )}
+        ) : null}
 
         <footer className={styles.footer}>
           <button className={styles.refreshButton} type="button" onClick={() => window.location.reload()}>Schema verversen</button>

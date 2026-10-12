@@ -56,6 +56,7 @@ export function TosEventCard({
   registrationPosition,
   socialDataUnavailable = false,
   compact = false,
+  homeView = false,
   actionOverride,
   now,
 }: {
@@ -66,10 +67,12 @@ export function TosEventCard({
   registrationPosition?: OwnRegistrationPosition | null;
   socialDataUnavailable?: boolean;
   compact?: boolean;
+  homeView?: boolean;
   actionOverride?: Readonly<{ href: string; label: string; status?: string }>;
   now: Date;
 }) {
   const status = eventPresentationStatus(event, now);
+  const placed = registration?.response === "attending" && registrationPosition?.placementStatus === "placed";
   const canChange = eventAllowsSelfService(event, now);
   const availability = registration?.response === "attending"
     ? `${formatEventClock(registration.availableFrom!)}–${formatEventClock(registration.availableUntil!)}`
@@ -80,13 +83,13 @@ export function TosEventCard({
   const personalLabel = registrationPosition?.placementStatus === "waitlist"
     ? `Wachtlijst · plek ${registrationPosition.waitlistPosition}`
     : registrationPosition?.placementStatus === "placed"
-      ? "✓ Geplaatst"
+      ? homeView ? "✓ Je bent geplaatst" : "✓ Geplaatst"
       : registration?.response === "declined"
         ? "Afgemeld"
         : null;
   return (
-    <Card className={`${styles.eventCard} ${compact ? styles.eventCardCompact : ""} ${event.sport === "padel" ? styles.eventCardPadel : styles.eventCardTennis} ${cardClass(event, registration)}`}>
-      <EventDateRail startsAt={event.startsAt} accent={registration ? "green" : "yellow"} />
+    <Card className={`${styles.eventCard} ${compact ? styles.eventCardCompact : ""} ${event.sport === "padel" ? styles.eventCardPadel : styles.eventCardTennis} ${cardClass(event, registration)} ${homeView ? placed ? styles.homePlaced : styles.homeOpen : ""}`}>
+      <EventDateRail startsAt={event.startsAt} accent={homeView ? placed ? "green" : "yellow" : registration ? "green" : "yellow"} />
       <div className={styles.eventBody}>
         <div className={styles.badges}>
           <SportBadge sport={event.sport} compact />

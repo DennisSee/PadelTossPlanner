@@ -19,7 +19,10 @@ it("selects the exact opaque own key despite duplicate names and permits Everyon
   expect(screen.getByRole("article", { name: "Hierna: Kremer Baan" }).className).not.toContain("personalFocusCurrent");
   expect(within(current).getByText("Dezelfde Naam")).toBeInTheDocument();
   expect(current).toHaveTextContent("Speler 2 & Speler 3");
-  expect(screen.getAllByRole("article")).toHaveLength(2);
+  expect(screen.getAllByRole("article")).toHaveLength(4);
+  expect(within(current).getByText("Nu spelen")).toBeVisible();
+  expect(within(current).getByText("BAAN")).toBeVisible();
+  expect(screen.getByRole("heading", { name: "Volledig schema" })).toBeVisible();
   await userEvent.selectOptions(screen.getByLabelText("Schema voor"), "");
   expect(screen.queryByRole("article")).not.toBeInTheDocument();
 });
@@ -27,6 +30,26 @@ it("shows rest and one next round", () => {
   render(<PersonalLive identity={identity} ownKey={keys[4]} now={new Date("2026-09-07T18:05:00Z")} slug="live-event" />);
   expect(screen.getByRole("article", { name: "Nu: Rust" })).toHaveTextContent("Deze ronde speel je niet.");
   expect(screen.getByRole("article", { name: "Hierna: Rust" })).toBeInTheDocument();
+  expect(screen.getByText("Nu rust")).toBeVisible();
+  expect(screen.queryByText("BAAN")).not.toBeInTheDocument();
+});
+
+it.each(["2026-09-07T17:00:00Z", "2026-09-07T19:00:00Z"])("never claims a current match outside a round at %s", (timestamp) => {
+  render(<PersonalLive identity={identity} ownKey={keys[1]} now={new Date(timestamp)} slug="live-event" />);
+  expect(screen.queryByText("Nu spelen")).not.toBeInTheDocument();
+  expect(screen.queryByText("Nu rust")).not.toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Volledig schema" })).toBeVisible();
+});
+
+it("shows full sponsor and player names without sport icons or name-based ownership", () => {
+  const court = "PlaySeat en Seppworks/Bax Baan met een bijzonder lange sponsornaam";
+  const longIdentity = { ...identity, players: identity.players.map((player) => ({ ...player, name: player.name + " van den Berg-van der Meer" })),
+    rounds: identity.rounds.map((round) => ({ ...round, slots: round.slots.map((slot) => ({ ...slot, court: slot.court ? court : null })) })) };
+  render(<PersonalLive identity={longIdentity} ownKey={keys[1]} now={new Date("2026-09-07T18:05:00Z")} slug="live-event" />);
+  const current = screen.getByRole("article", { name: `Nu: ${court}` });
+  expect(within(current).getByRole("heading", { name: court })).toBeVisible();
+  expect(current.querySelector("svg")).toBeNull();
+  expect(current).toHaveTextContent("Dezelfde Naam van den Berg-van der Meer");
 });
 it("does not match a name or stale key", () => {
   const { container } = render(<PersonalLive identity={identity} ownKey="Dezelfde Naam" now={new Date()} slug="live-event" />);

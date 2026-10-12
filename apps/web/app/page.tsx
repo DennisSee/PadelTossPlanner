@@ -29,6 +29,7 @@ export default async function Home() {
   let homeSnapshots: Parameters<typeof TosEventCard>[0][] = [];
   let homeKind: HomeEventSelection["kind"] | null = null;
   let homeHasPublishedSchedule = false;
+  const publishedByEvent = new Map<string, boolean>();
   let participantHomeResolved = false;
   let client: Awaited<ReturnType<typeof createServerSupabaseClient>> | null = null;
   try {
@@ -49,7 +50,7 @@ export default async function Home() {
         .map(async (registration) => [registration.eventId, await repository.ownRegistrationPosition(registration.eventId)] as const));
       const positions = new Map(positionEntries);
       const selected = selectHomeEvent(events, registrations, positions, now);
-      homeSnapshots = await Promise.all(homeOverviewEvents(events, selected, now).map(async (event) => {
+      homeSnapshots = await Promise.all(homeOverviewEvents(events, selected, now, registrations, positions).map(async (event) => {
         const [capacity, attendanceResult] = await Promise.all([
           repository.eventCapacity(event.id),
           repository.eventAttendance(event.id).then(
@@ -57,13 +58,28 @@ export default async function Home() {
             () => ({ attendance: [], unavailable: true }),
           ),
         ]);
+        const registration = registrations.find((registration) => registration.eventId === event.id);
+        const position = positions.get(event.id) ?? null;
+        const placed = registration?.response === "attending" && position?.placementStatus === "placed";
+        let published = false;
+        if (placed && (!eventAllowsSelfService(event, now) || new Date(event.startsAt) <= now)) {
+          try { published = Boolean(await loadEventPublicSchedule(event.slug)); } catch { published = false; }
+        }
+        publishedByEvent.set(event.id, published);
+        const personalPresentation = placed ? homePresentation(new Date(event.startsAt) <= now ? "live-placed" : "future-placed", event, {
+          now, hasPublishedSchedule: published, hasRegistration: true,
+        }) : null;
         return {
           event,
-          registration: registrations.find((registration) => registration.eventId === event.id),
+          registration,
           capacity,
           attendance: attendanceResult.attendance,
           socialDataUnavailable: attendanceResult.unavailable,
-          registrationPosition: positions.get(event.id) ?? null,
+          registrationPosition: position,
+          homeView: true,
+          actionOverride: placed ? eventAllowsSelfService(event, now)
+            ? { href: "/tos/" + event.slug, label: "Mijn aanmelding bekijken" }
+            : personalPresentation?.cardAction : undefined,
           compact: true,
           now,
         };
@@ -71,16 +87,7 @@ export default async function Home() {
       participantHomeResolved = true;
       if (selected) {
         homeKind = selected.kind;
-        if (
-          (selected.kind === "live-placed" || selected.kind === "future-placed") &&
-          (selected.kind === "live-placed" || !eventAllowsSelfService(selected.event, now))
-        ) {
-          try {
-            homeHasPublishedSchedule = Boolean(await loadEventPublicSchedule(selected.event.slug));
-          } catch {
-            homeHasPublishedSchedule = false;
-          }
-        }
+        homeHasPublishedSchedule = publishedByEvent.get(selected.event.id) ?? false;
         homeSnapshot = homeSnapshots.find((snapshot) => snapshot.event.id === selected.event.id) ?? null;
       }
     } catch {
@@ -95,10 +102,11 @@ export default async function Home() {
     hasPublishedSchedule: homeHasPublishedSchedule,
     hasRegistration: Boolean(homeSnapshot?.registration),
   });
+  const personalSnapshots = homeSnapshots.filter((snapshot) => snapshot.registration?.response === "attending" && snapshot.registrationPosition?.placementStatus === "placed");
   const openSnapshots = homeSnapshots.filter((snapshot) =>
-    eventAllowsSelfService(snapshot.event, now) && new Date(snapshot.event.endsAt) > now,
+    !personalSnapshots.includes(snapshot) && eventAllowsSelfService(snapshot.event, now) && new Date(snapshot.event.endsAt) > now,
   );
-  const separatePersonalSnapshot = homeSnapshot && !openSnapshots.some((snapshot) => snapshot.event.id === homeSnapshot.event.id)
+  const separatePersonalSnapshot = homeSnapshot && !personalSnapshots.includes(homeSnapshot) && !openSnapshots.some((snapshot) => snapshot.event.id === homeSnapshot.event.id)
     ? homeSnapshot : null;
 
   return (
@@ -117,7 +125,9 @@ export default async function Home() {
               <h1 className={styles.title}>{presentation.title}</h1>
               {presentation.cue ? <p className={styles.heroCue}>{presentation.cue}</p> : null}
               <p className={styles.lead}>{presentation.lead}</p>
-              <LinkButton href={presentation.action.href}>{presentation.action.label}</LinkButton>
+              <LinkButton href={personalSnapshots.length > 1 && homeKind !== "live-placed" ? "#home-enrollments" : presentation.action.href}>
+                {personalSnapshots.length > 1 && homeKind !== "live-placed" ? "Bekijk je inschrijvingen" : presentation.action.label}
+              </LinkButton>
             </div>
           </Card>
 
@@ -152,6 +162,16 @@ export default async function Home() {
             <div className={styles.barcode} aria-hidden="true" />
           </Card> : null}
         </div>
+        {personalSnapshots.length ? (
+          <section id="home-enrollments" className={styles.nextTos} aria-labelledby="enrollments-heading">
+            <div className={styles.enrollmentHeading}>
+              <span className={styles.enrollmentCheck} aria-hidden="true">✓</span>
+              <div><h2 id="enrollments-heading">{personalSnapshots.length === 1 ? "Jouw inschrijving" : "Jouw inschrijvingen"}</h2>
+                <p>Je bent geplaatst. Veel speelplezier!</p></div>
+            </div>
+            {personalSnapshots.map((snapshot) => <TosEventCard key={snapshot.event.id} {...snapshot} />)}
+          </section>
+        ) : null}
         {separatePersonalSnapshot ? (
           <section className={styles.nextTos} aria-labelledby="personal-tos-heading">
             <div className={styles.nextTosHeading}>
@@ -163,7 +183,7 @@ export default async function Home() {
         {openSnapshots.length ? (
           <section className={styles.nextTos} aria-labelledby="open-tos-heading">
             <div className={styles.nextTosHeading}>
-              <h2 id="open-tos-heading">Open TOS-momenten</h2>
+              <h2 id="open-tos-heading">{personalSnapshots.length ? "Andere open TOS-momenten" : "Open TOS-momenten"}</h2>
               <Link href="/tos">Alle TOS-momenten <span aria-hidden="true">→</span></Link>
             </div>
             {openSnapshots.map((snapshot) => (
@@ -175,7 +195,7 @@ export default async function Home() {
               />
             ))}
           </section>
-        ) : participantHomeResolved && !separatePersonalSnapshot ? (
+        ) : participantHomeResolved && !separatePersonalSnapshot && !personalSnapshots.length ? (
           <section className={styles.nextTos} aria-labelledby="next-tos-heading">
             <Card className={styles.emptyTos}>
               <div>

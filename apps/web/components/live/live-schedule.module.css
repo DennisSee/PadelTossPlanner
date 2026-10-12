@@ -758,3 +758,50 @@
   .personalFocus dd { font-size: 0.95rem; }
   .eventMeta { max-width: none; font-size: 0.82rem; }
 }
+
+/* Home and live share the same quiet mint personal surface. */
+.court { font-size: 0.95rem; font-weight: 750; line-height: 1.35; padding: 0.4rem 0.65rem; }
+.focusCourtBadge { display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem; border-radius: var(--radius-sm); padding: 0.85rem; background: var(--success-soft); font-size: clamp(1.5rem, 3vw, 2.2rem); color: var(--club-green-dark); }
+.courtCaption { font-size: 0.75rem; letter-spacing: 0.1em; }
+.identityName { margin: 0.65rem 0 0; padding: 0.7rem 1rem; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--success-soft); color: var(--club-green-dark); font-size: 1.25rem; font-weight: 750; overflow-wrap: anywhere; }
+.identityName:empty { display: none; }
+.personalFocus { border-top: 1px solid var(--border); border-left: 0.3rem solid var(--club-green); border-radius: var(--radius-md); background: color-mix(in srgb, var(--success-soft) 65%, var(--surface)); box-shadow: var(--shadow-sm); padding: 1rem 1.15rem; }
+.personalFocus + .personalFocus { border-top-color: var(--border); background: var(--surface); }
+.personalFocusNext { border-left-color: var(--club-yellow); }
+.personalFocusCurrent { border-left-color: var(--club-green); }
+.focusHeading { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; color: var(--club-green-dark); }
+.personalFocusLabel { margin: 0.45rem 0; font-size: 0.9rem; letter-spacing: 0.06em; }
+.focusRound { padding: 0.3rem 0.65rem; border-radius: 999px; background: var(--success-soft); font-size: 0.8rem; font-weight: 750; }
+.personalFocusNext .focusRound { background: var(--warning-soft); color: #624f00; }
+.focusCourt { min-width: 0; padding: 0.75rem 0.9rem; margin-bottom: 0.75rem; border: 1px solid color-mix(in srgb, var(--club-green) 22%, var(--border)); border-radius: var(--radius-sm); background: var(--success-soft); color: var(--club-green-dark); }
+.focusCourt > span { font-weight: 800; font-size: 0.8rem; letter-spacing: 0.1em; }
+.focusCourt :is(h2, h3) { font-size: clamp(1.8rem, 4vw, 2.5rem); line-height: 1.05; overflow-wrap: anywhere; }
+.personalFocusTime { font-size: 1.05rem; }
+.personalFocus dl { grid-template-columns: 1fr; }
+.personalFocus dd { font-size: 1rem; line-height: 1.4; color: var(--text); }
+.identityFullSchedule { display: grid; gap: 0.6rem; margin-top: 0.8rem; }
+.personalFullRound { display: grid; grid-template-columns: minmax(8rem, 0.6fr) minmax(0, 1fr) minmax(0, 1.5fr); align-items: center; gap: 0.5rem 1rem; border: 1px solid var(--border); background: var(--surface); padding: 0.75rem 1rem; box-shadow: none; }
+.personalFullRound + .personalFullRound { border-top-color: var(--border); }
+.personalFullRound .focusHeading { margin: 0; grid-column: 1; }
+.personalFullRound .focusRound { display: none; }
+.personalFullRound .focusCourt { grid-column: 2; grid-row: 1 / span 2; margin: 0; padding: 0.5rem 0.65rem; }
+.personalFullRound .focusCourt > span { display: none; }
+.personalFullRound :is(h2, h3), .personalFullRound .focusCourt :is(h2, h3) { font-size: 1.1rem; line-height: 1.3; margin: 0.25rem 0; }
+.personalFullRound .personalFocusTime { grid-column: 1; grid-row: 2; font-size: 0.9rem; }
+.personalFullRound dl { grid-column: 3; grid-row: 1 / span 2; margin: 0; gap: 0.3rem; }
+.identityHighlight { grid-column: 3; margin: 0; padding: 0.2rem 0.4rem; border-radius: 0.3rem; color: var(--club-green-dark); background: var(--success-soft); font-weight: 750; overflow-wrap: anywhere; }
+.personalFullRound > p:not(.personalFocusTime):not(.identityHighlight) { grid-column: 3; }
+@media (max-width: 42rem) {
+  .personalFullRound { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .personalFullRound .focusCourt { grid-row: 1 / span 2; }
+  .personalFullRound dl, .personalFullRound .identityHighlight, .personalFullRound > p:not(.personalFocusTime):not(.identityHighlight) { grid-column: 1 / -1; grid-row: auto; }
+  .focusCourtBadge { width: 100%; }
+  .roundTime { white-space: normal; }
+}
+
+.focusMatch { grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: 1rem; }
+.focusTeams { display: grid; gap: 0.75rem; margin: 0.5rem 0 0; }
+.focusTeams dt { color: var(--text-muted); font-size: 0.85rem; }
+.focusTeams dd { margin: 0.2rem 0 0; color: var(--text); font-size: 1rem; line-height: 1.4; overflow-wrap: anywhere; }
+.manualSelected { margin: 0.35rem 0; font-size: 0.95rem; font-weight: 750; color: var(--club-green-dark); }
+@media (max-width: 42rem) { .focusMatch { grid-template-columns: minmax(0, 1fr); } }
