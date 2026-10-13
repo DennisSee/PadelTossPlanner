@@ -90,6 +90,10 @@ export function TosEventCard({
   return (
     <Card className={`${styles.eventCard} ${compact ? styles.eventCardCompact : ""} ${event.sport === "padel" ? styles.eventCardPadel : styles.eventCardTennis} ${cardClass(event, registration)} ${homeView ? placed ? styles.homePlaced : styles.homeOpen : ""}`}>
       <EventDateRail startsAt={event.startsAt} accent={homeView ? placed ? "green" : "yellow" : registration ? "green" : "yellow"} />
+      <time className={styles.mobileDate} dateTime={event.startsAt}>
+        {new Intl.DateTimeFormat("nl-NL", { timeZone: "Europe/Amsterdam", weekday: "short", day: "numeric", month: "short", year: "numeric" }).format(new Date(event.startsAt))}
+        {" · "}{formatEventClock(event.startsAt)}–{formatEventClock(event.endsAt)}
+      </time>
       <div className={styles.eventBody}>
         <div className={styles.badges}>
           <SportBadge sport={event.sport} compact />

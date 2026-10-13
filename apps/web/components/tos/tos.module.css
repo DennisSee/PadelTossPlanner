@@ -1131,3 +1131,54 @@
 }
 
 .homePlaced .capacityPanel .waitlistCount, .homeOpen .capacityPanel .waitlistCount { grid-column: 1 / -1; grid-row: 3; text-align: left; }
+
+/* Capacity is information; personal badges carry the status emphasis. */
+.capacityPanel.capacityClarity { grid-template-columns: 1.9rem minmax(0, 1fr); gap: 0.45rem 0.65rem; min-height: 0; padding: 0.65rem 0.75rem; border-color: var(--border); background: color-mix(in srgb, var(--surface-subtle) 70%, var(--surface)); color: var(--text); }
+.capacityPanel.capacityClarity .capacityRing { width: 1.8rem; height: 1.8rem; grid-row: 1; background: conic-gradient(var(--club-green) var(--occupancy), var(--border) 0); }
+.capacityPanel.capacityClarity .capacityNumbers strong { font-size: 1.2rem; line-height: 1.1; }
+.capacityPanel.capacityClarity .capacityNumbers span { font-size: 0.75rem; font-weight: 500; letter-spacing: 0; text-transform: none; }
+.capacityPanel.capacityClarity .capacityAvailability { grid-column: 2; grid-row: 2; text-align: left; font-size: 0.9rem; font-weight: 600; }
+.fullBadge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 0.3rem; color: var(--text); background: var(--border); font-size: 0.8rem; }
+.capacityPanel.capacityClarity .waitlistCount { grid-column: 1 / -1; grid-row: 3; margin: 0; padding: 0.45rem 0 0; border-top: 1px solid var(--border); border-radius: 0; color: var(--text) !important; background: transparent; text-align: left; font-size: 0.85rem; font-weight: 500; }
+.homePlaced { background: var(--surface); }
+.homePlaced .eventBody { background: color-mix(in srgb, var(--success-soft) 30%, var(--surface)); }
+.mobileDate { display: none; }
+@media (max-width: 42rem) {
+  .eventCard, .eventCard.eventCardCompact { grid-template-columns: minmax(0, 1fr); padding: 0; gap: 0; }
+  .eventCard > time:not(.mobileDate) { display: none; }
+  .eventCard > time.mobileDate, .eventCard.eventCardCompact > time.mobileDate { display: block; grid-column: 1; grid-row: 1; width: auto; min-height: 0; margin: 0; padding: 0.7rem 0.85rem; border-bottom: 1px solid var(--border); color: var(--club-green-dark); background: var(--surface-subtle); font: 650 0.9rem/1.45 var(--font-interface); overflow-wrap: anywhere; }
+  .eventCard .eventBody, .eventCard.eventCardCompact .eventBody { display: grid; grid-template-columns: minmax(0, 1fr); grid-column: 1; grid-row: 2; padding: 0.85rem; gap: 0.65rem; }
+  .eventCard .eventBody > *, .eventCard.eventCardCompact .eventBody > * { grid-column: 1; grid-row: auto; }
+  .eventCard .eventBody > .metadata { display: none; }
+  .eventCard .actions > a { width: 100%; min-height: 44px; }
+}
+
+.filters { grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); }
+.filters > * { min-width: 0; }
+
+.filters select { width: 100%; min-width: 0; max-width: 100%; }
+@media (max-width: 48rem) {
+  .filters > label, .filters > fieldset, .filters > a, .filters > span { grid-column: 1 / -1; grid-row: auto; justify-self: stretch; }
+  .sportSegments { grid-template-columns: repeat(auto-fit, minmax(min(100%, 4rem), 1fr)); }
+}
+@media (max-width: 42rem) {
+  .capacityPanel.capacityClarity { grid-template-columns: 1.9rem minmax(0, 1fr) minmax(0, 0.85fr); }
+  .capacityPanel.capacityClarity .capacityAvailability { grid-column: 3; grid-row: 1; }
+  .capacityPanel.capacityClarity .waitlistCount { grid-row: 2; }
+}
+@container (max-width: 18rem) {
+  .capacityPanel.capacityClarity { grid-template-columns: 1.9rem minmax(0, 1fr); }
+  .capacityPanel.capacityClarity .capacityAvailability { grid-column: 2; grid-row: 2; }
+  .capacityPanel.capacityClarity .waitlistCount { grid-row: 3; }
+}
+
+.eventCard .actions a > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+@container (max-width: 12rem) {
+  .capacityPanel.capacityClarity { grid-template-columns: minmax(0, 1fr); }
+  .capacityPanel.capacityClarity .capacityRing { grid-column: 1; grid-row: 1; }
+  .capacityPanel.capacityClarity .capacityNumbers { grid-column: 1; grid-row: 2; }
+  .capacityPanel.capacityClarity .capacityAvailability { grid-column: 1; grid-row: 3; }
+  .capacityPanel.capacityClarity .waitlistCount { grid-column: 1; grid-row: 4; }
+  .eventCard .actions a { padding-inline: 0.55rem; gap: 0.4rem; }
+  .eventCard .actions a > span[aria-hidden] { display: none; }
+}

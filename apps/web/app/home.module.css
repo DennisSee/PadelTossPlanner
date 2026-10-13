@@ -386,3 +386,17 @@
 }
 
 @media (min-width: 48rem) { .lead { max-width: min(42rem, 55%); } }
+
+.heroLines { opacity: 0.7; }
+
+.topbar { flex-wrap: wrap; }
+
+.intro { container-type: inline-size; }
+.introContent { min-width: 0; }
+.intro a { max-width: 100%; }
+.intro a > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+@container (max-width: 12rem) {
+  .title { max-width: 100%; overflow-wrap: anywhere; }
+  .intro a { padding-inline: 0.55rem; }
+  .intro a > span[aria-hidden] { display: none; }
+}

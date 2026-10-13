@@ -113,7 +113,7 @@
 
 .controlSurface {
   display: grid;
-  grid-template-columns: minmax(14rem, 22rem) minmax(0, 1fr);
+  grid-template-columns: minmax(0, min(22rem, 50%)) minmax(0, 1fr);
   gap: var(--space-4);
   margin-top: var(--space-4);
   align-items: start;
@@ -831,3 +831,26 @@
   .personalScheduleDetail .focusTeams { grid-column: 2; grid-row: 5; margin: 0; }
   .personalScheduleDetail > button { grid-column: 1 / -1; justify-self: start; }
 }
+
+/* Structured teams are scoped to the Everyone round board. */
+.boardMatch { gap: 0.55rem; padding-block: 0.35rem; }
+.boardMatch .court { border-color: var(--border); background: var(--surface-subtle); color: var(--club-green-dark); font-size: 0.95rem; }
+.boardMatchup { gap: 0.75rem; font-size: 0.95rem; line-height: 1.4; align-items: start; }
+.boardMatchup > :first-child, .boardMatchup > :last-child { text-align: left; }
+.boardTeamLabel { display: block; margin-bottom: 0.15rem; color: var(--text-muted); font-size: 0.7rem; font-weight: 500; }
+.boardTeam .teamNamePart { display: block; }
+.boardTeam .teamSeparator { display: none; }
+.boardMatchup .versus { align-self: center; padding: 0.2rem 0.35rem; border-radius: 999px; background: var(--surface-subtle); font-size: 0.7rem; }
+@media (max-width: 30rem) {
+  .boardMatchup { grid-template-columns: minmax(0, 1fr); gap: 0.3rem; }
+  .boardMatchup .versus { justify-self: start; padding: 0; background: transparent; }
+  .boardTeamColumn { min-width: 0; }
+  .boardTeam .teamNamePart { display: inline; }
+  .boardTeam .teamNamePart + .teamNamePart::before { content: " · "; color: var(--text-muted); }
+}
+
+.topbar { flex-wrap: wrap; }
+
+.roundCard { container-type: inline-size; }
+@media (max-width: 30rem) { .boardMatchup:not(.boardLongTeams) { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); } }
+@container (max-width: 14rem) { .boardMatchup:not(.boardLongTeams) { grid-template-columns: minmax(0, 1fr); } }

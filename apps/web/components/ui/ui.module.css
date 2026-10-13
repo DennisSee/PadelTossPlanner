@@ -569,3 +569,8 @@
     padding-inline: 1rem;
   }
 }
+
+/* Let enlarged text reflow the existing header instead of squeezing the brand. */
+.header { flex: 1 1 12rem; }
+.navigation { min-width: 0; max-width: 100%; }
+.desktopNavigation { flex-wrap: wrap; }

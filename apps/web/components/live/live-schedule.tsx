@@ -181,12 +181,12 @@ function RoundCard({
       </div>
       <div className={styles.matches}>
         {round.rows.map((row, index) => (
-          <div className={styles.match} key={`${row.Baan}-${index}`}>
+          <div className={`${styles.match} ${styles.boardMatch}`} key={`${row.Baan}-${index}`}>
             <CourtBadge court={row.Baan} />
-            <div className={styles.matchup}>
-              <TeamNames team={row["Team 1"]} />
+            <div className={`${styles.matchup} ${styles.boardMatchup} ${[row["Team 1"], row["Team 2"]].flatMap((team) => team.split(" & ")).some((name) => name.trim().length > 28) ? styles.boardLongTeams : ""}`}>
+              <div className={styles.boardTeamColumn}><span className={styles.boardTeamLabel}>Team A</span><TeamNames team={row["Team 1"]} stacked /></div>
               <span className={styles.versus}>vs</span>
-              <TeamNames team={row["Team 2"]} />
+              <div className={styles.boardTeamColumn}><span className={styles.boardTeamLabel}>Team B</span><TeamNames team={row["Team 2"]} stacked /></div>
             </div>
           </div>
         ))}

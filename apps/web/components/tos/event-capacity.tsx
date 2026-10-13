@@ -18,7 +18,7 @@ export function EventCapacityPanel({
   const style = { "--occupancy": `${percentage}%` } as CSSProperties;
   return (
     <div
-      className={`${styles.capacityPanel} ${compact ? styles.capacityPanelCompact : ""} ${sport === "padel" ? styles.capacityPadel : styles.capacityTennis} ${capacity.availableCount === 0 ? styles.capacityFull : ""}`.trim()}
+      className={`${styles.capacityPanel} ${styles.capacityClarity} ${compact ? styles.capacityPanelCompact : ""}`.trim()}
       data-sport={sport}
       aria-label={`${occupied} van ${capacity.maxParticipants} plaatsen bezet`}
     >
@@ -27,7 +27,7 @@ export function EventCapacityPanel({
         <strong>{occupied} / {capacity.maxParticipants}</strong>
         <span>Plekken bezet</span>
       </div>
-      <p>{capacity.availableCount} {capacity.availableCount === 1 ? "plek" : "plekken"} vrij</p>
+      <p className={styles.capacityAvailability}>{capacity.availableCount === 0 ? <span className={styles.fullBadge}>Vol</span> : <>{capacity.availableCount} {capacity.availableCount === 1 ? "plek" : "plekken"} vrij</>}</p>
       {capacity.waitlistCount ? (
         <p className={styles.waitlistCount}>{capacity.waitlistCount} op wachtlijst</p>
       ) : null}

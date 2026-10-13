@@ -13,9 +13,11 @@ function isSelectedPlayer(name: string, selectedPlayer?: string): boolean {
 export function TeamNames({
   team,
   selectedPlayer,
+  stacked = false,
 }: {
   team: string;
   selectedPlayer?: string;
+  stacked?: boolean;
 }) {
   const names = team.split(TEAM_SEPARATOR).map((name) => name.trim()).filter(Boolean);
   if (names.length === 0) {
@@ -23,7 +25,7 @@ export function TeamNames({
   }
 
   return (
-    <span className={styles.teamNames}>
+    <span className={`${styles.teamNames} ${stacked ? styles.boardTeam : ""}`}>
       {names.map((name, index) => {
         const selected = isSelectedPlayer(name, selectedPlayer);
         return (

@@ -428,3 +428,9 @@
   .identityBanner, .nameAction { grid-template-columns: minmax(0, 1fr); }
   .nameTrigger { justify-self: start; }
 }
+
+.topbar { flex-wrap: wrap; }
+
+.pageHeaderTos { flex-wrap: wrap; }
+.pageHeaderTos .headerCopy { min-width: 0; max-width: 100%; }
+.pageHeaderTos h1 { overflow-wrap: anywhere; }
