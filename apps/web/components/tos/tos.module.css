@@ -1306,3 +1306,12 @@
   :is(.homePlaced, .homeOpen).eventCardCompact .compactAttendeePreview { grid-template-columns: auto minmax(0, 1fr); gap: 0.2rem 0.4rem; }
   :is(.homePlaced, .homeOpen).eventCardCompact .compactPeopleAction { grid-column: 1 / -1; max-width: none; white-space: nowrap; overflow-wrap: normal; }
 }
+
+/* Only the compact homepage capacity groups totals, full status and waitlist. */
+.capacityPanel.capacityClarity.capacityHomeGroup,
+.eventCardCompact .capacityPanel.capacityClarity.capacityHomeGroup { grid-template-columns: 2.6rem minmax(0, 1fr); align-items: center; }
+.capacityHomeGroup .capacityTotal { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-start; gap: 0.35rem 0.5rem; }
+.capacityHomeGroup .capacityNumbers { min-width: 0; text-align: left; }
+.capacityHomeGroup .capacityTotal .fullBadge { font-size: 0.8rem; line-height: 1.2; }
+.eventCardCompact .capacityPanel.capacityClarity.capacityHomeGroup .capacityNumbers .waitlistCount,
+.capacityPanel.capacityClarity.capacityHomeGroup .capacityNumbers .waitlistCount { grid-column: 1; grid-row: auto; margin: 0.2rem 0 0; padding: 0; border: 0; font-size: 0.8rem; text-align: left; }

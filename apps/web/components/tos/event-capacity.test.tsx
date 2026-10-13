@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { expect, it } from "vitest";
 import { EventCapacityPanel } from "./event-capacity";
 
@@ -9,6 +9,16 @@ it.each(["padel", "tennis"] as const)("shows full capacity as information while 
   expect(screen.getByText("Vol")).toBeVisible();
   expect(screen.getByText("4 op wachtlijst")).toBeVisible();
   expect(screen.queryByText(/plekken vrij/)).not.toBeInTheDocument();
+});
+
+it.each([0, 4])("groups the full home total and badge with %i waiting players", (waitlistCount) => {
+  render(<EventCapacityPanel sport="padel" compact hideFreePlaces capacity={{ maxParticipants: 15, placedCount: 15, availableCount: 0, waitlistCount }} />);
+  const total = screen.getByText("15 / 15");
+  expect(within(total.parentElement!).getByText("Vol")).toBeVisible();
+  const group = total.parentElement!.parentElement!;
+  expect(within(group).getByText("Plekken bezet")).toBeVisible();
+  if (waitlistCount) expect(within(group).getByText("4 op wachtlijst")).toBeVisible();
+  else expect(within(group).queryByText(/op wachtlijst/)).not.toBeInTheDocument();
 });
 
 it("keeps exact occupancy and free places for a non-full event", () => {
