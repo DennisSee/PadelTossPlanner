@@ -32,7 +32,7 @@ describe("TeamNames", () => {
 
   it("keeps database-like HTML as escaped React text", () => {
     const unsafeName = '<img src=x onerror="alert(1)">';
-    render(<TeamNames team={`${unsafeName} & Anna`} selectedPlayer={unsafeName} stacked />);
+    render(<TeamNames team={`${unsafeName} & Anna`} selectedPlayer={unsafeName} stacked avatars />);
     expect(screen.getByText(unsafeName, { exact: true })).toBeInTheDocument();
     expect(document.querySelector("img[src='x']")).not.toBeInTheDocument();
   });

@@ -9,7 +9,7 @@ for (const width of [360, 390, 1024, 1440]) {
     const current = page.locator("[data-personal-detail]");
     await expect(current.getByText("Nu spelen")).toBeVisible();
     await expect(current.getByRole("heading", { name: /Seppworks\/Bax/ })).toBeVisible();
-    await expect(current.getByText("Samen met")).toBeVisible();
+    await expect(current.getByText("Samen met")).toHaveClass("sr-only");
     await expect(page.getByRole("region", { name: "Volgende ronde" }).getByRole("button")).toBeVisible();
     await overflow();
     await page.screenshot({ path: info.outputPath(`active-${width}.png`), fullPage: true });
@@ -35,7 +35,8 @@ for (const width of [360, 390, 1024, 1440]) {
       await overflow();
       await page.screenshot({ path: info.outputPath(`${slug}-${width}.png`), fullPage: true });
       await page.getByLabel("Kies je naam").selectOption("Iedereen");
-      await expect(page.getByRole("button", { name: "Bekijk ronde 2", exact: true })).toHaveCount(0);
+      await expect(page.getByRole("navigation", { name: "Persoonlijke ronde kiezen", exact: true })).toHaveCount(0);
+      await expect(page.getByRole("navigation", { name: "Ronde kiezen", exact: true })).toBeVisible();
       await expect(page.getByRole("heading", { name: "Ronde 1" })).toBeVisible();
     }
     await page.goto("/login?next=%2Faccount");

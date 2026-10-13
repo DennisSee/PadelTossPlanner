@@ -90,9 +90,30 @@ describe("live schedule UI", () => {
 
     await user.selectOptions(select, "Zoë");
     expect(select).toHaveValue("Zoë");
-    expect(screen.getAllByText("Deze ronde speel je niet.").length).toBeGreaterThan(0);
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Jouw schema");
+    expect(screen.getByRole("button", { name: "Bekijk ronde 1" })).toHaveTextContent("Rust");
     expect(document.querySelectorAll('[data-selected-player="true"]').length).toBeGreaterThan(0);
     expect(window.localStorage.getItem("tc-zuid-tos/preferred-player:schedule-event")).toBe("Zoë");
+  });
+
+  it("selects rounds with keyboard and restores the complete published order", async () => {
+    render(<LiveSchedule schedule={schedule()} initialNowIso="2026-08-21T18:05:00.000Z" />);
+    const second = screen.getByRole("button", { name: "Bekijk ronde 2" });
+    second.focus();
+    await userEvent.keyboard("{Enter}");
+    expect(second).toHaveFocus();
+    expect(second).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("PlaySeat Baan", { exact: true })).toBeVisible();
+    expect(screen.queryByText("Kremer Baan", { exact: true })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Alle rondes" }));
+    expect([...document.querySelectorAll("[data-round-number]")].map((node) => node.getAttribute("data-round-number"))).toEqual(["1", "2"]);
+  });
+
+  it.each(["2026-08-21T17:00:00Z", "2026-08-21T19:00:00Z"])("does not invent an active round when browsing a non-live schedule at %s", async (timestamp) => {
+    render(<LiveSchedule schedule={schedule()} initialNowIso={timestamp} />);
+    await userEvent.click(screen.getByRole("button", { name: "Bekijk ronde 2" }));
+    expect(screen.queryByText(/Nu bezig/)).not.toBeInTheDocument();
+    expect(screen.getByText("PlaySeat Baan", { exact: true })).toBeVisible();
   });
 
   it("highlights an exact selected player in both teams without partial matches", async () => {
@@ -122,8 +143,9 @@ describe("live schedule UI", () => {
     expect(screen.getAllByText("Zoë", { exact: true }).length).toBeGreaterThan(0);
   });
 
-  it("renders compact court badges with their court labels", () => {
+  it("renders every court in the All rounds view", async () => {
     render(<LiveSchedule schedule={schedule()} initialNowIso="2026-08-21T18:05:00.000Z" />);
+    await userEvent.click(screen.getByRole("button", { name: "Alle rondes" }));
     const badges = screen.getAllByTestId("court-badge");
     expect(badges.length).toBeGreaterThan(0);
     expect(screen.getAllByText("Kremer Baan", { exact: true }).length).toBeGreaterThan(0);
@@ -145,15 +167,15 @@ describe("live schedule UI", () => {
 
     await user.selectOptions(select, "Rust Speler");
     expect(document.querySelector('[data-personal-status="rest"]')).toHaveTextContent(
-      "RustDeze ronde speel je niet.",
+      "Deze ronde speel je niet.",
     );
     await user.selectOptions(select, "Nog Niet Speler");
     expect(document.querySelector('[data-personal-status="not-arrived"]')).toHaveTextContent(
-      "Nog niet aanwezigJe bent deze ronde nog niet beschikbaar.",
+      "Je bent deze ronde nog niet beschikbaar.",
     );
     await user.selectOptions(select, "Niet Meer Speler");
     expect(document.querySelector('[data-personal-status="unavailable"]')).toHaveTextContent(
-      "Niet meer beschikbaarDeze ronde valt na jouw eindtijd.",
+      "Deze ronde valt na jouw eindtijd.",
     );
   });
 
@@ -231,7 +253,7 @@ describe("live schedule UI", () => {
     const select = screen.getByLabelText("Kies je naam");
     await user.selectOptions(select, "Zoë");
     expect(select).toHaveValue("Zoë");
-    expect(screen.getAllByText("Deze ronde speel je niet.").length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: "Bekijk ronde 1" })).toHaveTextContent("Rust");
   });
 
   it("uses the in-memory fallback when reads and writes are blocked", async () => {
@@ -289,13 +311,18 @@ describe("live schedule UI", () => {
 
   it("renders database-like HTML names as escaped React text", () => {
     const unsafeName = '<img src=x onerror="alert(1)">';
+    const data = schedule([unsafeName]);
+    data.rows[0].Baan = unsafeName;
+    data.rows[0]["Team 1"] = `${unsafeName} & Anna`;
+    data.rows[0].Rust = unsafeName;
     render(
       <LiveSchedule
-        schedule={schedule([unsafeName])}
+        schedule={data}
         initialNowIso="2026-08-21T17:55:00.000Z"
       />,
     );
     expect(screen.getAllByText(unsafeName).length).toBeGreaterThan(0);
+    expect(screen.getByTestId("court-badge")).toHaveAttribute("title", unsafeName);
     expect(document.querySelector("img[src='x']")).not.toBeInTheDocument();
   });
 });

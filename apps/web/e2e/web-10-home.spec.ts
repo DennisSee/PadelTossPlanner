@@ -48,10 +48,10 @@ async function noHorizontalOverflow(page: Page) {
 
 test("home kiest de eerstvolgende geplaatste registratie", async ({ page, request }) => {
   await signInHome(page, request, email("dashboard-web10"));
-  await expect(page.getByRole("heading", { level: 1, name: "Je volgende TOS staat klaar." })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Jouw TOS-momenten staan klaar" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Bekijk je inschrijvingen" })).toHaveAttribute("href", "#home-enrollments");
   await expect(page.getByRole("heading", { name: "Andere open TOS-momenten" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Aanmelding wijzigen" }).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: "Mijn aanmelding" }).first()).toBeVisible();
   await expect(page.getByText("✓ Je bent geplaatst")).toHaveCount(2);
   await expect(page.getByText(/Je doet mee/u)).toHaveCount(0);
   await expect(page.getByRole("heading", { level: 3 })).toHaveCount(4);
@@ -79,12 +79,12 @@ test("home toont na sluiting zonder publicatie alleen de eventstatus", async ({ 
     data: { email: address, state: "closed" },
   })).ok()).toBe(true);
   await signInHome(page, request, address);
-  await expect(page.getByRole("heading", { level: 1, name: "Je plaats staat vast." })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Bekijk TOS" }).first()).toHaveAttribute("href", "/tos/vrijdag-padel");
+  await expect(page.getByRole("heading", { level: 1, name: "Je volgende TOS staat klaar" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Mijn aanmelding" }).first()).toHaveAttribute("href", "/tos/vrijdag-padel");
   await expect(page.getByText("Schema volgt", { exact: true })).toBeVisible();
   await expect(page.getByRole("region", { name: "Jouw inschrijving" }).getByRole("heading", { level: 3 })).toHaveCount(1);
   await expect(page.getByRole("region", { name: "Andere open TOS-momenten" }).getByRole("heading", { name: "Padel TOS vrijdagavond" })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Aanmelding wijzigen" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Opnieuw aanmelden" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Bekijk je schema" })).toHaveCount(0);
   await noHorizontalOverflow(page);
 });
@@ -95,9 +95,9 @@ test("home toont na sluiting uitsluitend een echt gepubliceerd schema", async ({
     data: { email: address, state: "closed-published" },
   })).ok()).toBe(true);
   await signInHome(page, request, address);
-  await expect(page.getByRole("heading", { level: 1, name: "Je schema staat klaar." })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Je volgende TOS staat klaar" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Bekijk je schema" }).first()).toHaveAttribute("href", "/live/vrijdag-padel");
-  await expect(page.getByRole("link", { name: "Aanmelding wijzigen" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Opnieuw aanmelden" })).toHaveCount(0);
   await noHorizontalOverflow(page);
 });
 
@@ -108,8 +108,8 @@ test("home toont een wachtlijstregistratie met de juiste actie", async ({ page, 
   });
   expect(fixture.ok()).toBe(true);
   await signInHome(page, request, address);
-  await expect(page.getByRole("heading", { level: 1, name: "Je staat op de wachtlijst." })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Bekijk je status" }).first()).toHaveAttribute(
+  await expect(page.getByRole("heading", { level: 1, name: "Zin in een TOS?" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Mijn wachtlijstpositie" }).first()).toHaveAttribute(
     "href",
     "/tos/tennis-avond-2026",
   );
@@ -122,7 +122,7 @@ test("home houdt een gesloten wachtlijst op de statusroute", async ({ page, requ
     data: { email: address, state: "waitlist-closed" },
   })).ok()).toBe(true);
   await signInHome(page, request, address);
-  await expect(page.getByRole("link", { name: "Bekijk je status" }).first()).toHaveAttribute(
+  await expect(page.getByRole("link", { name: "Mijn wachtlijstpositie" }).first()).toHaveAttribute(
     "href", "/tos/tennis-avond-2026",
   );
   await expect(page.getByRole("link", { name: "Bekijk je schema", exact: true })).toHaveCount(0);
@@ -132,7 +132,7 @@ test("home houdt een gesloten wachtlijst op de statusroute", async ({ page, requ
 
 test("home valt terug op de eerste open TOS", async ({ page, request }) => {
   await signInHome(page, request, email("home-open"));
-  await expect(page.getByRole("heading", { level: 1, name: "ZIN IN EEN TOS?" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Zin in een TOS?" })).toBeVisible();
   await expect(page.getByRole("link", { name: "BEKIJK TOS-MOMENTEN" })).toHaveAttribute("href", "/tos");
   await expect(page.getByRole("link", { name: "Aanmelden" }).first()).toHaveAttribute(
     "href",
@@ -148,7 +148,7 @@ test("home heeft een rustige lege participantstate", async ({ page, request }) =
   });
   expect(fixture.ok()).toBe(true);
   await signInHome(page, request, address);
-  await expect(page.getByRole("heading", { level: 1, name: "ZIN IN EEN TOS?" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Zin in een TOS?" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Geen aankomende TOS-momenten" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Bekijk alle TOS-momenten" })).toHaveAttribute("href", "/tos");
   await expect(page.getByRole("heading", { level: 3 })).toHaveCount(0);
@@ -167,6 +167,6 @@ test("home toont alle open TOS-momenten op dezelfde dag in tijdsvolgorde", async
     "Tennis TOS voor alle clubleden",
     "TOS over middernacht met een extra lange titel die veilig moet afbreken op mobiel",
   ]);
-  await expect(page.getByRole("link", { name: "Op wachtlijst" })).toHaveAttribute("href", "/tos/tennis-avond-2026");
+  await expect(page.getByRole("link", { name: "Aanmelden" })).toHaveAttribute("href", "/tos/tennis-avond-2026");
   await noHorizontalOverflow(page);
 });

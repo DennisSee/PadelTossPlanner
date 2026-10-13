@@ -21,7 +21,8 @@ it("shows the first playing round for a non-live schedule, then selects a differ
   expect(button).toHaveAttribute("aria-pressed", "true");
   const detail = screen.getByRole("article", { name: "Geselecteerde ronde: Kremer" });
   expect(within(detail).getByText("Yvo")).toBeVisible();
-  expect(within(detail).getByText("Niels & Bram")).toBeVisible();
+  expect(within(detail).getByText("Niels", { exact: true })).toBeVisible();
+  expect(within(detail).getByText("Bram", { exact: true })).toBeVisible();
   expect(within(detail).getByText("19:50–20:10")).toBeVisible();
 });
 
@@ -29,6 +30,10 @@ it("keeps the authoritative current rest and next round, with no invented court"
   render(<PersonalSchedule rounds={rounds} active currentId="1" nextId="2" playerName="Dennis" />);
   const current = screen.getByRole("article", { name: "Nu: Rust" });
   expect(within(current).getByText("Nu rust")).toBeVisible();
+  expect(within(current).queryByRole("heading", { name: "Rust" })).not.toBeInTheDocument();
+  expect(within(current).queryByText("Rust", { exact: true })).not.toBeInTheDocument();
+  expect(within(screen.getByRole("button", { name: "Bekijk ronde 1" })).getAllByText("Rust", { exact: true })).toHaveLength(1);
+  expect(within(screen.getByRole("button", { name: "Bekijk ronde 1" })).queryByText("Deze ronde speel je niet.")).not.toBeInTheDocument();
   expect(within(current).queryByText("BAAN")).not.toBeInTheDocument();
   await userEvent.click(screen.getByRole("button", { name: "Bekijk ronde 3" }));
   expect(screen.queryByText("Nu spelen")).not.toBeInTheDocument();

@@ -42,7 +42,7 @@ export function ParticipantsSheet({
   return (
     <>
       <button className={`${styles.peopleTrigger} ${triggerContent ? styles.peopleTriggerCompact : ""}`.trim()} type="button" onClick={() => dialog.current?.showModal()}>
-        {triggerContent ?? <>Bekijk deelnemers <span aria-hidden="true">›</span></>}
+        {triggerContent ?? <>Bekijk deelnemers <span aria-hidden="true">→</span></>}
       </button>
       <dialog className={styles.peopleDialog} ref={dialog} aria-labelledby={`people-${event.id}`}>
         <div className={styles.dialogHandle} aria-hidden="true" />

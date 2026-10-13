@@ -17,8 +17,9 @@ it("selects the exact opaque own key despite duplicate names and permits Everyon
   const current = screen.getByRole("article", { name: "Nu: Kremer Baan" });
   expect(current.className).toContain("personalFocusCurrent");
   expect(screen.getByRole("article", { name: "Hierna: Kremer Baan" }).className).not.toContain("personalFocusCurrent");
-  expect(within(current).getByText("Dezelfde Naam", { selector: "dd" })).toBeInTheDocument();
-  expect(current).toHaveTextContent("Speler 2 & Speler 3");
+  expect(current.querySelectorAll('[data-player-name="Dezelfde Naam"]')).toHaveLength(3);
+  expect(within(current).getByText("Speler 2", { exact: true })).toBeVisible();
+  expect(within(current).getByText("Speler 3", { exact: true })).toBeVisible();
   expect(screen.getAllByRole("article")).toHaveLength(2);
   expect(within(current).getByText("Nu spelen")).toBeVisible();
   expect(within(current).getByText("BAAN")).toBeVisible();

@@ -77,8 +77,9 @@ export function RegistrationForm({
           />
         </label>
       </div>
+      {existing ? <p className={styles.muted}>Wijzig hier je tijden of kies ‘Ik doe niet mee’ om je af te melden.</p> : null}
       <button className={styles.primaryButton} type="submit">
-        {existing ? "Aanmelding wijzigen" : waitlistExpected ? "Aanmelden voor wachtlijst" : "Aanmelden"}
+        {existing ? "Wijzigingen opslaan" : waitlistExpected ? "Aanmelden voor wachtlijst" : "Aanmelden"}
       </button>
     </form>
   );

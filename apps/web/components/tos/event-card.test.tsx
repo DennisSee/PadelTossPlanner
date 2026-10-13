@@ -28,6 +28,37 @@ const declined: OwnRegistration = {
 };
 
 describe("participant TOS cards", () => {
+  it.each([
+    ["placed", "2026-08-20T12:00:00Z", "Mijn aanmelding"],
+    ["placed", "2026-08-21T17:00:01Z", "Mijn aanmelding"],
+    ["waitlist", "2026-08-21T17:00:01Z", "Mijn wachtlijstpositie"],
+  ] as const)("keeps %s navigation truthful at %s", (placementStatus, now, label) => {
+    render(<TosEventCard event={event}
+      registration={{ ...declined, response: "attending", availableFrom: event.startsAt, availableUntil: event.endsAt }}
+      registrationPosition={{ placementStatus, waitlistPosition: placementStatus === "waitlist" ? 2 : null }}
+      capacity={{ maxParticipants: 24, placedCount: 24, availableCount: 0, waitlistCount: 2 }}
+      attendance={[]} now={new Date(now)} />);
+    expect(screen.getByRole("link", { name: label })).toHaveAttribute("href", "/tos/vrijdag-padel");
+    if (placementStatus === "waitlist") expect(screen.queryByText(/✓.*Geplaatst/u)).not.toBeInTheDocument();
+  });
+
+  it("links an unregistered closed event to its detail without offering signup", () => {
+    render(<TosEventCard event={event}
+      capacity={{ maxParticipants: 24, placedCount: 0, availableCount: 24, waitlistCount: 0 }}
+      attendance={[]} now={new Date("2026-08-21T17:00:01Z")} />);
+    expect(screen.getByRole("link", { name: "Bekijk TOS" })).toHaveAttribute("href", "/tos/vrijdag-padel");
+    expect(screen.queryByRole("link", { name: "Aanmelden" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the full deadline date and time in the compact home caption", () => {
+    const { container } = render(<TosEventCard event={event} homeView compact
+      capacity={{ maxParticipants: 24, placedCount: 2, availableCount: 22, waitlistCount: 0 }}
+      attendance={[]} now={new Date("2026-08-20T12:00:00Z")} />);
+    const deadline = container.querySelector(`time[datetime="${event.signupDeadline}"]`);
+    expect(deadline).toHaveTextContent("Inschrijven tot 21 aug 2026 · 19:00");
+    expect(deadline).toHaveAttribute("title", "vrijdag 21 augustus 2026 · 19:00");
+  });
+
   it("groups participant information and the primary action in one column", () => {
     render(
       <TosEventCard
@@ -107,7 +138,7 @@ describe("participant TOS cards", () => {
       />,
     );
     expect(screen.getByText("Afgemeld")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Aanmelding wijzigen" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Opnieuw aanmelden" })).toBeInTheDocument();
   });
 
   it("does not offer a misleading action after the deadline", () => {
@@ -121,8 +152,8 @@ describe("participant TOS cards", () => {
       />,
     );
     expect(screen.getByText("Deze aanmelding kan niet meer worden gewijzigd.")).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Aanmelding wijzigen" })).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Aanmelding bekijken" })).toHaveAttribute(
+    expect(screen.queryByRole("link", { name: "Opnieuw aanmelden" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Bekijk TOS" })).toHaveAttribute(
       "href",
       "/tos/vrijdag-padel",
     );
@@ -141,7 +172,7 @@ describe("participant TOS cards", () => {
     />);
     expect(screen.getAllByText("2 / 2")[0]).toBeVisible();
     expect(screen.getByText("1 op wachtlijst")).toBeVisible();
-    expect(screen.getByRole("link", { name: "Op wachtlijst" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Aanmelden" })).toHaveAttribute(
       "href",
       "/tos/vrijdag-padel",
     );
@@ -164,7 +195,7 @@ describe("participant TOS cards", () => {
       now={new Date("2026-08-20T12:00:00Z")}
     />);
     expect(screen.getByText("Wachtlijst · plek 2")).toBeVisible();
-    expect(screen.getByRole("link", { name: "Aanmelding wijzigen" })).toBeVisible();
+    expect(screen.getByRole("link", { name: "Mijn wachtlijstpositie" })).toBeVisible();
   });
 
   it("uses a compact home hierarchy without the duplicate availability sentence", () => {

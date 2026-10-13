@@ -8,10 +8,12 @@ export function EventCapacityPanel({
   capacity,
   sport,
   compact = false,
+  hideFreePlaces = false,
 }: {
   capacity: EventCapacity;
   sport: Sport;
   compact?: boolean;
+  hideFreePlaces?: boolean;
 }) {
   const occupied = capacity.placedCount;
   const percentage = Math.min(100, Math.round((occupied / capacity.maxParticipants) * 100));
@@ -27,7 +29,7 @@ export function EventCapacityPanel({
         <strong>{occupied} / {capacity.maxParticipants}</strong>
         <span>Plekken bezet</span>
       </div>
-      <p className={styles.capacityAvailability}>{capacity.availableCount === 0 ? <span className={styles.fullBadge}>Vol</span> : <>{capacity.availableCount} {capacity.availableCount === 1 ? "plek" : "plekken"} vrij</>}</p>
+      {!hideFreePlaces || capacity.availableCount === 0 ? <p className={styles.capacityAvailability}>{capacity.availableCount === 0 ? <span className={styles.fullBadge}>Vol</span> : <>{capacity.availableCount} {capacity.availableCount === 1 ? "plek" : "plekken"} vrij</>}</p> : null}
       {capacity.waitlistCount ? (
         <p className={styles.waitlistCount}>{capacity.waitlistCount} op wachtlijst</p>
       ) : null}

@@ -32,13 +32,13 @@ function presentation(
 describe("truthful status-aware homepage presentation", () => {
   it("keeps an editable placed registration on its participant route", () => {
     const value = presentation("future-placed");
-    expect(value.action).toMatchObject({ href: "/tos/vrijdag-padel", label: "Bekijk je aanmelding" });
-    expect(value.cardAction).toMatchObject({ href: "/tos/vrijdag-padel", label: "Aanmelding wijzigen" });
+    expect(value.action).toMatchObject({ href: "/tos/vrijdag-padel", label: "Mijn aanmelding" });
+    expect(value.cardAction).toMatchObject({ href: "/tos/vrijdag-padel", label: "Mijn aanmelding" });
   });
 
   it("uses event status after close when no published schedule exists", () => {
     const value = presentation("future-placed", { now: editClosed });
-    expect(value.action).toMatchObject({ href: "/tos/vrijdag-padel", label: "Bekijk TOS", status: "Schema volgt" });
+    expect(value.action).toMatchObject({ href: "/tos/vrijdag-padel", label: "Mijn aanmelding", status: "Schema volgt" });
     expect(value.cardAction).toEqual(value.action);
     expect(JSON.stringify(value)).not.toContain("Aanmelding wijzigen");
     expect(JSON.stringify(value)).not.toContain("Bekijk je schema");
@@ -60,7 +60,7 @@ describe("truthful status-aware homepage presentation", () => {
   it("keeps waitlist states on the status route before and after close", () => {
     for (const now of [editOpen, editClosed]) {
       const value = presentation("future-waitlist", { now });
-      expect(value.action).toEqual({ href: "/tos/vrijdag-padel", label: "Bekijk je status" });
+      expect(value.action).toEqual({ href: "/tos/vrijdag-padel", label: "Mijn wachtlijstpositie" });
       expect(value.cardAction).toEqual(value.action);
     }
   });

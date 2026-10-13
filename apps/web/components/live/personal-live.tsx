@@ -14,14 +14,14 @@ export function PersonalLive({ identity, ownKey, now, slug, everyoneSchedule }: 
   return <section className={styles.personalLive} aria-label="Persoonlijk live-schema">
     <a className={styles.mobileLiveLink} href={`/live/${slug}#persoonlijk`}>Mijn live-schema →</a>
     <div id="persoonlijk" className={styles.personalPicker}>
-      <label htmlFor="live-person">Schema voor</label>
-      <select id="live-person" value={selected} onChange={(event) => setChoice(event.target.value)}>
+      <label htmlFor="live-person">Bekijk schema voor:</label>
+      <select id="live-person" aria-label="Schema voor" value={selected} onChange={(event) => setChoice(event.target.value)}>
         <option value="">Iedereen · volledig schema</option>
         {identity.players.map((player, index) => <option key={player.key} value={player.key}>{player.name}{identity.players.filter((peer) => peer.name === player.name).length > 1 ? ` · speler ${index + 1}` : ""}{player.key === ownKey ? " · jij" : ""}</option>)}
       </select>
     </div>
-    <p className={styles.identityName}>{identity.players.find((player) => player.key === selected)?.name}</p>
-    <p className={styles.hint} role="status">{current ? `Ronde ${current.number} is bezig.` : "Wachten op de volgende ronde."}</p>
+    <p className="sr-only">{identity.players.find((player) => player.key === selected)?.name}</p>
+    <p className="sr-only" role="status">{current ? `Ronde ${current.number} is bezig.` : "Wachten op de volgende ronde."}</p>
     {selected ? <PersonalSchedule key={selected} rounds={identity.rounds.flatMap<PersonalScheduleRound>((round) => {
       const slot = round.slots.find((slot) => slot.key === selected);
       if (!slot) return [];

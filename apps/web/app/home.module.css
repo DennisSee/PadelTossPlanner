@@ -400,3 +400,45 @@
   .intro a { padding-inline: 0.55rem; }
   .intro a > span[aria-hidden] { display: none; }
 }
+/* Approved Matchday composition: compact hero, energetic accents, real content. */
+.intro { min-height: 0; padding: clamp(1.1rem, 2.3vw, 1.8rem); border-radius: 1rem; background: linear-gradient(90deg, #003d2cf2 0%, #003d2cd9 48%, #003d2c22 100%), url('/matchday-court.svg') right center / cover, var(--club-green); }
+.introContent { gap: 0.5rem; }
+.heroLines { opacity: 0.16; }
+.title { max-width: min(100%, 22ch); font-size: clamp(2.2rem, 4.2vw, 3.4rem); line-height: 0.95; }
+.titleAccent { display: block; color: var(--club-yellow-soft); }
+.eyebrow { margin: 0; font-size: 0.82rem; letter-spacing: 0.02em; }
+.lead { margin: 0.2rem 0; font-size: 0.95rem; }
+.heroCue { margin: 0.2rem 0; background: transparent; padding: 0; color: var(--surface); font-size: 0.85rem; }
+.intro a { min-height: 44px; margin-top: 0.45rem; border-color: var(--club-yellow); background: var(--club-yellow-soft); color: var(--club-green-dark); text-transform: none; font-size: 1rem; box-shadow: 0 0.25rem 0.8rem #002c2026; }
+@media (max-width: 42rem) {
+  .intro { padding: 1.1rem; background-position: right center; }
+  .title { max-width: 17ch; font-size: clamp(2.05rem, 8.5vw, 2.8rem); }
+  .intro a { width: fit-content; max-width: 100%; padding: 0.65rem 0.8rem; }
+  .eyebrow { font-size: 0.72rem; }
+}
+@container (max-width: 12rem) { .title { max-width: 100%; overflow-wrap: anywhere; } }
+@media (max-width: 42rem) {
+  .intro { background-image: linear-gradient(90deg, #003d2cf5, #003d2caa), url('/matchday-court.svg'); }
+}
+/* Review round 2: compact hero without a single-event cue for plural placement. */
+.intro { padding: 1rem 1.2rem; }
+.introContent { gap: 0.3rem; max-width: 45rem; }
+.title { font-size: clamp(2rem, 3.5vw, 2.8rem); }
+.lead { font-size: 0.85rem; line-height: 1.4; margin: 0; }
+.heroCue { font-size: 0.8rem; }
+.intro a { margin-top: 0.35rem; padding: 0.6rem 0.85rem; }
+@media (max-width: 42rem) {
+  .intro { padding: 0.9rem 1rem; }
+  .title { font-size: clamp(2rem, 8.3vw, 2.6rem); }
+}
+
+/* Matchday title proportions without synthetic display-font emboldening. */
+.title { font-weight: 700; font-synthesis: none; line-height: 1.02; letter-spacing: 0.015em; }
+.introContent { gap: 0.35rem; }
+.intro a { font-weight: 650; }
+@media (max-width: 42rem) {
+  .intro { padding-block: 0.8rem; }
+  .title { font-size: clamp(1.95rem, 8.1vw, 2.5rem); }
+  .eyebrow { font-weight: 650; line-height: 1.3; }
+  .intro a { margin-top: 0.2rem; padding-block: 0.5rem; }
+}

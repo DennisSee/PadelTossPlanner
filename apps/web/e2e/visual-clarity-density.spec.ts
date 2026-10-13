@@ -34,8 +34,8 @@ for (const width of [360, 390, 1024, 1440]) {
         await expect(page.getByText("Vol", { exact: true }).first()).toBeVisible();
       } else if (label === "board") {
         await expect(page.getByLabel("Kies je naam")).toHaveValue("Iedereen");
-        await expect(page.getByText("Team A", { exact: true }).first()).toBeVisible();
-        await expect(page.getByText("Team B", { exact: true }).first()).toBeVisible();
+        await expect(page.getByLabel("Eerste team", { exact: true }).first()).toBeVisible();
+        await expect(page.getByLabel("Tweede team", { exact: true }).first()).toBeVisible();
       } else {
         await page.getByLabel("Kies je naam").selectOption("Dezelfde Naam");
         await expect(page.getByRole("article").getByRole("heading", { name: "Kremer Baan" })).toBeVisible();

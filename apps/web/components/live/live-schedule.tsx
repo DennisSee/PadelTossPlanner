@@ -27,7 +27,6 @@ import type {
   LiveRoundState,
   PersonalRound,
   PublicSchedule,
-  TimedRound,
 } from "../../lib/public-schedule/types";
 
 import styles from "./live-schedule.module.css";
@@ -112,6 +111,7 @@ function CourtBadge({ court, prominent = false }: { court: string; prominent?: b
     <span
       className={`${styles.court} ${prominent ? styles.focusCourtBadge : ""} ${courtClass(court)}`.trim()}
       data-testid="court-badge"
+      title={label}
     >
       {prominent ? <span className={styles.courtCaption}>BAAN</span> : <span className={styles.courtDot} aria-hidden="true" />}
       <span>{label}</span>
@@ -182,11 +182,11 @@ function RoundCard({
       <div className={styles.matches}>
         {round.rows.map((row, index) => (
           <div className={`${styles.match} ${styles.boardMatch}`} key={`${row.Baan}-${index}`}>
-            <CourtBadge court={row.Baan} />
-            <div className={`${styles.matchup} ${styles.boardMatchup} ${[row["Team 1"], row["Team 2"]].flatMap((team) => team.split(" & ")).some((name) => name.trim().length > 28) ? styles.boardLongTeams : ""}`}>
-              <div className={styles.boardTeamColumn}><span className={styles.boardTeamLabel}>Team A</span><TeamNames team={row["Team 1"]} stacked /></div>
-              <span className={styles.versus}>vs</span>
-              <div className={styles.boardTeamColumn}><span className={styles.boardTeamLabel}>Team B</span><TeamNames team={row["Team 2"]} stacked /></div>
+            <div className={styles.matchHeader}><CourtBadge court={row.Baan} /><span className={styles.matchTime}>{round.roundTime}</span></div>
+            <div className={`${styles.matchup} ${styles.boardMatchup}`}>
+              <div className={styles.boardTeamColumn} role="group" aria-label="Eerste team"><TeamNames team={row["Team 1"]} stacked avatars /></div>
+              <span className={styles.versus}>VS</span>
+              <div className={styles.boardTeamColumn} role="group" aria-label="Tweede team"><TeamNames team={row["Team 2"]} stacked avatars /></div>
             </div>
           </div>
         ))}
@@ -303,15 +303,7 @@ function FullSchedule({
 }) {
   if (selectedPlayer === EVERYONE) {
     return (
-      <div className={styles.grid}>
-        {groupScheduleRows(schedule.rows).map((round) => (
-          <RoundCard
-            key={`${round.roundNumber}-${round.roundTime}`}
-            round={round}
-            state={stateForRound(round.roundNumber, state)}
-          />
-        ))}
-      </div>
+      <GeneralRoundBoard schedule={schedule} state={state} />
     );
   }
 
@@ -337,22 +329,33 @@ function FullSchedule({
   );
 }
 
-function FocusRound({
-  round,
-  selectedPlayer,
-  state,
-}: {
-  round: TimedRound;
-  selectedPlayer: string;
-  state: "current" | "next";
-}) {
-  if (selectedPlayer === EVERYONE) {
-    return <RoundCard round={round} state={state} />;
-  }
-  const personal = personalScheduleRows(round.rows, selectedPlayer)[0];
-  return personal
-    ? <PersonalRoundCard round={personal} selectedPlayer={selectedPlayer} state={state} focus />
-    : null;
+function GeneralRoundBoard({ schedule, state }: { schedule: PublicSchedule; state: LiveRoundState }) {
+  const [chosen, setChosen] = useState<string | null>(null);
+  const rounds = groupScheduleRows(schedule.rows);
+  const current = state.kind === "current" ? state.current : null;
+  const next = state.kind === "current" || state.kind === "between" || state.kind === "before" ? state.next : null;
+  const selected = chosen === "all" ? "all" : rounds.find((round) => round.roundNumber === chosen)?.roundNumber
+    ?? current?.roundNumber ?? rounds[0]?.roundNumber;
+  const visible = selected === "all" ? rounds : rounds.filter((round) => round.roundNumber === selected);
+  return <div className={styles.matchdayBoard}>
+    <nav className={styles.roundNavigation} aria-label="Ronde kiezen">
+      {rounds.map((round) => <button key={round.roundNumber} type="button" aria-pressed={selected === round.roundNumber}
+        aria-label={`Bekijk ronde ${round.roundNumber}`} onClick={() => setChosen(round.roundNumber)}>
+        Ronde {round.roundNumber}{current?.roundNumber === round.roundNumber ? <small>Nu</small> : next?.roundNumber === round.roundNumber ? <small>Hierna</small> : null}
+      </button>)}
+      <button type="button" aria-pressed={selected === "all"} onClick={() => setChosen("all")}>Alle rondes</button>
+    </nav>
+    {current ? <div className="sr-only" role="status">Nu bezig · {current.roundTime}<span>Nog {state.kind === "current" ? state.remainingMinutes : 0} min</span></div> : null}
+    {state.kind === "before" || state.kind === "between" ? <LiveBanner title={state.kind === "before" ? "Het schema staat klaar" : "Volgende ronde komt eraan"}
+      text="Alle rondes zijn beschikbaar via de rondekiezer." countdown={`Start over ${state.startsInMinutes} min`} /> : null}
+    {state.kind === "after" ? <p className={styles.hint}>Afgelopen · alle rondes blijven bekijkbaar.</p> : null}
+    {state.kind === "untimed" ? <p className={styles.warning} role="status">Live-status kon niet worden bepaald; de rondetijden hebben een onbekend formaat.</p> : null}
+    <div className={styles.selectedRounds}>
+      {visible.map((round) => <section key={round.roundNumber} aria-label={current?.roundNumber === round.roundNumber ? "Huidige ronde" : next?.roundNumber === round.roundNumber ? "Volgende ronde" : `Wedstrijden ronde ${round.roundNumber}`}>
+        <RoundCard round={round} state={stateForRound(round.roundNumber, state)} />
+      </section>)}
+    </div>
+  </div>;
 }
 
 function LiveContent({
@@ -378,84 +381,7 @@ function LiveContent({
           partner: ownTeam.filter((_, index) => index !== selectedIndex).join(" & "), opponents: teamOne.some(matches) ? round.teamTwo : round.teamOne };
       })} />;
   }
-  if (state.kind === "untimed") {
-    return (
-      <>
-        <p className={styles.warning} role="status">
-          Live-status kon niet worden bepaald; de rondetijden hebben een onbekend formaat.
-        </p>
-        <FullSchedule schedule={schedule} selectedPlayer={selectedPlayer} state={state} />
-      </>
-    );
-  }
-  if (state.kind === "before") {
-    return (
-      <>
-        <LiveBanner
-          title="Het schema staat klaar"
-          text="Alle rondes zijn alvast zichtbaar."
-          countdown={`Start over ${state.startsInMinutes} min`}
-        />
-        <FullSchedule schedule={schedule} selectedPlayer={selectedPlayer} state={state} />
-      </>
-    );
-  }
-  if (state.kind === "after") {
-    return (
-      <>
-        <p className={styles.hint}>Alle rondes blijven hieronder zichtbaar.</p>
-        <FullSchedule schedule={schedule} selectedPlayer={selectedPlayer} state={state} />
-      </>
-    );
-  }
-
-  const current = state.kind === "current" ? state.current : null;
-  const next = state.next;
-  return (
-    <>
-      {state.kind === "between" ? (
-        <LiveBanner
-          title="Volgende ronde komt eraan"
-          text="Controleer alvast je baan en medespelers."
-          countdown={`Start over ${state.startsInMinutes} min`}
-        />
-      ) : null}
-      <div className={styles.liveGrid}>
-        {current ? (
-          <section
-            aria-label="Huidige ronde"
-            className={`${styles.livePanel} ${styles.currentPanel}`}
-          >
-            <div className={styles.panelHeading}>
-              <span>Nu bezig</span>
-              <span>Nog {state.kind === "current" ? state.remainingMinutes : 0} min</span>
-            </div>
-            <FocusRound round={current} selectedPlayer={selectedPlayer} state="current" />
-          </section>
-        ) : null}
-        {next ? (
-          <section
-            aria-label="Volgende ronde"
-            className={`${styles.livePanel} ${styles.nextPanel} ${
-              state.nextIsUrgent ? styles.urgentPanel : ""
-            }`.trim()}
-          >
-            <div className={styles.panelHeading}>
-              <span>{state.nextIsUrgent ? "Klaarmaken" : "Volgende ronde"}</span>
-              <span>{state.kind === "between" ? `Start over ${state.startsInMinutes} min` : "Hierna"}</span>
-            </div>
-            <FocusRound round={next} selectedPlayer={selectedPlayer} state="next" />
-          </section>
-        ) : null}
-      </div>
-      <Card className={styles.allRounds}>
-        <details open>
-          <summary>{selectedPlayer === EVERYONE ? "Alle rondes bekijken" : "Volledig schema"}</summary>
-          <FullSchedule schedule={schedule} selectedPlayer={selectedPlayer} state={state} />
-        </details>
-      </Card>
-    </>
-  );
+  return <GeneralRoundBoard schedule={schedule} state={state} />;
 }
 
 function eventStatus(state: LiveRoundState): { label: string; tone: "neutral" | "success" | "warning" } {
@@ -469,6 +395,15 @@ function eventStatus(state: LiveRoundState): { label: string; tone: "neutral" | 
     return { label: "Afgelopen", tone: "neutral" };
   }
   return { label: "Schema", tone: "neutral" };
+}
+
+function MetadataIcon({ kind }: { kind: "date" | "time" | "courts" | "players" }) {
+  return <svg className={styles.metadataIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    {kind === "date" ? <><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M7 3v4m10-4v4M3 11h18m-13 5h2m4 0h2" /></> : null}
+    {kind === "time" ? <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></> : null}
+    {kind === "courts" ? <><rect x="4" y="3" width="16" height="18" rx="1" /><path d="M8 3v18m8-18v18M4 12h16" /></> : null}
+    {kind === "players" ? <><circle cx="9" cy="7" r="3" /><path d="M3 21v-3a6 6 0 0 1 12 0v3M17 4a3 3 0 0 1 0 6m2 11v-3a6 6 0 0 0-2-4" /></> : null}
+  </svg>;
 }
 
 export function LiveSchedule({
@@ -498,6 +433,7 @@ export function LiveSchedule({
     ? Date.parse(schedule.eventStartsAt) <= now.getTime() && now.getTime() < Date.parse(schedule.eventEndsAt)
     : state.kind === "current" || state.kind === "between";
   const personal = currentEvent && ownPlayerKey && schedule.liveIdentity && schedule.liveIdentity.players.some((player) => player.key === ownPlayerKey);
+  const eventTitle = schedule.eventTitle ?? (currentEvent ? "Live TOS-schema" : "TOS-schema");
 
   return (
     <main className={styles.page}>
@@ -510,13 +446,12 @@ export function LiveSchedule({
         <Card className={styles.eventCard}>
           <CourtLines className={styles.eventLines} />
           <div className={styles.eventSummary} data-testid="event-summary">
-            <p className={styles.eventEyebrow}>{state.kind === "after" ? "Laatste schema" : state.kind === "before" ? "Volgende TOS" : "Wedstrijdprogramma"}</p>
-            <h1 className={styles.eventTitle}>{schedule.eventTitle ?? (currentEvent ? "Live TOS-schema" : "TOS-schema")}</h1>
-            <p className={styles.eventDate}>{formatEventDate(schedule.eventDate)}</p>
+            <h1 className={styles.eventTitle} title={eventTitle}>{personal || selectedPlayer !== EVERYONE ? "Jouw schema" : eventTitle}</h1>
+            <p className={styles.eventDate}><MetadataIcon kind="date" />{formatEventDate(schedule.eventDate)}</p>
             <p className={styles.eventMeta}>
-              <span>{schedule.startTime}–{schedule.endTime}</span>
-              <span>{schedule.courts.length} {schedule.courts.length === 1 ? "baan" : "banen"}</span>
-              <span>{participantCount} deelnemers</span>
+              <span><MetadataIcon kind="time" />{schedule.startTime}–{schedule.endTime}</span>
+              <span><MetadataIcon kind="courts" />{schedule.courts.length} {schedule.courts.length === 1 ? "baan" : "banen"}</span>
+              <span><MetadataIcon kind="players" />{participantCount} deelnemers</span>
             </p>
           </div>
           <div className={styles.eventStatus} data-testid="event-status">
@@ -524,12 +459,12 @@ export function LiveSchedule({
           </div>
         </Card>
 
-        {!currentEvent ? <p className={styles.noCurrent} role="status">Er is nu geen TOS bezig.{state.kind === "before" && schedule.eventSlug ? <> <a href={`/tos/${schedule.eventSlug}`}>Bekijk TOS →</a></> : null}</p> : null}
         {personal ? <PersonalLive key={`${schedule.id}-${ownPlayerKey}`} identity={schedule.liveIdentity!} ownKey={ownPlayerKey!} now={now} slug={schedule.eventSlug!} everyoneSchedule={<FullSchedule schedule={schedule} selectedPlayer={EVERYONE} state={state} />} /> : null}
-        <Card className={styles.controlSurface}>
-          {!personal ? <div className={styles.selectBlock}>
-            <label className={styles.label} htmlFor="player-select">Kies je naam</label>
+        {!personal ? <Card className={styles.controlSurface}>
+          <div className={styles.selectBlock}>
+            <label className={styles.label} htmlFor="player-select">Bekijk schema voor:</label>
             <select
+              aria-label="Kies je naam"
               className={styles.select}
               id="player-select"
               value={selectedPlayer}
@@ -540,22 +475,10 @@ export function LiveSchedule({
                 <option key={participant} value={participant}>{participant}</option>
               ))}
             </select>
-            <p className={styles.hint}>Alleen onthouden op dit apparaat.</p>
-          </div> : null}
-
-          <div className={styles.participants}>
-            <details>
-              <summary>Deelnemers ({participantCount})</summary>
-              <div className={styles.chips}>
-                {participants.map((participant) => (
-                  <span className={styles.chip} key={participant}>{participant}</span>
-                ))}
-              </div>
-            </details>
           </div>
-        </Card>
+        </Card> : null}
 
-        {!personal ? <h2 className={styles.scheduleTitle}>
+        {!personal ? <h2 className="sr-only">
           {personal || selectedPlayer === EVERYONE ? "Wedstrijdschema" : `Schema voor ${selectedPlayer}`}
         </h2> : null}
 
@@ -568,6 +491,11 @@ export function LiveSchedule({
         ) : null}
 
         <footer className={styles.footer}>
+          <details className={styles.secondaryParticipants}>
+            <summary>Deelnemers ({participantCount})</summary>
+            <div className={styles.chips}>{participants.map((participant) => <span className={styles.chip} key={participant}>{participant}</span>)}</div>
+          </details>
+          {!currentEvent ? <p className={styles.noCurrent} role="status">Er is nu geen TOS bezig.{state.kind === "before" && schedule.eventSlug ? <> <a href={`/tos/${schedule.eventSlug}`}>Bekijk TOS →</a></> : null}</p> : null}
           <button className={styles.refreshButton} type="button" onClick={() => window.location.reload()}>Schema verversen</button>
           <p>De rondeklok loopt automatisch door. Ververs voor wijzigingen in de publicatie.</p>
           Gepubliceerd door {schedule.createdByName || "T.C. Zuid"} · {formatCreatedAt(schedule.createdAt)}

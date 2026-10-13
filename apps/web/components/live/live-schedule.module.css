@@ -814,7 +814,7 @@
 .compactRoundTime { display: block; color: var(--text-muted); font-size: 0.85rem; }
 .compactRoundCourt { color: var(--club-green-dark); }
 .compactRoundPartner { font-size: 0.9rem; }
-.compactNext { margin-top: 0.75rem; padding-left: 0.5rem; border-left: 0.25rem solid var(--club-yellow); }
+.compactNext { margin-top: 0.75rem; }
 .roundStatus { color: var(--club-green-dark); font-weight: 700; }
 @media (max-width: 42rem) {
   .compactRound { grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 0.4rem 0.75rem; }
@@ -854,3 +854,270 @@
 .roundCard { container-type: inline-size; }
 @media (max-width: 30rem) { .boardMatchup:not(.boardLongTeams) { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); } }
 @container (max-width: 14rem) { .boardMatchup:not(.boardLongTeams) { grid-template-columns: minmax(0, 1fr); } }
+/* Matchday round navigation and cards: presentation only. */
+.eventCard { border-radius: 1rem; background: linear-gradient(90deg, #003d2cf5 0%, #003d2cdc 52%, #003d2c22 100%), url('/matchday-court.svg') right center / cover, var(--club-green); padding: 1.2rem; }
+.eventLines { opacity: 0.15; }
+.eventTitle { max-width: 23ch; font-size: clamp(2rem, 3.5vw, 3rem); line-height: 1; overflow-wrap: anywhere; }
+.eventDate { font-size: 1rem; }
+.eventEyebrow { font-size: 0.8rem; }
+.controlSurface { border-color: #bedbcc; border-radius: 0.8rem; }
+.roundNavigation { display: flex; gap: 0.55rem; overflow-x: auto; padding: 0.35rem 0.2rem 0.7rem; margin: 0.5rem 0 0.8rem; scroll-padding-inline: 0.4rem; }
+.roundNavigation button { flex: 0 0 auto; min-width: 7.2rem; min-height: 44px; padding: 0.6rem 1rem; border: 1px solid #b5d2c4; border-radius: 999px; background: var(--success-soft); color: var(--club-green-dark); font: inherit; font-weight: 700; cursor: pointer; }
+.roundNavigation button[aria-pressed="true"] { background: var(--club-green); color: white; border: 3px solid var(--club-yellow); padding: calc(0.6rem - 2px) calc(1rem - 2px); box-shadow: 0 0.25rem 0.6rem #004b3615; }
+.roundNavigation small { display: block; font-size: 0.7rem; }
+.activeRoundBanner { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.4rem; padding: 0.7rem 1rem; margin-bottom: 1rem; border-radius: 0.75rem; background: var(--club-yellow-soft); color: var(--club-green-dark); font-weight: 800; }
+.activeRoundBanner span { font-size: 0.8rem; align-self: center; font-weight: 600; }
+.selectedRounds { display: grid; gap: 1.3rem; }
+.matchdayBoard .roundCard { padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.matchdayBoard .roundHeader { padding: 0 0.25rem 0.55rem; }
+.matchdayBoard .matches { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.8rem; }
+.matchdayBoard .boardMatch { display: block; margin: 0; padding: 1rem; border: 1px solid #d4e3da; border-radius: 0.85rem; background: var(--surface); box-shadow: 0 0.45rem 1.1rem #004b360c; }
+.matchHeader { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: space-between; align-items: start; margin-bottom: 0.7rem; }
+.boardMatch .court { display: block; max-width: 100%; border: 0; border-radius: 0.45rem; padding: 0.4rem 0.75rem; color: white; background: var(--club-green); font-size: 1rem; line-height: 1.35; }
+.boardMatch .courtDot { display: none; }
+.matchTime { font-size: 0.8rem; color: var(--text-muted); }
+.boardMatchup { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 0.65rem; align-items: center; font-size: 0.95rem; }
+.boardTeamColumn { min-width: 0; }
+.avatarTeam { display: grid; gap: 0.4rem; }
+.avatarTeam .teamNamePart { display: flex; gap: 0.45rem; align-items: center; min-width: 0; }
+.avatarTeam .teamNamePart + .teamNamePart::before, .avatarTeam .teamSeparator { display: none; }
+.avatarTeam .teamNamePart > [data-player-name] { min-width: 0; overflow-wrap: anywhere; }
+.playerAvatar { flex: 0 0 auto; width: 1.9rem; height: 1.9rem; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; background: #dfefe5; color: var(--club-green-dark); font-size: 0.75rem; font-weight: 700; }
+.boardMatchup .versus, .personalVersus dd { padding: 0.45rem 0.5rem; margin: 0; border-radius: 0.5rem; background: var(--club-yellow-soft); color: var(--club-green-dark); font-size: 1rem; font-weight: 850; }
+.matchdayBoard .roundFooter { display: grid; gap: 0.4rem; margin-top: 0.75rem; border: 0; }
+.matchdayBoard .footerChip { display: block; border-radius: 0.65rem; padding: 0.65rem 0.85rem; background: #edf5ee; font-size: 0.85rem; }
+.matchdayBoard .restChip { background: var(--success-soft); }
+.personalScheduleDetail { display: block; border: 0; border-radius: 1rem; padding: 1.1rem; color: white; background: linear-gradient(110deg, #003d2c 45%, #00664bbb), url('/matchday-court.svg') right bottom / cover; box-shadow: 0 0.5rem 1.5rem #004b3620; }
+.personalScheduleDetail .focusHeading { color: white; }
+.personalScheduleDetail .personalFocusLabel { border-radius: 999px; padding: 0.4rem 0.8rem; background: var(--club-yellow-soft); color: var(--club-green-dark); font-size: 0.85rem; letter-spacing: 0; }
+.personalScheduleDetail .focusRound { background: transparent; color: white; }
+.personalScheduleDetail .focusCourt { border: 0; background: transparent; color: white; padding: 0.2rem 0; }
+.personalScheduleDetail .focusCourt h2 { margin: 0.1rem 0 0.5rem; font-family: var(--font-display); font-size: clamp(2.8rem, 5vw, 4.6rem); font-weight: 800; line-height: 1; }
+.personalScheduleDetail .personalFocusTime { margin: 0.3rem 0 0.6rem; font-weight: 700; }
+.personalScheduleDetail .roundStatus { color: white; }
+.personalScheduleDetail .focusTeams { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 0.65rem; padding: 1rem; margin: 0.8rem 0 0; border-radius: 0.8rem; background: var(--surface); color: var(--text); align-items: center; }
+.personalScheduleDetail .focusTeams dt { color: var(--club-green); text-transform: uppercase; font-weight: 750; }
+.personalScheduleDetail .focusTeams dd { color: var(--text); font-size: 0.95rem; }
+.personalScheduleDetail .focusTeams > div { min-width: 0; }
+.personalScheduleDetail > button { margin-top: 0.8rem; background: var(--surface); }
+.compactRound { border-radius: 0.7rem; border-color: #bfd9ca; background: var(--surface); }
+.compactRound[aria-pressed="true"] { border-color: var(--club-green); background: var(--success-soft); box-shadow: inset 0.25rem 0 var(--club-yellow); }
+.compactNext { padding: 0.7rem 0; }
+@media (max-width: 48rem) {
+  .matchdayBoard .matches { grid-template-columns: minmax(0, 1fr); }
+  .personalScheduleDetail .focusTeams { grid-template-columns: minmax(0, 1fr); padding: 0.8rem; }
+  .personalVersus { justify-self: start; }
+}
+@media (max-width: 30rem) {
+  .boardMatchup.boardLongTeams { grid-template-columns: minmax(0, 1fr); }
+  .boardMatchup .versus { justify-self: center; }
+  .boardMatchup.boardLongTeams .versus { justify-self: start; }
+  .matchdayBoard .boardMatch { padding: 0.8rem; }
+}
+@container (max-width: 14rem) { .boardMatchup, .boardMatchup:not(.boardLongTeams) { grid-template-columns: minmax(0, 1fr); } }
+/* Visual correction: two teams when readable, stack at narrow text widths. */
+.matchdayBoard .roundCard::before { display: none; }
+.personalScheduleDetail { container-type: inline-size; }
+@media (max-width: 48rem) {
+  .personalScheduleDetail .focusTeams { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
+  .personalScheduleDetail .focusTeams[data-long-teams="true"] { grid-template-columns: minmax(0, 1fr); }
+  .personalScheduleDetail .focusTeams .playerAvatar { width: 1.5rem; height: 1.5rem; font-size: 0.65rem; }
+  .personalScheduleDetail .focusTeams .avatarTeam .teamNamePart { gap: 0.3rem; }
+  .personalScheduleDetail .focusTeams dd { font-size: 0.85rem; }
+  .personalScheduleDetail .focusTeams dt { font-size: 0.75rem; }
+}
+@container (max-width: 18rem) { .personalScheduleDetail .focusTeams { grid-template-columns: minmax(0, 1fr); } }
+.compactRoundPartner[data-personal-status] > span { display: block; }
+
+/* Enlarged text responds to the matchcard width, not only the viewport. */
+.matchdayBoard .boardMatch { container-type: inline-size; }
+@media (max-width: 42rem) {
+  .eventCard { background-image: linear-gradient(90deg, #003d2cf5, #003d2caa), url('/matchday-court.svg'); }
+}
+/* Review round 2: task first, compact overview, full values in accessible titles. */
+.eventCard { grid-template-columns: minmax(0, 1fr) auto; gap: 0.4rem; padding: 0.75rem 0.9rem; margin-top: 0.65rem; }
+.eventTitle { font-size: clamp(1.45rem, 4.6vw, 2.2rem); line-height: 1.05; margin: 0 0 0.3rem; }
+.eventDate { display: inline; margin: 0; font-size: 0.8rem; color: var(--surface); }
+.eventMeta { display: inline-flex; margin: 0 0 0 0.6rem; gap: 0.3rem 0.6rem; font-size: 0.8rem; }
+.eventMeta span:not(:last-child)::after { margin-left: 0.6rem; }
+.eventStatus { max-width: 9rem; }
+.controlSurface { display: block; border: 0; box-shadow: none; background: transparent; padding: 0; margin: 0.6rem 0; }
+.selectBlock, .personalPicker { display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem 0.6rem; }
+.label, .personalPicker label { margin: 0; font-size: 0.8rem; font-weight: 650; }
+.select, .personalPicker select { flex: 1 1 10rem; width: auto; min-width: 0; max-width: 26rem; min-height: 44px; padding: 0.5rem 0.65rem; font-size: 0.9rem; }
+.personalLive { padding: 0; margin-top: 0.6rem; border: 0; background: transparent; }
+.personalPicker { margin: 0 0 0.6rem; }
+.page .personalLive .mobileLiveLink { display: none; }
+.secondaryParticipants { text-align: left; margin-bottom: 0.8rem; }
+.secondaryParticipants summary { display: list-item; min-height: 44px; padding: 0.6rem 0; font-size: 0.85rem; cursor: pointer; }
+.roundNavigation { margin: 0.3rem 0 0.45rem; padding-block: 0.4rem; gap: 0.4rem; }
+.roundNavigation button { min-width: 6.4rem; padding: 0.5rem 0.8rem; font-size: 0.9rem; }
+.roundNavigation button[aria-pressed="true"] { padding: calc(0.5rem - 2px) calc(0.8rem - 2px); }
+.roundNavigation small { display: inline; margin-left: 0.3rem; }
+.matchdayBoard .roundHeader { padding-bottom: 0.5rem; }
+.matchdayBoard .roundTitle { font-size: 1rem; }
+.roundCurrent .roundMeta > span:first-child { color: var(--club-green-dark); background: var(--club-yellow-soft); }
+.matchdayBoard .boardMatch { padding: 0.75rem; }
+.matchHeader { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.5rem; align-items: center; margin-bottom: 0.6rem; }
+.boardMatch .court { min-width: 0; max-width: 100%; justify-self: start; padding: 0.35rem 0.6rem; font-size: 0.9rem; }
+.boardMatch .court > span:last-child { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.matchTime { font-size: 0.72rem; white-space: nowrap; }
+.boardMatchup, .boardMatchup:not(.boardLongTeams) { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 0.45rem; }
+.boardMatchup .versus { justify-self: center; }
+.playerAvatar { width: 1.5rem; height: 1.5rem; font-size: 0.65rem; }
+.avatarTeam .teamNamePart { gap: 0.35rem; }
+.avatarTeam [data-player-name] > span { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; font-size: 0.9rem; line-height: 1.3; }
+.boardTeamColumn:last-child .teamNamePart { flex-direction: row-reverse; text-align: right; }
+.personalScheduleDetail { padding: 0.9rem; }
+.personalScheduleDetail .focusCourt h2 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: clamp(2.4rem, 5vw, 3.7rem); }
+.personalScheduleDetail .focusHeading { gap: 0.4rem; margin-bottom: 0.5rem; }
+.personalScheduleDetail .focusTeams { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 0.45rem; padding: 0.75rem; }
+.personalScheduleDetail .focusTeams > div:last-child .teamNamePart { flex-direction: row-reverse; text-align: right; }
+.compactRoundCourt { display: block; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.compactRoundPartner { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+@media (max-width: 42rem) {
+  .eventCard { grid-template-columns: minmax(0, 1fr); padding: 0.75rem 0.8rem; }
+  .eventSummary { padding-right: 0; }
+  .eventTitle { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; padding-right: 5.5rem; }
+  .eventStatus { position: absolute; top: 0.75rem; right: 0.65rem; max-width: 5.2rem; }
+  .eventStatus > span { font-size: 0.65rem; letter-spacing: 0; padding: 0.3rem 0.4rem; }
+  .eventMeta { margin-left: 0; display: flex; margin-top: 0.2rem; }
+  .eventMeta span:last-child { display: none; }
+  .eventMeta span:nth-last-child(2)::after { display: none; }
+  .matchdayBoard .matches { gap: 0.65rem; }
+  .personalScheduleDetail .focusTeams .avatarTeam [data-player-name] > span { font-size: 0.8rem; }
+}
+@container (max-width: 14rem) {
+  .boardMatchup, .boardMatchup:not(.boardLongTeams) { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 0.3rem; }
+  .matchHeader { grid-template-columns: minmax(0, 1fr); }
+  .playerAvatar { display: none; }
+}
+@container (max-width: 18rem) { .personalScheduleDetail .focusTeams { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); } }
+@container (max-width: 12rem) {
+  .personalScheduleDetail .focusTeams { grid-template-columns: minmax(0, 1fr); }
+  .boardMatchup, .boardMatchup:not(.boardLongTeams) { grid-template-columns: minmax(0, 1fr); }
+  .boardTeamColumn:last-child .teamNamePart { flex-direction: row; text-align: left; }
+}
+
+/* At enlarged text widths, status follows the title instead of squeezing it. */
+.eventCard { container-type: inline-size; }
+@container (max-width: 14rem) {
+  .eventTitle { padding-right: 0; }
+  .eventStatus { position: static; max-width: 100%; justify-self: start; }
+}
+.matchdayBoard .liveBanner { min-height: 0; margin: 0.25rem 0 0.5rem; padding: 0.25rem 0; border: 0; background: transparent; justify-content: flex-start; }
+.matchdayBoard .liveBanner > div { display: none; }
+.matchdayBoard > .hint { display: none; }
+
+/* Live fidelity polish: retain task-first spacing and text truncation. */
+.eventCard {
+  background: radial-gradient(ellipse at 90% 5%, #26826770, transparent 65%),
+    repeating-linear-gradient(135deg, transparent 0 42px, #b6dcc612 43px 44px, transparent 45px 86px),
+    linear-gradient(110deg, #003b2f, #005b43);
+}
+.eventLines { opacity: 0.18; }
+.eventTitle { text-shadow: 0 1px 2px #002a2040; }
+.eventDate { display: flex; align-items: center; gap: 0.35rem; }
+.metadataIcon { flex: 0 0 auto; width: 0.95rem; height: 0.95rem; color: var(--club-yellow); }
+.eventMeta { display: flex; margin: 0.2rem 0 0; gap: 0.35rem 0.75rem; }
+.eventMeta span { display: inline-flex; align-items: center; gap: 0.3rem; }
+.eventMeta span:not(:last-child)::after { content: none; }
+.boardMatch .court {
+  background: linear-gradient(120deg, #00614a, #004333);
+  box-shadow: inset 0 1px 0 #ffffff20, 0 2px 4px #004b3610;
+  font-weight: 750;
+}
+.matchdayBoard .boardMatch { background: #fffefa; box-shadow: 0 5px 15px #003d2c0d; }
+.boardTeamColumn:first-child { text-align: left; }
+.playerAvatar { background: linear-gradient(135deg, #e5f3eb, #d3e8df); box-shadow: inset 0 1px 0 #ffffff80; }
+.boardMatchup .versus, .personalVersus dd {
+  position: relative;
+  background: linear-gradient(135deg, #ffdf37, var(--club-yellow));
+  box-shadow: 0 2px 5px #a98a0010;
+  border-radius: 0.5rem;
+  line-height: 1.25;
+}
+.boardMatchup .versus::before, .boardMatchup .versus::after,
+.personalVersus dd::before, .personalVersus dd::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  width: 1px;
+  height: 0.9rem;
+  background: #deded0;
+}
+.boardMatchup .versus::before, .personalVersus dd::before { bottom: calc(100% + 0.2rem); }
+.boardMatchup .versus::after, .personalVersus dd::after { top: calc(100% + 0.2rem); }
+.personalScheduleDetail {
+  background: radial-gradient(ellipse at right top, #17806390, transparent 65%),
+    repeating-linear-gradient(135deg, transparent 0 58px, #d5e8d512 59px 60px, transparent 61px 116px),
+    linear-gradient(110deg, #003b2f, #005b43);
+  box-shadow: 0 7px 20px #003d2c20, inset 0 1px 0 #ffffff18;
+}
+.personalScheduleDetail .focusTeams { background: #fffefa; box-shadow: 0 3px 10px #002b2015; }
+.personalVersus { justify-self: center; }
+.personalScheduleDetail .focusTeams > div:last-child dt { text-align: right; }
+@media (max-width: 42rem) {
+  .eventMeta { font-size: 0.75rem; gap: 0.3rem 0.6rem; }
+  .eventMeta span:last-child { display: inline-flex; }
+  .eventMeta .metadataIcon { width: 0.85rem; height: 0.85rem; }
+}
+@container (max-width: 12rem) {
+  .boardMatchup .versus::before, .boardMatchup .versus::after,
+  .personalVersus dd::before, .personalVersus dd::after { display: none; }
+  .personalScheduleDetail .focusTeams > div:last-child dt { text-align: left; }
+}
+
+/* Mobile doubles share row tracks so corresponding names and avatars align. */
+@media (max-width: 30rem) {
+  .matchdayBoard .boardMatch { padding-inline: 0.6rem; }
+  .boardMatchup, .boardMatchup:not(.boardLongTeams) {
+    grid-template-columns: minmax(0, 1fr) 2rem minmax(0, 1fr);
+    grid-template-rows: repeat(2, minmax(1.65rem, auto));
+    gap: 0.3rem;
+  }
+  .boardMatchup .boardTeamColumn { display: grid; grid-template-rows: subgrid; grid-row: 1 / span 2; align-self: stretch; }
+  .boardMatchup .boardTeamColumn:first-child { grid-column: 1; }
+  .boardMatchup .boardTeamColumn:last-child { grid-column: 3; }
+  .boardMatchup .avatarTeam { grid-template-rows: subgrid; grid-row: 1 / span 2; }
+  .boardMatchup .avatarTeam .teamNamePart { gap: 0.25rem; }
+  .boardMatchup .avatarTeam [data-player-name] > span { font-weight: 650; }
+  .boardMatchup .playerAvatar { width: 1.3rem; height: 1.3rem; font-size: 0.6rem; }
+  .boardMatchup .versus { grid-column: 2; grid-row: 1 / span 2; width: 2rem; padding-inline: 0; text-align: center; align-self: center; }
+}
+@container (max-width: 12rem) {
+  .boardMatchup .boardTeamColumn, .boardMatchup .avatarTeam { display: block; grid-row: auto; }
+  .boardMatchup .boardTeamColumn:first-child, .boardMatchup .boardTeamColumn:last-child, .boardMatchup .versus { grid-column: 1; grid-row: auto; }
+}
+
+/* Display titles stay distinct from readable functional metadata. */
+.eventTitle { font-weight: 700; font-synthesis: none; letter-spacing: 0.025em; line-height: 1.1; }
+.eventDate, .eventMeta, .eventStatus { font-family: var(--font-interface); }
+.eventDate { font-size: 0.85rem; font-weight: 550; gap: 0.45rem; }
+.eventMeta { font-size: 0.85rem; font-weight: 500; gap: 0.3rem 0.8rem; }
+.eventMeta span { gap: 0.4rem; }
+.eventStatus > span { font-family: var(--font-interface); font-weight: 650; }
+@media (max-width: 42rem) {
+  .eventCard { padding-block: 0.6rem; }
+  .eventTitle { font-size: 1.5rem; margin-bottom: 0.25rem; }
+  .eventMeta { font-size: 0.8rem; gap: 0.3rem 0.6rem; }
+  .eventMeta span { gap: 0.35rem; }
+}
+
+.personalScheduleDetail .personalFocusTime { margin-bottom: 0.25rem; }
+.personalScheduleDetail .focusTeams { margin-top: 0.35rem; }
+
+/* Personal teams share two row tracks; labels remain available to assistive technology. */
+.personalScheduleDetail .focusTeams { grid-template-rows: repeat(2, minmax(1.5rem, auto)); }
+.personalScheduleDetail .focusTeams > div:not(.personalVersus) { display: grid; grid-template-rows: subgrid; grid-row: 1 / span 2; align-self: stretch; }
+.personalScheduleDetail .focusTeams > div:first-child { grid-column: 1; }
+.personalScheduleDetail .focusTeams > div:last-child { grid-column: 3; }
+.personalScheduleDetail .focusTeams > div:not(.personalVersus) dd { display: grid; grid-template-rows: subgrid; grid-row: 1 / span 2; margin: 0; }
+.personalScheduleDetail .focusTeams .avatarTeam { grid-template-rows: subgrid; grid-row: 1 / span 2; }
+.personalVersus { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
+@container (max-width: 12rem) {
+  .personalScheduleDetail .focusTeams { grid-template-rows: auto; }
+  .personalScheduleDetail .focusTeams > div:not(.personalVersus), .personalScheduleDetail .focusTeams > div:not(.personalVersus) dd,
+  .personalScheduleDetail .focusTeams .avatarTeam { display: block; grid-row: auto; }
+  .personalScheduleDetail .focusTeams > div:first-child, .personalScheduleDetail .focusTeams > div:last-child, .personalVersus { grid-column: 1; grid-row: auto; }
+}

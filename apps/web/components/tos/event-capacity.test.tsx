@@ -18,3 +18,14 @@ it("keeps exact occupancy and free places for a non-full event", () => {
   expect(screen.queryByText("Vol")).not.toBeInTheDocument();
   expect(screen.queryByText(/op wachtlijst/)).not.toBeInTheDocument();
 });
+
+it.each([false, true])("keeps compact home capacity truthful when full=%s", (full) => {
+  render(<EventCapacityPanel sport="padel" compact hideFreePlaces capacity={{ maxParticipants: 24, placedCount: full ? 24 : 4, availableCount: full ? 0 : 20, waitlistCount: full ? 3 : 0 }} />);
+  expect(screen.getByText(full ? "24 / 24" : "4 / 24")).toBeVisible();
+  expect(screen.getByText("Plekken bezet")).toBeVisible();
+  expect(screen.queryByText(/plekken vrij/)).not.toBeInTheDocument();
+  if (full) {
+    expect(screen.getByText("Vol")).toBeVisible();
+    expect(screen.getByText("3 op wachtlijst")).toBeVisible();
+  }
+});

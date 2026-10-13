@@ -104,17 +104,19 @@ export function TosEventCard({
             </Badge>
           ) : null}
         </div>
-        <h3 className={styles.eventTitle}>{eventDisplayTitle(event)}</h3>
+        <h3 className={styles.eventTitle} title={eventDisplayTitle(event)}>{eventDisplayTitle(event)}</h3>
         <p className={styles.metadata}>
-          {formatEventDate(event.startsAt)} · {formatEventClock(event.startsAt)}–{formatEventClock(event.endsAt)}
+          <span className={homeView ? styles.homeCardDate : undefined}>{formatEventDate(event.startsAt)} · </span>{formatEventClock(event.startsAt)}–{formatEventClock(event.endsAt)}
         </p>
         {availability && !compact ? <p className={styles.personalStatus}>Je doet mee · {availability}</p> : null}
         {event.signupDeadline ? (
           <p className={styles.deadline}>
-            Inschrijven t/m {formatEventDate(event.signupDeadline)} · {formatEventClock(event.signupDeadline)}
+            {homeView ? <time dateTime={event.signupDeadline} title={`${formatEventDate(event.signupDeadline)} · ${formatEventClock(event.signupDeadline)}`}>
+              Inschrijven tot {new Intl.DateTimeFormat("nl-NL", { timeZone: "Europe/Amsterdam", day: "numeric", month: "short", year: "numeric" }).format(new Date(event.signupDeadline))} · {formatEventClock(event.signupDeadline)}
+            </time> : <>Inschrijven t/m {formatEventDate(event.signupDeadline)} · {formatEventClock(event.signupDeadline)}</>}
           </p>
         ) : null}
-        <EventCapacityPanel capacity={capacity} sport={event.sport} compact={compact} />
+        <EventCapacityPanel capacity={capacity} sport={event.sport} compact={compact} hideFreePlaces={homeView && compact} />
         <div className={styles.participantColumn}>
           {!socialDataUnavailable ? (
             <>
@@ -132,10 +134,10 @@ export function TosEventCard({
                           ))}
                         </span>
                       ) : null}
-                      <span className={styles.attendeePreview}>
+                      <span className={styles.attendeePreview} title={placedNames.join(", ")}>
                         {placedNames.length ? compactNamesPreview(placedNames) : "Nog geen deelnemers"}
                       </span>
-                      <strong className={styles.compactPeopleAction}>Bekijk <span aria-hidden="true">›</span></strong>
+                      <strong className={styles.compactPeopleAction}>Bekijk deelnemers <span aria-hidden="true">→</span></strong>
                     </span>
                   )}
                 />
@@ -163,22 +165,18 @@ export function TosEventCard({
             ) : registration && !canChange ? (
               <>
                 <SecondaryLinkButton href={`/tos/${event.slug}`}>
-                  Aanmelding bekijken
+                  {registration?.response === "declined" ? "Bekijk TOS" : registrationPosition?.placementStatus === "waitlist" ? "Mijn wachtlijstpositie" : "Mijn aanmelding"}
                 </SecondaryLinkButton>
                 <p className={styles.muted}>Deze aanmelding kan niet meer worden gewijzigd.</p>
               </>
             ) : canChange ? (
               <LinkButton href={`/tos/${event.slug}`}>
                 {registration
-                  ? "Aanmelding wijzigen"
-                  : capacity.availableCount === 0
-                    ? "Op wachtlijst"
-                    : "Aanmelden"}
+                  ? registration.response === "declined" ? "Opnieuw aanmelden" : registrationPosition?.placementStatus === "waitlist" ? "Mijn wachtlijstpositie" : "Mijn aanmelding"
+                  : "Aanmelden"}
               </LinkButton>
             ) : (
-              <button className={styles.disabledAction} type="button" disabled>
-                Inschrijving gesloten
-              </button>
+              <SecondaryLinkButton href={`/tos/${event.slug}`}>Bekijk TOS</SecondaryLinkButton>
             )}
           </div>
         </div>

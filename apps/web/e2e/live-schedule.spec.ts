@@ -68,6 +68,7 @@ test("iedereenweergave toont event, rondes, banen, teams en statussen", async ({
   const current = page.getByRole("region", { name: "Huidige ronde" });
   const next = page.getByRole("region", { name: "Volgende ronde" });
   await expect(current).toBeVisible();
+  await page.getByRole("button", { name: "Alle rondes", exact: true }).click();
   await expect(next).toBeVisible();
   await expect(current.getByText(LONG_COURT_NAME, { exact: true })).toBeVisible();
   await expect(current.getByText("Kremer Baan", { exact: true })).toBeVisible();
@@ -169,6 +170,9 @@ test("databaseachtige XSS-tekst blijft tekst en voert niets uit", async ({ page 
     await dialog.dismiss();
   });
   await openLive(page);
+  await expect(page.locator('[class*="footerChip"]').filter({ hasText: XSS_NAME }).first()).toBeVisible();
+  const sizes = await page.evaluate(() => ({ width: document.documentElement.clientWidth, content: document.documentElement.scrollWidth }));
+  expect(sizes.content).toBeLessThanOrEqual(sizes.width + 1);
   const participants = page.getByText(/^Deelnemers \(12\)$/);
   await participants.click();
   await expect(participants.locator("..").getByText(XSS_NAME, { exact: true })).toBeVisible();

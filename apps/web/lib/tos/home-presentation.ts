@@ -59,8 +59,8 @@ export function homePresentation(
         title: "Je volgende TOS staat klaar.",
         lead: `Je bent geplaatst voor ${eventDisplayTitle(event)} op ${formatEventDate(event.startsAt)}.`,
         cue: eventCue(event),
-        action: eventAction(event, "Bekijk je aanmelding"),
-        cardAction: eventAction(event, "Aanmelding wijzigen"),
+        action: eventAction(event, "Mijn aanmelding"),
+        cardAction: eventAction(event, "Mijn aanmelding"),
       });
     }
     if (options.hasPublishedSchedule) {
@@ -73,7 +73,7 @@ export function homePresentation(
         cardAction: action,
       });
     }
-    const action = eventAction(event, "Bekijk TOS", "Schema volgt");
+    const action = eventAction(event, "Mijn aanmelding", "Schema volgt");
     return Object.freeze({
       title: "Je plaats staat vast.",
       lead: `De inschrijving voor ${eventDisplayTitle(event)} is gesloten. Het schema volgt.`,
@@ -83,7 +83,7 @@ export function homePresentation(
     });
   }
   if (kind === "live-placed" && event) {
-    const action = eventAction(event, "Bekijk TOS", "Schema volgt");
+    const action = eventAction(event, "Mijn aanmelding", "Schema volgt");
     return Object.freeze({
       title: "Je TOS is begonnen.",
       lead: "Er is nog geen gepubliceerd wedstrijdschema beschikbaar.",
@@ -93,7 +93,7 @@ export function homePresentation(
     });
   }
   if (kind === "future-waitlist" && event) {
-    const action = eventAction(event, "Bekijk je status");
+    const action = eventAction(event, "Mijn wachtlijstpositie");
     return Object.freeze({
       title: "Je staat op de wachtlijst.",
       lead: `Bekijk je actuele wachtlijststatus voor ${eventDisplayTitle(event)}.`,
@@ -105,7 +105,7 @@ export function homePresentation(
   if (kind === "open" && event) {
     const cardAction = eventAction(
       event,
-      options.hasRegistration ? "Aanmelding wijzigen" : "Aanmelden",
+      options.hasRegistration ? "Mijn aanmelding" : "Aanmelden",
     );
     return Object.freeze({
       title: "ZIN IN EEN TOS?",

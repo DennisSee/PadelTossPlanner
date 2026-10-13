@@ -78,7 +78,7 @@ export default async function Home() {
           registrationPosition: position,
           homeView: true,
           actionOverride: placed ? eventAllowsSelfService(event, now)
-            ? { href: "/tos/" + event.slug, label: "Mijn aanmelding bekijken" }
+            ? { href: "/tos/" + event.slug, label: "Mijn aanmelding" }
             : personalPresentation?.cardAction : undefined,
           compact: true,
           now,
@@ -103,6 +103,11 @@ export default async function Home() {
     hasRegistration: Boolean(homeSnapshot?.registration),
   });
   const personalSnapshots = homeSnapshots.filter((snapshot) => snapshot.registration?.response === "attending" && snapshot.registrationPosition?.placementStatus === "placed");
+  const multiplePlacements = personalSnapshots.length > 1;
+  const heroTitle = multiplePlacements ? "Jouw TOS-momenten staan klaar"
+    : homeKind === "live-placed" ? presentation.title
+    : personalSnapshots.length === 1 ? "Je volgende TOS staat klaar" : "Zin in een TOS?";
+  const heroAccent = heroTitle.match(/\b(?:staat|staan) klaar\.?$/iu);
   const openSnapshots = homeSnapshots.filter((snapshot) =>
     !personalSnapshots.includes(snapshot) && eventAllowsSelfService(snapshot.event, now) && new Date(snapshot.event.endsAt) > now,
   );
@@ -122,11 +127,11 @@ export default async function Home() {
             <CourtLines className={styles.heroLines} />
             <div className={styles.introContent}>
               <p className={styles.eyebrow}>Samen spelen, iedere ronde anders</p>
-              <h1 className={styles.title}>{presentation.title}</h1>
-              {presentation.cue ? <p className={styles.heroCue}>{presentation.cue}</p> : null}
-              <p className={styles.lead}>{presentation.lead}</p>
-              <LinkButton href={personalSnapshots.length > 1 && homeKind !== "live-placed" ? "#home-enrollments" : presentation.action.href}>
-                {personalSnapshots.length > 1 && homeKind !== "live-placed" ? "Bekijk je inschrijvingen" : presentation.action.label}
+              <h1 className={styles.title}>{heroAccent ? <>{heroTitle.slice(0, heroAccent.index)}<span className={styles.titleAccent}>{heroAccent[0]}</span></> : heroTitle}</h1>
+              {!multiplePlacements && presentation.cue ? <p className={styles.heroCue}>{presentation.cue}</p> : null}
+              <p className={styles.lead}>{multiplePlacements ? "Je bent geplaatst voor deze TOS-momenten." : presentation.lead}</p>
+              <LinkButton href={multiplePlacements ? "#home-enrollments" : presentation.action.href}>
+                {multiplePlacements ? "Bekijk je inschrijvingen" : presentation.action.label}
               </LinkButton>
             </div>
           </Card>

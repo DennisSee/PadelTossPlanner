@@ -172,21 +172,28 @@ test("aanmelden, minutenavailability, afmelden en opnieuw aanmelden behouden exa
   await expect(page.getByRole("heading", { name: "Padel TOS vrijdagavond", level: 3 }).first()).toBeVisible();
   await expect(page.getByText(`Je doet mee · ${customMinute}–${originalUntil}`)).toBeVisible();
 
-  await page.getByRole("link", { name: "Aanmelding wijzigen" }).first().click();
+  await page.getByRole("link", { name: "Mijn aanmelding" }).first().click();
   await expect(page.getByLabel("Vanaf")).toHaveValue(customMinute);
   await expect(page.getByLabel("Tot")).toHaveValue(originalUntil);
+  await page.getByLabel("Vanaf").fill(originalFrom);
+  await page.getByRole("button", { name: "Wijzigingen opslaan" }).click();
+  await expect(page).toHaveURL(/\/tos\?notice=registration-updated$/u);
+  await page.getByRole("link", { name: "Mijn aanmelding" }).first().click();
+  await expect(page.getByLabel("Vanaf")).toHaveValue(originalFrom);
+  await expect(page.getByLabel("Tot")).toHaveValue(originalUntil);
+  await page.screenshot({ path: test.info().outputPath("registration-save-390.png"), fullPage: true });
 
   await page.getByLabel("Ik doe niet mee").click();
-  await page.getByRole("button", { name: "Aanmelding wijzigen" }).click();
+  await page.getByRole("button", { name: "Wijzigingen opslaan" }).click();
   await expect(page).toHaveURL(/\/tos\?notice=registration-declined$/u);
   await expect(page.getByText("Je hebt je afgemeld.")).toBeVisible();
   await expect(page.getByText("Afgemeld").first()).toBeVisible();
   await expect(page.getByRole("heading", { name: "Padel TOS vrijdagavond", level: 3 }).first()).toBeVisible();
 
-  await page.getByRole("link", { name: "Aanmelding wijzigen" }).first().click();
+  await page.getByRole("link", { name: "Opnieuw aanmelden" }).first().click();
   await expect(page.getByLabel("Ik doe niet mee")).toBeChecked();
   await page.getByLabel("Ik doe mee").click();
-  await page.getByRole("button", { name: "Aanmelding wijzigen" }).click();
+  await page.getByRole("button", { name: "Wijzigingen opslaan" }).click();
   await expect(page).toHaveURL(/\/tos\?notice=registration-updated$/u);
   await expect(page.getByText("Je aanmelding is gewijzigd.")).toBeVisible();
   await expect(page.getByText(`Je doet mee · ${originalFrom}–${originalUntil}`)).toBeVisible();

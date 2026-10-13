@@ -48,7 +48,7 @@ describe("WEB-2 routes", () => {
   it("links the public homepage to live schedule and the shared login", async () => {
     render(await Home());
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
-      "ZIN IN EEN TOS?",
+      "Zin in een TOS?",
     );
     expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
       "Doe mee met de volgende TOS",
@@ -132,16 +132,16 @@ describe("WEB-2 routes", () => {
 
     render(await Home());
     expect(screen.getByRole("heading", { level: 2, name: "Jouw inschrijving" })).toBeVisible();
-    expect(screen.getByRole("heading", { level: 1, name: "Je volgende TOS staat klaar." })).toBeVisible();
+    expect(screen.getByRole("heading", { level: 1, name: "Je volgende TOS staat klaar" })).toBeVisible();
     expect(screen.queryByRole("heading", { level: 1, name: /live/u })).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Bekijk je aanmelding" })).toHaveAttribute("href", "/tos/vrijdag-padel");
+    expect(screen.getAllByRole("link", { name: "Mijn aanmelding" })[0]).toHaveAttribute("href", "/tos/vrijdag-padel");
     expect(screen.getByRole("heading", { level: 3, name: "Clubkampioenen TOS" })).toBeVisible();
     expect(screen.queryByRole("heading", { name: "Padel TOS-avond" })).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Mijn aanmelding bekijken" })).toHaveAttribute("href", "/tos/vrijdag-padel");
+    expect(screen.getAllByRole("link", { name: "Mijn aanmelding" })[1]).toHaveAttribute("href", "/tos/vrijdag-padel");
   });
 
   it.each([
-    [false, "Bekijk TOS", "/tos/vrijdag-padel"],
+    [false, "Mijn aanmelding", "/tos/vrijdag-padel"],
     [true, "Bekijk je schema", "/live/vrijdag-padel"],
   ] as const)("maps a closed placed registration truthfully when schedule published=%s", async (published, label, href) => {
     const event = {
@@ -176,7 +176,7 @@ describe("WEB-2 routes", () => {
     expect(screen.getAllByRole("heading", { level: 3, name: event.title })).toHaveLength(1);
     expect(screen.getAllByRole("link", { name: label })).not.toHaveLength(0);
     expect(screen.getAllByRole("link", { name: label })[0]).toHaveAttribute("href", href);
-    expect(screen.queryByRole("link", { name: "Aanmelding wijzigen" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Opnieuw aanmelden" })).not.toBeInTheDocument();
   });
 
   it.each([false, true])("groups personal and open cards chronologically with multiple placements=%s", async (multiple) => {
@@ -215,12 +215,15 @@ describe("WEB-2 routes", () => {
     expect(within(open).getAllByRole("heading", { level: 3 }).map((node) => node.textContent))
       .toEqual((multiple ? [events[1], events[2]] : events.slice(0, 3)).map((event) => event.title));
     expect(screen.getAllByRole("heading", { level: 3 })).toHaveLength(4);
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(multiple ? "Jouw TOS-momenten staan klaar" : "Je volgende TOS staat klaar");
+    if (multiple) expect(document.querySelector('[class*="heroCue"]')).toBeNull();
     if (!multiple) expect(screen.getByText("Wachtlijst · plek 2")).toBeVisible();
     else expect(screen.getByRole("link", { name: "Bekijk je inschrijvingen" })).toHaveAttribute("href", "#home-enrollments");
     expect(screen.getByText("Afgemeld")).toBeVisible();
     expect(screen.getAllByText("✓ Je bent geplaatst")).toHaveLength(multiple ? 2 : 1);
-    expect(screen.getByRole("link", { name: "Op wachtlijst" })).toHaveAttribute("href", "/tos/tos-2");
-    expect(screen.getAllByRole("link", { name: "Aanmelding wijzigen" })).toHaveLength(multiple ? 1 : 2);
+    expect(screen.getByRole("link", { name: "Aanmelden" })).toHaveAttribute("href", "/tos/tos-2");
+    expect(screen.getAllByRole("link", { name: "Opnieuw aanmelden" })).toHaveLength(1);
+    if (!multiple) expect(screen.getByRole("link", { name: "Mijn wachtlijstpositie" })).toHaveAttribute("href", "/tos/tos-0");
     expect(eventCapacity).toHaveBeenCalledTimes(4);
     expect(eventAttendance).toHaveBeenCalledTimes(4);
   });

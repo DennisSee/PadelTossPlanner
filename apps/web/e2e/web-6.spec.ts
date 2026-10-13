@@ -60,7 +60,7 @@ test("participant filters, capaciteit en veilige deelnemerssheet werken samen", 
   await expect(page.getByRole("heading", { name: "Tennis TOS voor alle clubleden", level: 3 })).toBeVisible();
   await expect(page.getByLabel("2 van 2 plaatsen bezet")).toBeVisible();
   await expect(page.getByText("1 op wachtlijst").first()).toBeVisible();
-  await expect(page.getByRole("link", { name: "Op wachtlijst" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Aanmelden" })).toBeVisible();
 
   await page.getByRole("button", { name: "Bekijk deelnemers" }).click();
   const dialog = page.getByRole("dialog", { name: "Tennis TOS voor alle clubleden" });

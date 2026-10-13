@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import styles from "./live-schedule.module.css";
+import { TeamNames } from "./team-names";
 
 export type PersonalScheduleRound = {
   id: string;
@@ -38,22 +39,29 @@ export function PersonalSchedule({ rounds, currentId, nextId, active, playerName
   const select = (id: string) => setChosen(id);
   const compact = (round: PersonalScheduleRound) => <>
     <span><strong>Ronde {round.number}</strong><span className={styles.compactRoundTime}>{round.time}</span></span>
-    <strong className={styles.compactRoundCourt}>{round.status === "playing" ? round.court : statusCopy[round.status]}</strong>
-    <span className={styles.compactRoundPartner} data-personal-status={round.status !== "playing" ? round.status : undefined}>{round.status === "playing" ? `Samen met ${round.partner}` : <><span>{statusCopy[round.status]}</span><span>{explanation[round.status]}</span></>}</span>
+    <strong className={styles.compactRoundCourt} title={round.status === "playing" ? round.court : statusCopy[round.status]}>{round.status === "playing" ? round.court : statusCopy[round.status]}</strong>
+    {round.status !== "rest" ? <span className={styles.compactRoundPartner} title={round.status === "playing" ? `Samen met ${round.partner}` : undefined} data-personal-status={round.status !== "playing" ? round.status : undefined}>{round.status === "playing" ? `Samen met ${round.partner}` : explanation[round.status]}</span> : null}
   </>;
   return <>
+    <nav className={styles.roundNavigation} aria-label="Persoonlijke ronde kiezen">
+      {rounds.map((round) => <button type="button" key={round.id} aria-pressed={round.id === selected.id} onClick={() => select(round.id)} aria-label={`Selecteer ronde ${round.number}`}>
+        Ronde {round.number}
+      </button>)}
+    </nav>
     <section aria-label={current ? "Huidige ronde" : "Geselecteerde ronde"} data-personal-detail>
       <article className={`${styles.personalFocus} ${styles.personalScheduleDetail} ${current ? styles.personalFocusCurrent : ""}`} aria-label={`${label}: ${selected.status === "playing" ? selected.court : statusCopy[selected.status]}`}>
         <div className={styles.focusHeading}>
           <span className={styles.personalFocusLabel}>{current ? selected.status === "playing" ? "Nu spelen" : selected.status === "rest" ? "Nu rust" : "Nu" : label}</span>
           <h3 className={styles.focusRound}>Ronde {selected.number}</h3>
         </div>
-        {selected.status === "playing" ? <div className={styles.focusCourt} data-testid="court-badge"><span>BAAN</span><h2>{selected.court}</h2></div> : <h2>{statusCopy[selected.status]}</h2>}
+        {selected.status === "playing" ? <div className={styles.focusCourt} data-testid="court-badge"><span>BAAN</span><h2 title={selected.court}>{selected.court}</h2></div> : current && selected.status === "rest" ? null : <h2>{statusCopy[selected.status]}</h2>}
         <p className={styles.personalFocusTime}>{selected.time}</p>
-        <p className={styles.manualSelected} data-selected-player={selected.status === "playing" ? "true" : undefined} data-player-name={playerName}>{playerName}</p>
-        {selected.status === "playing" ? <><p className={styles.roundStatus}>Spelen</p><dl className={styles.focusTeams}>
-          <div><dt>Samen met</dt><dd>{selected.partner}</dd></div><div><dt>Tegen</dt><dd>{selected.opponents}</dd></div>
-        </dl></> : <div data-personal-status={selected.status}><span className={styles.personalStatus}>{statusCopy[selected.status]}</span><span>{explanation[selected.status]}</span></div>}
+        <p className="sr-only" data-selected-player={selected.status === "playing" ? "true" : undefined} data-player-name={playerName}>{playerName}</p>
+        {selected.status === "playing" ? <>{!current ? <p className={styles.roundStatus}>Spelen</p> : null}<dl className={styles.focusTeams}>
+          <div><dt className="sr-only">Samen met</dt><dd><TeamNames team={[playerName, selected.partner].filter(Boolean).join(" & ")} stacked avatars emphasizeFirst /></dd></div>
+          <div className={styles.personalVersus}><dt className="sr-only">Versus</dt><dd aria-hidden="true">VS</dd></div>
+          <div><dt className="sr-only">Tegen</dt><dd><TeamNames team={selected.opponents} stacked avatars /></dd></div>
+        </dl></> : <div data-personal-status={selected.status}>{explanation[selected.status]}</div>}
         {active && chosen && selected.id !== currentId && currentId ? <button className={styles.refreshButton} onClick={() => setChosen(null)}>Terug naar huidige ronde</button> : null}
       </article>
     </section>
